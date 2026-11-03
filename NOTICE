@@ -1,0 +1,22 @@
+Exact RPN for Android
+
+This project uses arithmetic code from the Android Open Source Project:
+UnifiedReal.java, BoundedRational.java, and StringUtils.java.
+Copyright notices and the Apache License 2.0 terms are retained in those files
+and licenses/APACHE-2.0.txt.
+
+Upstream project:
+https://android.googlesource.com/platform/packages/apps/ExactCalculator/
+Source mirror used:
+https://github.com/LineageOS/android_packages_apps_ExactCalculator/tree/lineage-18.1
+
+The constructive-real arithmetic library (com.hp.creals) is by Hans-J. Boehm,
+with Silicon Graphics and Hewlett-Packard copyright and permissive license
+notices retained in its source files and licenses/CR-COPYRIGHT.txt.
+Upstream project:
+https://android.googlesource.com/platform/external/crcalc/
+Source mirror used:
+https://github.com/lineage-next/crcalc
+
+New code in this project is licensed under Apache License 2.0; see LICENSE.
+Upstream components retain their respective licenses.

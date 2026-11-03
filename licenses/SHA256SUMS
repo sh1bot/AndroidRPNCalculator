@@ -1,0 +1,6 @@
+b0f9ad7dca049fbb11d5c83c5b6b0ef5164d6fcbbed83f1581031a2e7041265f  engine/src/main/java/com/android/calculator2/BoundedRational.java
+555d6ec775a27642e76a878eec7913f338c5ce8c92eac039c4c01ae8a2690b73  engine/src/main/java/com/android/calculator2/StringUtils.java
+6e3e982409ad44f3555155db47633423fdea3e4ecafca05d69d8a3baaeb986d3  engine/src/main/java/com/android/calculator2/UnifiedReal.java
+6bd36ed02a35ec9b7b5b19e956557db510c28f138dc5a3f94f1e966bb164b4dd  engine/src/main/java/com/hp/creals/CR.java
+00db8250b399de89c18ef804be7b70117ba5bae96d168fb5770ff3f236b6d73e  engine/src/main/java/com/hp/creals/StringFloatRep.java
+80148e1d38cf14c388e26766684a800a8a5d72cd4b0a7fcd87e926da2a88d7c4  engine/src/main/java/com/hp/creals/UnaryCRFunction.java
