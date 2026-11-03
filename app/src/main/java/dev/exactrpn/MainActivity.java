@@ -34,6 +34,7 @@ public final class MainActivity extends Activity {
         volatile String error = "Radians · exact values";
         final Deque<String> pending = new ArrayDeque<>();
         volatile boolean busy, cancelRequested;
+        volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
         Session(ValueFormatter.Notation n) { notation = n; display = new Display(Collections.emptyList(), "", n); }
@@ -65,7 +66,8 @@ public final class MainActivity extends Activity {
         header.addView(help,new LinearLayout.LayoutParams(dp(40),-2));
         root.addView(header);
         LinearLayout statusRow = new LinearLayout(this); statusRow.setGravity(Gravity.CENTER_VERTICAL);
-        status = text(13); statusRow.addView(status,new LinearLayout.LayoutParams(0,-2,1));
+        status = text(13); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        statusRow.addView(status,new LinearLayout.LayoutParams(0,-2,1));
         cancelButton = new Button(this); cancelButton.setText("Cancel"); cancelButton.setTextSize(13);
         cancelButton.setOnClickListener(v -> cancelCalculation()); statusRow.addView(cancelButton);
         root.addView(statusRow);
@@ -106,7 +108,7 @@ public final class MainActivity extends Activity {
         synchronized (session) {
             session.pending.addLast(key);
             start = !session.busy;
-            if (start) { session.cancelRequested = false; session.busy = true; }
+            if (start) { session.cancelRequested = false; session.busySince = SystemClock.elapsedRealtime(); session.busy = true; }
         }
         refresh();
         if (start) session.worker.submit(this::drainKeys);
@@ -192,8 +194,12 @@ public final class MainActivity extends Activity {
             // scroll on polling ticks: the user must still be able to inspect older entries.
             scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
         }
-        status.setText(session.busy ? (session.cancelRequested ? "Cancelling…" : "Calculating… Back to cancel") : session.error);
-        cancelButton.setVisibility(session.busy ? View.VISIBLE : View.GONE);
+        // Reserve the button's space even when idle. Brief entry evaluations should not
+        // flash progress UI; Back/Escape can still cancel immediately.
+        boolean showProgress = session.busy && (session.cancelRequested
+            || SystemClock.elapsedRealtime() - session.busySince >= 250);
+        status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Calculating… Back to cancel") : session.error);
+        cancelButton.setVisibility(showProgress ? View.VISIBLE : View.INVISIBLE);
         notationButton.setEnabled(!session.busy);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
