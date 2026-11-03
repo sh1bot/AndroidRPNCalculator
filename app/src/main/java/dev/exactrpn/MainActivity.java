@@ -80,9 +80,11 @@ public final class MainActivity extends Activity {
         for (String[] row : rows) {
             LinearLayout line = new LinearLayout(this);
             for (String key : row) {
-                Button button = new Button(this); button.setText(key); button.setTextSize(15);
+                Button button = new Button(this); button.setAllCaps(false); button.setText(key);
+                button.setTextSize(key.equals("e") || key.equals("π") ? 23 : key.equals("1/x") || key.equals("eˣ") ? 18 : 15);
                 button.setMinHeight(0); button.setMinimumHeight(0); button.setPadding(0,0,0,0);
-                button.setContentDescription(key.equals("BACK") ? "Backspace" : key.equals("eˣ") ? "e to the power of X" : key);
+                button.setContentDescription(key.equals("BACK") ? "Backspace" : key.equals("eˣ") ? "e to the power of X"
+                    : key.equals("e") ? "Euler’s number" : key.equals("π") ? "Pi" : key.equals("1/x") ? "Reciprocal of X" : key);
                 button.setOnClickListener(v -> execute(key));
                 line.addView(button,new LinearLayout.LayoutParams(0,dp(44),1));
             }
