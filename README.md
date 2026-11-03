@@ -4,6 +4,19 @@ An initial native Android RPN calculator using the original AOSP `UnifiedReal`,
 `BoundedRational`, and Hans Boehm constructive-real arithmetic code. No floating
 point conversion occurs in input parsing, stack arithmetic, or display formatting.
 
+## Automatic builds
+
+[![Android build](https://github.com/sh1bot/AndroidRPNCalculator/actions/workflows/android.yml/badge.svg)](https://github.com/sh1bot/AndroidRPNCalculator/actions/workflows/android.yml)
+
+GitHub Actions runs the engine regression checks and builds a debug APK on every
+push and pull request. You can also start it manually from **Actions → Android
+build → Run workflow**. Open a successful run and download **ExactRPN-debug-…**
+under **Artifacts**, unzip it, and install `app-debug.apk` on your Android device.
+Artifacts are retained for 30 days. These are debug builds, not signed release
+builds for the Play Store. Each runner generates its own debug signing key, so
+installing a later build may require uninstalling the previous one (clearing its
+data).
+
 ## Build
 
 Open this directory in Android Studio with JDK 17 (or 21), Android SDK 35, and
