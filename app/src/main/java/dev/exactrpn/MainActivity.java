@@ -4,79 +4,212 @@ package dev.exactrpn;
 import android.app.*;
 import android.os.*;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.view.*;
 import android.widget.*;
+import java.util.*;
 import java.util.concurrent.*;
 import com.android.calculator2.UnifiedReal;
 
-/** Evaluation is serialized off the main thread; rotations retain the exact objects. */
+/** Exact values and evaluation survive rotation; views consume immutable display snapshots. */
 public final class MainActivity extends Activity {
     private Session session;
-    private TextView stackView, entryView, status;
-    private LinearLayout keys;
+    private TextView entryView, status;
+    private Button notationButton, cancelButton;
+    private android.window.OnBackInvokedCallback backCallback;
+    private LinearLayout stackRows;
+    private ScrollView scroll;
+    private Display rendered;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    static final class Display {
+        final List<String> rows;
+        final String entry;
+        final ValueFormatter.Notation notation;
+        Display(List<String> r, String e, ValueFormatter.Notation n) { rows = r; entry = e; notation = n; }
+    }
     static final class Session {
-        final RpnCalculator calculator = new RpnCalculator();
+        RpnCalculator calculator = new RpnCalculator();
         final ExecutorService worker = Executors.newSingleThreadExecutor();
-        volatile String stack = "Stack is empty", entry = "", error = "Radians · exact values";
-        volatile boolean busy;
-        volatile Future<?> task;
+        volatile Display display;
+        volatile String error = "Radians · exact values";
+        final Deque<String> pending = new ArrayDeque<>();
+        volatile boolean busy, cancelRequested;
+        volatile Thread calculatingThread;
+        ValueFormatter.Notation notation;
+        Session(ValueFormatter.Notation n) { notation = n; display = new Display(Collections.emptyList(), "", n); }
     }
     @Override public Object onRetainNonConfigurationInstance() { return session; }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         session = (Session)getLastNonConfigurationInstance();
-        if (session == null) session = new Session();
+        if (session == null) session = new Session(getPreferences(0).getBoolean("engineering", false)
+            ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC);
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
-        root.setPadding(16,16,16,12); root.setBackgroundColor(Color.rgb(16,23,31));
+        root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
         root.setOnApplyWindowInsetsListener((v,insets) -> {
-            android.graphics.Insets bars = android.os.Build.VERSION.SDK_INT >= 30
-                ? insets.getInsets(WindowInsets.Type.systemBars()) : null;
-            if (bars != null) root.setPadding(16+bars.left,16+bars.top,16+bars.right,12+bars.bottom);
-            else root.setPadding(16,16+insets.getSystemWindowInsetTop(),16,12+insets.getSystemWindowInsetBottom());
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
+                root.setPadding(dp(16)+bars.left,dp(16)+bars.top,dp(16)+bars.right,dp(12)+bars.bottom);
+            } else root.setPadding(dp(16),dp(16)+insets.getSystemWindowInsetTop(),dp(16),dp(12)+insets.getSystemWindowInsetBottom());
             return insets;
         });
-        TextView title = text(24); title.setText("EXACT / RPN"); root.addView(title);
-        status = text(13); root.addView(status);
-        ScrollView scroll = new ScrollView(this); stackView = text(21); stackView.setTextIsSelectable(true);
-        stackView.setGravity(Gravity.END); scroll.addView(stackView);
+        LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
+        TextView title = text(24); title.setText("EXACT / RPN"); header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        notationButton = new Button(this); notationButton.setTextSize(13);
+        notationButton.setOnClickListener(v -> execute("FORMAT")); header.addView(notationButton);
+        Button help = new Button(this); help.setText("?"); help.setContentDescription("Keyboard shortcuts");
+        help.setMinWidth(0); help.setMinimumWidth(0);
+        help.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Keyboard shortcuts")
+            .setMessage("0–9 and .: number entry\n+ − * /: arithmetic\nEnter or Space: enter / duplicate X\nBackspace: edit entry\nDelete: drop X\nEscape: cancel calculation / clear entry\nCtrl+Z: undo\nCtrl+D: duplicate X\nCtrl+S: swap X and Y\nCtrl+L: clear stack\nF9: change sign\n^: Y to the power X\nr: square root · i: reciprocal\ns/c/t: sin/cos/tan\nl: natural logarithm\np: π · e: Euler’s number · E: eˣ\n\nTrig functions use radians. Click/tap calculator buttons if your emulator does not forward a key.")
+            .setPositiveButton("OK",null).show());
+        header.addView(help,new LinearLayout.LayoutParams(dp(40),-2));
+        root.addView(header);
+        LinearLayout statusRow = new LinearLayout(this); statusRow.setGravity(Gravity.CENTER_VERTICAL);
+        status = text(13); statusRow.addView(status,new LinearLayout.LayoutParams(0,-2,1));
+        cancelButton = new Button(this); cancelButton.setText("Cancel"); cancelButton.setTextSize(13);
+        cancelButton.setOnClickListener(v -> cancelCalculation()); statusRow.addView(cancelButton);
+        root.addView(statusRow);
+        scroll = new ScrollView(this); scroll.setFillViewport(true);
+        stackRows = new LinearLayout(this); stackRows.setOrientation(1); stackRows.setGravity(Gravity.BOTTOM);
+        scroll.addView(stackRows,new ScrollView.LayoutParams(-1,-2));
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        entryView = text(28); entryView.setGravity(Gravity.END); root.addView(entryView);
-        keys = new LinearLayout(this); keys.setOrientation(1);
-        String[][] rows = {{"UNDO","SWAP","DROP","CLEAR"},{"sin","cos","tan","π"},{"√","ln","exp","e"},{"7","8","9","÷"},{"4","5","6","×"},{"1","2","3","−"},{"0",".","±","+"},{"BACK","1/x","xʸ","ENTER"}};
+        entryView = text(32); entryView.setGravity(Gravity.END); digits(entryView); entryView.setTextIsSelectable(true);
+        root.addView(entryView);
+        LinearLayout keys = new LinearLayout(this); keys.setOrientation(1);
+        String[][] rows = {{"UNDO","SWAP","DROP","CLEAR"},{"sin","cos","tan","π"},{"√","ln","eˣ","e"},{"7","8","9","÷"},{"4","5","6","×"},{"1","2","3","−"},{"0",".","±","+"},{"BACK","1/x","xʸ","ENTER"}};
         for (String[] row : rows) {
             LinearLayout line = new LinearLayout(this);
             for (String key : row) {
                 Button button = new Button(this); button.setText(key); button.setTextSize(15);
                 button.setMinHeight(0); button.setMinimumHeight(0); button.setPadding(0,0,0,0);
-                button.setContentDescription(key.equals("BACK") ? "Backspace" : key);
+                button.setContentDescription(key.equals("BACK") ? "Backspace" : key.equals("eˣ") ? "e to the power of X" : key);
                 button.setOnClickListener(v -> execute(key));
-                line.addView(button,new LinearLayout.LayoutParams(0,(int)(44 * getResources().getDisplayMetrics().density),1));
+                line.addView(button,new LinearLayout.LayoutParams(0,dp(44),1));
             }
             keys.addView(line);
         }
-        root.addView(keys); setContentView(root); refresh();
+        root.addView(keys); setContentView(root);
+        if (Build.VERSION.SDK_INT >= 33) {
+            backCallback = this::handleBack;
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
+        }
+        refresh();
     }
-    private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(Color.rgb(228,237,242)); t.setPadding(4,8,4,8); return t; }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
+    private void digits(TextView t) { t.setTypeface(Typeface.MONOSPACE); t.setFontFeatureSettings("tnum"); }
+    private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(Color.rgb(228,237,242)); t.setPadding(dp(4),dp(6),dp(4),dp(6)); return t; }
     private void execute(String key) {
-        if (session.busy) return;
-        session.busy = true; refresh();
-        session.task = session.worker.submit(() -> {
-            try {
-                session.calculator.key(key);
-                StringBuilder s = new StringBuilder();
-                java.util.List<UnifiedReal> values = session.calculator.values();
-                for (int i=0;i<values.size();i++) s.append(values.size()-i).append("   ").append(RpnCalculator.format(values.get(i))).append('\n');
-                session.stack = s.length()==0 ? "Stack is empty" : s.toString();
-                session.entry = session.calculator.entry(); session.error = "Radians · exact values";
-            } catch (RuntimeException ex) { session.error = ex instanceof com.hp.creals.CR.AbortedException ? "Calculation cancelled" : "Error: " + (ex.getMessage()==null ? "Undefined result" : ex.getMessage()); }
-            finally { session.busy = false; }
-        });
+        boolean start;
+        synchronized (session) {
+            session.pending.addLast(key);
+            start = !session.busy;
+            if (start) { session.cancelRequested = false; session.busy = true; }
+        }
+        refresh();
+        if (start) session.worker.submit(this::drainKeys);
     }
-    private final Runnable tick = new Runnable() { public void run() { refresh(); handler.postDelayed(this,150); } };
-    private void refresh() { stackView.setText(session.stack); entryView.setText(session.entry.isEmpty()?"▸":session.entry); status.setText(session.busy?"Calculating… Back to cancel":session.error); }
+    private void drainKeys() {
+        while (true) {
+            String key;
+            synchronized (session) {
+                if (session.cancelRequested) session.pending.clear();
+                if (session.pending.isEmpty()) {
+                    session.calculatingThread = null; session.busy = false;
+                    Thread.interrupted();
+                    return;
+                }
+                key = session.pending.removeFirst();
+                session.calculatingThread = Thread.currentThread();
+            }
+            try {
+                checkCancelled();
+                // Private candidate includes undo; cancellation during formatting rolls back too.
+                RpnCalculator candidate = session.calculator.copy();
+                ValueFormatter.Notation notation = session.notation;
+                if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
+                    ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
+                else candidate.key(key);
+                List<UnifiedReal> values = candidate.values();
+                List<String> rows = new ArrayList<>();
+                for (int i=0;i<values.size();i++) {
+                    checkCancelled();
+                    rows.add(ValueFormatter.format(values.get(i),i==values.size()-1,notation));
+                }
+                synchronized (session) {
+                    checkCancelled();
+                    session.calculator = candidate; session.notation = notation;
+                    session.display = new Display(Collections.unmodifiableList(rows),candidate.entry(),notation);
+                    session.error = "Radians · exact values";
+                }
+            } catch (RuntimeException ex) {
+                session.error = session.cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
+                    ? "Calculation cancelled" : "Error: " + (ex.getMessage()==null ? "Undefined result" : ex.getMessage());
+                synchronized (session) { session.pending.clear(); }
+            } finally { Thread.interrupted(); }
+        }
+    }
+    private void checkCancelled() {
+        if (session.cancelRequested || Thread.currentThread().isInterrupted()) throw new com.hp.creals.CR.AbortedException();
+    }
+    private void cancelCalculation() {
+        synchronized (session) {
+            if (!session.busy) return;
+            session.cancelRequested = true;
+            if (session.calculatingThread != null) session.calculatingThread.interrupt();
+        }
+        refresh();
+    }
+    private void handleBack() { if (session.busy) cancelCalculation(); else finish(); }
+    private final Runnable tick = new Runnable() { public void run() { refresh(); handler.postDelayed(this,100); } };
+    private void refresh() {
+        Display display = session.display;
+        if (rendered != display) {
+            boolean stackChanged = rendered == null || !rendered.rows.equals(display.rows);
+            if (stackChanged) {
+                stackRows.removeAllViews();
+                if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(Color.rgb(133,150,164)); stackRows.addView(empty); }
+                for (int i=0;i<display.rows.size();i++) {
+                    int depth = display.rows.size()-i;
+                    LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.BOTTOM);
+                    TextView label = text(12); digits(label); label.setText(depth + ":");
+                    label.setGravity(Gravity.START | Gravity.BOTTOM); label.setTextColor(Color.rgb(133,150,164));
+                    label.setContentDescription("Stack level " + depth);
+                    row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
+                    TextView value = text(21); digits(value); value.setGravity(Gravity.END); value.setText(display.rows.get(i));
+                    value.setTextIsSelectable(true); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
+                    stackRows.addView(row);
+                }
+            }
+            entryView.setText(display.entry.isEmpty()?"▸":display.entry);
+            notationButton.setText(display.notation == ValueFormatter.Notation.ENGINEERING ? "ENG" : "SCI");
+            notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
+            getPreferences(0).edit().putBoolean("engineering",display.notation == ValueFormatter.Notation.ENGINEERING).apply();
+            rendered = display;
+            // A second post runs after the updated rows have been measured. Do not repeatedly
+            // scroll on polling ticks: the user must still be able to inspect older entries.
+            scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+        }
+        status.setText(session.busy ? (session.cancelRequested ? "Cancelling…" : "Calculating… Back to cancel") : session.error);
+        cancelButton.setVisibility(session.busy ? View.VISIBLE : View.GONE);
+        notationButton.setEnabled(!session.busy);
+    }
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        int keyCode = event.getKeyCode();
+        String key = KeyboardInput.command(keyCode,event.getUnicodeChar(),event.isCtrlPressed(),event.isAltPressed(),event.isMetaPressed());
+        if (key == null) return super.dispatchKeyEvent(event);
+        if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
+        if (key.equals("ESCAPE")) { if (session.busy) cancelCalculation(); else execute("CE"); }
+        else execute(key);
+        return true;
+    }
     @Override protected void onResume() { super.onResume(); handler.post(tick); }
     @Override protected void onPause() { handler.removeCallbacks(tick); super.onPause(); }
-    @Override public void onBackPressed() { if (session.busy && session.task!=null) session.task.cancel(true); else super.onBackPressed(); }
-    @Override protected void onDestroy() { if (isFinishing()) session.worker.shutdownNow(); super.onDestroy(); }
+    @Override public void onBackPressed() { handleBack(); }
+    @Override protected void onDestroy() {
+        if (Build.VERSION.SDK_INT >= 33 && backCallback != null)
+            getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
+        if (isFinishing()) { cancelCalculation(); session.worker.shutdownNow(); }
+        super.onDestroy();
+    }
 }
