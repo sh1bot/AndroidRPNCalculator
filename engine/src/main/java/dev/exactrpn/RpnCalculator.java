@@ -16,11 +16,18 @@ public final class RpnCalculator {
         final List<UnifiedReal> stack; final String entry;
         State(List<UnifiedReal> s, String e) { stack = new ArrayList<>(s); entry = e; }
     }
+    /** Independent transaction candidate; immutable UnifiedReal values can be shared safely. */
+    public RpnCalculator copy() {
+        RpnCalculator result = new RpnCalculator();
+        result.stack = new ArrayList<>(stack); result.entry = entry;
+        result.undo.addAll(undo);
+        return result;
+    }
     public String entry() { return entry; }
     public List<UnifiedReal> values() { return Collections.unmodifiableList(new ArrayList<>(stack)); }
     public void key(String key) {
         if (key.equals("UNDO")) {
-            if (!undo.isEmpty()) { State s = undo.pop(); stack = s.stack; entry = s.entry; }
+            if (!undo.isEmpty()) { State s = undo.pop(); stack = new ArrayList<>(s.stack); entry = s.entry; }
             return;
         }
         State before = new State(stack, entry);
@@ -34,6 +41,7 @@ public final class RpnCalculator {
                 if (!entry.isEmpty()) entry = entry.substring(0, entry.length()-1);
             } else if (key.equals("±") && !entry.isEmpty()) {
                 entry = entry.startsWith("-") ? entry.substring(1) : "-" + entry;
+            } else if (key.equals("CE")) { entry = "";
             } else if (key.equals("CLEAR")) { stack.clear(); entry = "";
             } else if (key.equals("ENTER")) {
                 if (!entry.isEmpty()) commit(); else { need(1); stack.add(top()); }
@@ -66,13 +74,13 @@ public final class RpnCalculator {
                             case "cos": r = a.cos(); break;
                             case "tan": r = a.tan(); break;
                             case "ln": r = a.ln(); break;
-                            case "exp": r = a.exp(); break;
+                            case "exp": case "eˣ": r = a.exp(); break;
                             default: throw new IllegalArgumentException("Unknown operation");
                         }
                         stack.set(stack.size()-1, r);
                 }
                 // Force lazy domain errors before committing the transaction.
-                if (!stack.isEmpty()) format(top());
+                if (!stack.isEmpty()) ValueFormatter.format(top(), true, ValueFormatter.Notation.SCIENTIFIC);
             }
             undo.push(before); if (undo.size() > 100) undo.removeLast();
         } catch (RuntimeException ex) { stack = before.stack; entry = before.entry; throw ex; }

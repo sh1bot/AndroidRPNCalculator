@@ -47,18 +47,42 @@ ENTER pushes the pending entry; when no entry is pending it duplicates X.
 Operations automatically push a pending entry before consuming operands. SWAP
 exchanges X and Y; DROP removes X. UNDO restores the entire previous state,
 including pending input, for up to 100 actions. ± changes the entry sign or negates X.
-Trig functions use radians. π and e push exact constants.
+Trig functions use radians. π and e push exact constants. The `eˣ` key computes
+e raised to X; it is a unary function, not decimal-exponent entry.
 
-Known exact values appear as integers, fractions, or symbolic constants. Other
-values show an approximation marked ≈ with 24 fractional decimal places. This
-finite display is never used in later arithmetic. The original library provides
-bounded approximation error; this app does not promise correctly rounded final
-digits for every transcendental expression.
+Stack rows sit at the bottom of the display, with newest values last. Small,
+muted stack indices occupy a separate left column. New input and results scroll
+to the bottom; you can scroll back through older values between actions. Entry
+uses a larger font; entry and values use monospace, tabular digits.
 
-Calculations run on a single background thread. Press Android Back while a
-calculation is running to interrupt it. Failed operations restore their previous
-stack and entry. Rotation retains the session's exact objects. Closing the app or
-process death clears the session; disk persistence is not implemented.
+Values display up to 12 significant digits. Large and tiny values use scientific
+notation; tap SCI/ENG to switch to engineering notation (exponents divisible by
+three). The newest stack value is displayed in full when it is a known exact
+integer; older integers are compacted too. Rounded values are marked ≈. Values
+too close to zero to resolve at the display's 1e-1000 detection limit are marked
+explicitly. Display approximations never replace the exact arithmetic values.
+
+Calculations run on a single background thread. Press Android Back or the visible
+Cancel button while a calculation is running to interrupt it. Cancellation is
+cooperative, so an indivisible library operation may take time to return. Both
+legacy and modern Android Back callbacks are handled. Work is evaluated on a
+private stack copy and committed only after display evaluation completes, so
+errors and cancellation preserve the previous stack, entry, and undo history.
+Rotation retains the session's exact objects. Closing the app or process death
+clears the session; disk persistence is not implemented.
+
+## Keyboard
+
+Click the emulator/device window so it receives keys. Digits, decimal point,
+`+ - * /`, Enter (or Space), Backspace, and Delete work directly. Escape cancels
+a calculation or clears the unfinished entry. Ctrl+Z undoes, Ctrl+D duplicates,
+Ctrl+S swaps X/Y, Ctrl+L clears the stack, and F9 changes sign. `^` raises Y to X.
+Use `r` for square root, `i` for reciprocal, `s/c/t` for sin/cos/tan, `l` for ln,
+`p` for π, `e` for Euler's number, and uppercase `E` for eˣ. Numpad keys are
+supported. The `?` button shows this reference in the app. Input is queued in order
+while calculations finish; cancelling or an error discards subsequent queued keys.
+Some browser-based emulators may intercept shortcuts before Android receives them;
+use the on-screen controls in that case.
 
 ## Structure
 
@@ -68,13 +92,13 @@ process death clears the session; disk persistence is not implemented.
 
 ## Verification and limitations
 
-The engine is compiled with Java 17 compatibility and its 16 regression checks
+The engine is compiled with Java 17 compatibility and its 48 regression checks
 pass, including exact decimals, rational division, symbolic simplification,
 operand order, undo, stack operations, and error rollback.
 
-The Android APK has not been compiled or run here: the environment has no Android
-SDK or Gradle, and its shell download proxy is unavailable. Device layout,
-accessibility, lifecycle handling, and installation still need Android validation.
+GitHub Actions builds the Android APK and runs the engine regressions. Device
+layout, accessibility, lifecycle handling, and installation still need hands-on
+Android validation.
 This is an initial implementation, not a Play Store release.
 
 ## Source provenance
@@ -95,3 +119,4 @@ and Android interface are separate from the unmodified upstream classes.
 
 New project code is licensed under Apache 2.0; see `LICENSE`. Vendored code
 retains its upstream license and copyright notices; see `NOTICE` and `licenses/`.
+
