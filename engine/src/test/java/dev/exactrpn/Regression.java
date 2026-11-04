@@ -38,6 +38,12 @@ public final class Regression {
         ValueFormatter.Notation sci = ValueFormatter.Notation.SCIENTIFIC;
         ValueFormatter.Notation eng = ValueFormatter.Notation.ENGINEERING;
         check(ValueFormatter.format(RpnCalculator.parse("0.3"),true,sci).equals("0.3"),"exact decimal display");
+        check(ValueFormatter.format(RpnCalculator.parse("56123456789.456"),true,sci).equals("≈ 56123456789.5"),"large decimal rounds with guard digits");
+        for(int tail=100;tail<1000;tail+=7) {
+            String input="56789012345."+tail;
+            String expected=new java.math.BigDecimal(input).round(new java.math.MathContext(12,java.math.RoundingMode.HALF_EVEN)).stripTrailingZeros().toPlainString();
+            check(ValueFormatter.format(RpnCalculator.parse(input),true,sci).equals((new java.math.BigDecimal(input).compareTo(new java.math.BigDecimal(expected))==0 ? "" : "≈ ")+expected),"large decimal rounding "+input);
+        }
         UnifiedReal huge = RpnCalculator.parse("123456789012345678901234567890");
         check(ValueFormatter.format(huge,true,sci).equals("123456789012345678901234567890"),"newest integer expanded");
         check(ValueFormatter.format(huge,false,sci).equals("≈ 1.23456789012e+29"),"older integer compact scientific");
