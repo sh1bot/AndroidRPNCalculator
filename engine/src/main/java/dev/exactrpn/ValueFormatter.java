@@ -41,6 +41,11 @@ public final class ValueFormatter {
         return format(value,newest,notation);
     }
     public static String clipboard(UnifiedReal value, Notation notation) {
+        BigInteger integer = value.bigIntegerValue();
+        if(integer!=null) return integer.toString();
+        BoundedRational rational = value.boundedRationalValue();
+        int places = BoundedRational.digitsRequired(rational);
+        if(places<=1000) return new BigDecimal(rational.toStringTruncated(places)).stripTrailingZeros().toPlainString();
         String text = format(value,true,notation);
         if (text.startsWith("≈ ")) text = text.substring(2);
         if (text.startsWith("0 (")) return "0";
