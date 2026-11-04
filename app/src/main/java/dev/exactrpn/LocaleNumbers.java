@@ -60,7 +60,7 @@ public final class LocaleNumbers {
         appendInteger(text,whole,groupingColor);
         if (dot>=0) {
             int start=text.length(); text.append(Character.toString(decimalSeparator()));
-            text.setSpan(new DecimalSeparatorSpan(),start,start+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new DecimalSeparatorSpan(symbols.getZeroDigit()),start,start+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             text.append(entry(mantissa.substring(dot+1)));
         }
         if (e>=0) text.append("e").append(entry(number.substring(e+1)));
@@ -72,7 +72,7 @@ public final class LocaleNumbers {
         for(int i=0;i<text.length();i++) {
             char c=text.charAt(i);
             if(c=='e' || c=='E') break;
-            if(c==decimalSeparator()) text.setSpan(new DecimalSeparatorSpan(),i,i+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            if(c==decimalSeparator()) text.setSpan(new DecimalSeparatorSpan(symbols.getZeroDigit()),i,i+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
     }
     private void appendInteger(SpannableStringBuilder text,String whole,int groupingColor) {
