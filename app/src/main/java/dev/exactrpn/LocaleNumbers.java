@@ -8,6 +8,9 @@ import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.Spannable;
 import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.SuperscriptSpan;
+import android.text.style.SubscriptSpan;
 import java.math.BigInteger;
 import java.util.Locale;
 
@@ -49,14 +52,21 @@ public final class LocaleNumbers {
         int slash=number.indexOf('/');
         if(slash>=0) {
             int whole=number.indexOf(' ');
+            String numerator=number.substring(0,slash);
             if(whole>=0 && whole<slash) {
-                appendInteger(text,number.substring(0,whole),groupingColor); text.append("\u202f");
-                appendInteger(text,number.substring(whole+1,slash),groupingColor);
-            } else appendInteger(text,number.substring(0,slash),groupingColor);
-            // U+2044 triggers automatic numerator/denominator shaping in some fonts.
-            // An ordinary solidus keeps every digit on the same baseline.
-            text.append("\u202f/\u202f");
-            appendInteger(text,number.substring(slash+1),groupingColor);
+                appendInteger(text,number.substring(0,whole),groupingColor); text.append("\u00a0");
+                numerator=number.substring(whole+1,slash);
+            } else if(numerator.startsWith("-")) {
+                text.append(((DecimalFormat)integers).getNegativePrefix()); numerator=numerator.substring(1);
+            }
+            int start=text.length(); appendInteger(text,numerator,groupingColor);
+            text.setSpan(new RelativeSizeSpan(.72f),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new SuperscriptSpan(),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            // Ordinary slash; styling is explicit and covers every digit, rather than font-dependent.
+            text.append("/");
+            start=text.length(); appendInteger(text,number.substring(slash+1),groupingColor);
+            text.setSpan(new RelativeSizeSpan(.72f),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(new SubscriptSpan(),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             return text;
         }
         int e = number.indexOf('e');
