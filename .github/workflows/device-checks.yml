@@ -8,6 +8,8 @@ on:
       - 'app/src/main/java/dev/exactrpn/RemoteCalculator.java'
       - 'app/src/main/java/dev/exactrpn/CalculatorStore.java'
       - 'app/src/androidTest/**'
+      - 'app/build.gradle'
+      - 'gradle.properties'
       - '.github/workflows/device-checks.yml'
 
 permissions:
