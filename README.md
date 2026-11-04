@@ -20,7 +20,9 @@ when the app reopens. Oldest undo steps are dropped if the saved history exceeds
 1 MiB; the current calculation is retained. **Clear** can be undone while the app
 stays open. Leaving the app with an empty stack and entry discards undo history.
 
-**Swap** exchanges X and Y; **Undo** restores the previous state. **Functions**
+**Swap** exchanges X and Y; **Undo** restores the previous state and long-press
+Undo redoes it. Individual edits remain undoable until entry is committed; committing
+with Enter or an operation drops the intermediate edit history. **Functions**
 expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
 **SCI/ENG** for display notation. **FRAC/DEC** switches known rational results
 between reduced fractions and decimals; irrational results remain decimal.
@@ -29,7 +31,7 @@ between reduced fractions and decimals; irrational results remain decimal.
 Keyboard: digits, decimal point, and `+ - * /` enter numbers and operations.
 Enter/Space commits or duplicates; Backspace/Delete edits or drops X.
 Left/Right and Home/End move the cursor; hold Shift to select.
-Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+S swaps, Ctrl+L clears,
+Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+Y redoes, Ctrl+S swaps, Ctrl+L clears,
 and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 `s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, and `^` power.
 

@@ -345,6 +345,54 @@ public final class Regression {
             RpnCalculator loaded=RpnCalculator.load(expression.save());
             check(top(loaded).toStringTruncated(60).equals(top(expression).toStringTruncated(60)),"restore binary expression "+operation);
         }
+        RpnCalculator editingHistory=new RpnCalculator(); number(editingHistory,"123");
+        editingHistory.key("UNDO"); check(editingHistory.entry().equals("12"),"current entry edits undo individually");
+        editingHistory.key("REDO"); check(editingHistory.entry().equals("123"),"redo current entry edit");
+        editingHistory.key("ENTER");
+        check(editingHistory.undoCount()==2,"commit drops intermediate entry edits");
+        editingHistory.key("UNDO"); check(editingHistory.entry().equals("123") && editingHistory.values().isEmpty(),"undo commit restores complete entry");
+        editingHistory.key("UNDO"); check(editingHistory.isEmpty(),"next undo skips intermediate spellings");
+        editingHistory.key("REDO"); check(editingHistory.entry().equals("123"),"redo complete entry");
+        editingHistory.key("REDO"); check(top(editingHistory).definitelyEquals(new UnifiedReal(123)) && !editingHistory.isEditing(),"redo commit");
+        RpnCalculator operationHistory=new RpnCalculator(); number(operationHistory,"12"); operationHistory.key("ENTER"); number(operationHistory,"345"); operationHistory.key("+");
+        operationHistory.key("UNDO"); check(operationHistory.entry().equals("345") && top(operationHistory).definitelyEquals(new UnifiedReal(12)),"undo operator restores full entry");
+        operationHistory.key("UNDO"); check(operationHistory.entry().isEmpty() && top(operationHistory).definitelyEquals(new UnifiedReal(12)),"operator commit drops intermediate edits");
+        operationHistory.key("UNDO"); check(operationHistory.entry().equals("12") && operationHistory.values().isEmpty(),"older calculation remains reachable");
+        operationHistory.key("REDO"); operationHistory.key("REDO"); operationHistory.key("REDO");
+        check(top(operationHistory).definitelyEquals(new UnifiedReal(357)),"redo full calculation sequence");
+        operationHistory.key("CLEAR"); operationHistory.key("UNDO");
+        check(top(operationHistory).definitelyEquals(new UnifiedReal(357)),"undo Clear still works");
+        operationHistory.key("REDO"); check(operationHistory.isEmpty(),"redo Clear");
+        operationHistory.key("UNDO"); operationHistory.key("9");
+        check(operationHistory.redoCount()==0,"new edit discards redo branch");
+        operationHistory.key("REDO"); check(operationHistory.entry().equals("9"),"discarded redo cannot replay stale Clear");
+        RpnCalculator failedCommit=new RpnCalculator(); number(failedCommit,"123"); int priorUndo=failedCommit.undoCount();
+        try { failedCommit.key("+"); throw new AssertionError("underflow accepted"); } catch(IllegalArgumentException expected) {}
+        check(failedCommit.undoCount()==priorUndo,"failed operation preserves entry edit history");
+        failedCommit.key("UNDO"); check(failedCommit.entry().equals("12"),"edits still undo individually after failed commit");
+        RpnCalculator failedRedo=new RpnCalculator(); keys(failedRedo,"π","UNDO");
+        try { failedRedo.key("+"); throw new AssertionError("underflow accepted"); } catch(IllegalArgumentException expected) {}
+        check(failedRedo.redoCount()==1,"failed operation preserves redo"); failedRedo.key("REDO");
+        check(top(failedRedo).definitelyEquals(UnifiedReal.PI),"redo exact constant after failure");
+        RpnCalculator redoSaved=new RpnCalculator(); keys(redoSaved,"π","2","√","+","UNDO");
+        RpnCalculator redoRestored=RpnCalculator.load(redoSaved.save());
+        check(redoRestored.redoCount()==1 && redoRestored.entry().isEmpty(),"restore redo history");
+        redoRestored.key("REDO");
+        check(top(redoRestored).toStringTruncated(80).equals(UnifiedReal.PI.add(UnifiedReal.TWO.sqrt()).toStringTruncated(80)),"redo exact irrational operation after restart");
+        redoRestored.key("UNDO"); RpnCalculator redoCopy=redoRestored.copy(); redoCopy.key("REDO");
+        check(redoRestored.redoCount()==1 && redoCopy.redoCount()==0,"redo history isolated between candidates");
+        redoRestored.clearUndo(); check(redoRestored.undoCount()==0 && redoRestored.redoCount()==0,"clear history removes undo and redo");
+        check("REDO".equals(KeyboardInput.command(53,0,true,false,false)),"Ctrl Y redo shortcut");
+        java.io.ByteArrayOutputStream legacyBytes=new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream legacy=new java.io.DataOutputStream(legacyBytes);
+        legacy.writeInt(0x52504e31); legacy.writeUTF("RAD");
+        legacy.writeChar('.'); legacy.writeChar(','); legacy.writeInt(3); legacy.writeInt(3);
+        legacy.writeInt(0); legacy.writeInt(1); legacy.writeInt(0); legacy.writeUTF("12.3");
+        legacy.writeBoolean(true); legacy.writeBoolean(false); legacy.writeInt(2); legacy.writeInt(4);
+        legacy.writeChar('.'); legacy.writeChar(','); legacy.writeInt(3); legacy.writeInt(3);
+        RpnCalculator legacyRestored=RpnCalculator.load(legacyBytes.toByteArray());
+        check(legacyRestored.entry().equals("12.3") && legacyRestored.selectionStart()==2 && legacyRestored.selectionEnd()==4,"restore previous saved-state format");
+        legacyRestored.key("ENTER"); check(top(legacyRestored).definitelyEquals(RpnCalculator.parse("12.3")),"legacy state remains usable");
         byte[] valid=durable.save();
         try { RpnCalculator.load(java.util.Arrays.copyOf(valid,valid.length-1)); throw new AssertionError("truncated state accepted"); }
         catch(java.io.IOException expected) { check(true,"reject truncated state"); }

@@ -62,7 +62,7 @@ public final class CalculatorKeypad extends LinearLayout {
         if (calculating == active) return;
         calculating = active;
         undoButton.setText(active ? "Cancel" : "Undo");
-        undoButton.setContentDescription(active ? "Cancel calculation" : "Undo");
+        undoButton.setContentDescription(active ? "Cancel calculation" : "Undo; long press to redo");
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String key, String label) {
@@ -90,6 +90,7 @@ public final class CalculatorKeypad extends LinearLayout {
         b.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(65,255,255,255)),shape,null));
         String description;
         switch (key) {
+            case "UNDO": description="Undo; long press to redo"; break;
             case "ENTER": description="Enter; long press to paste"; break;
             case ".": description="Decimal separator"; break;
             case "BACK": description="Backspace"; break;
@@ -104,6 +105,7 @@ public final class CalculatorKeypad extends LinearLayout {
         }
         b.setContentDescription(description);
         b.setOnClickListener(v -> command.accept(key.equals("UNDO") && calculating ? "CANCEL" : key));
+        if (key.equals("UNDO")) b.setOnLongClickListener(v -> { command.accept(calculating ? "CANCEL" : "REDO"); return true; });
         if (key.equals("ENTER")) b.setOnLongClickListener(v -> { command.accept("PASTE"); return true; });
         return b;
     }
