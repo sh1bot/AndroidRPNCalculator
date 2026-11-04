@@ -216,19 +216,32 @@ public final class Regression {
         check(cursor.entry().equals("81.2"),"append-end deletion remains supported");
         cursor.pasteText("123",us); cursor.key("ENTER"); cursor.key("DELETE");
         check(!cursor.isEditing(),"Delete in stack mode drops without opening entry");
-        RpnCalculator confirm=new RpnCalculator(); keys(confirm,"2","ENTER"); confirm.pasteText("12.34",us);
-        check(confirm.requiresEnter() && confirm.isEditing() && confirm.values().size()==1,"even valid paste waits for explicit Enter");
-        try { confirm.key("+"); throw new AssertionError("paste committed through arithmetic"); } catch(IllegalArgumentException expected) {}
-        check(confirm.requiresEnter() && confirm.entry().equals("12.34"),"arithmetic cannot accept a paste preview");
-        confirm.key("ENTER"); check(!confirm.requiresEnter() && confirm.values().size()==2,"Enter accepts valid pasted number");
-        confirm.key("UNDO"); check(confirm.requiresEnter() && confirm.isEditing(),"undo restores paste confirmation");
-        confirm.key("CE"); check(!confirm.requiresEnter(),"cancel entry clears paste confirmation");
-        confirm.pasteText("1.234",us); confirm.select(1,1); confirm.key("DELETE");
-        check(confirm.entry().equals("1234") && confirm.entryProblem().isEmpty() && confirm.requiresEnter(),"remove ambiguous separator but still require Enter");
+        RpnCalculator accept=new RpnCalculator(); keys(accept,"2","ENTER"); accept.pasteText("12.34",us);
+        check(accept.isEditing() && accept.values().size()==1,"safe paste waits in entry without auto commit");
+        accept.key("+"); check(!accept.isEditing() && top(accept).definitelyEquals(RpnCalculator.parse("14.34")),"operator accepts safe pasted number");
+        accept.key("UNDO"); check(accept.isEditing() && accept.entry().equals("12.34") && top(accept).definitelyEquals(UnifiedReal.TWO),"undo restores safe paste before operator");
+        accept.key("ENTER"); check(!accept.isEditing() && accept.values().size()==2,"Enter accepts safe pasted number");
+        accept.pasteText("9",us); accept.key("√");
+        check(!accept.isEditing() && top(accept).definitelyEquals(new UnifiedReal(3)),"function accepts safe pasted number");
+        RpnCalculator commaPaste=new RpnCalculator(); keys(commaPaste,"2","ENTER"); commaPaste.pasteText("9,5",us); commaPaste.key("+");
+        check(top(commaPaste).definitelyEquals(RpnCalculator.parse("11.5")),"safe comma decimal accepted by operator");
+        RpnCalculator blocked=new RpnCalculator(); keys(blocked,"9","ENTER"); blocked.pasteText("1,234",us);
+        for(String operation:new String[]{"ENTER","+","−","×","÷","√","sin","ln","eˣ"}) {
+            try { blocked.key(operation); throw new AssertionError("ambiguous input accepted by "+operation); }
+            catch(IllegalArgumentException expected) { check(blocked.rawEntry() && blocked.values().size()==1 && blocked.entry().equals("1,234"),"ambiguity blocks "+operation); }
+        }
+        blocked.select(1,2); blocked.key("."); blocked.key("+");
+        check(top(blocked).definitelyEquals(RpnCalculator.parse("10.234")),"corrected decimal can proceed with operator");
+        RpnCalculator localized=new RpnCalculator(); localized.setInputProfile(de); keys(localized,"2","ENTER");
+        localized.pasteText("1.234",de); localized.select(1,2); localized.key("."); localized.key("+");
+        check(top(localized).definitelyEquals(RpnCalculator.parse("3.234")),"configured comma resolves input before operator");
+        accept.pasteText("1.234",us); accept.select(1,1); accept.key("DELETE");
+        check(accept.entry().equals("1234") && accept.entryProblem().isEmpty(),"removing ambiguous separator makes a safe integer");
+        accept.key("√"); check(!accept.isEditing(),"function accepts corrected safe entry");
         try { NumberText.normalize("1.234",'.',',',3,3); throw new AssertionError("normalizer guessed ambiguity"); }
         catch(IllegalArgumentException expected) { check(true,"all public clipboard parsing rejects ambiguity"); }
-        confirm.pasteText("",us); check(confirm.isEditing() && confirm.entry().isEmpty(),"empty paste remains in edit mode");
-        confirm.key("ENTER"); check(!confirm.isEditing(),"Enter leaves empty pasted edit without pushing zero");
+        accept.pasteText("",us); check(accept.isEditing() && accept.entry().isEmpty(),"empty paste remains in edit mode");
+        accept.key("ENTER"); check(!accept.isEditing(),"Enter leaves empty pasted edit without pushing zero");
         check("LEFT".equals(KeyboardInput.command(21,0,false,false,false)),"left key mapping");
         check("RIGHT".equals(KeyboardInput.command(22,0,false,false,false)),"right key mapping");
         check("HOME".equals(KeyboardInput.command(122,0,false,false,false)),"home key mapping");

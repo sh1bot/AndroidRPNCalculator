@@ -29,8 +29,8 @@ and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 **LOC/DOT** switches between phone-locale numbers and computer format (decimal
 dot, apostrophe display grouping). Copied numbers follow this choice but never
 include grouping. Tap a stack value to copy it; long-press **Enter** or Ctrl+V to
-paste into entry, then press **Enter** to accept it. Ambiguous or invalid input
-stays red and cannot commit until corrected. Tap to position the cursor or select text; the decimal key replaces
+paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
+Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
 a selected separator explicitly. Backspace/Delete edit at the cursor.
 
 ## Build
