@@ -160,7 +160,7 @@ public final class MainActivity extends Activity {
         button.setPadding(dp(4),0,dp(4),0);
     }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
-    private void digits(TextView t) { t.setTypeface(Typeface.MONOSPACE); t.setFontFeatureSettings("tnum"); }
+    private void digits(TextView t) { t.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL)); t.setFontFeatureSettings("tnum"); }
     private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(Color.rgb(228,237,242)); t.setPadding(dp(4),dp(6),dp(4),dp(6)); return t; }
     private void execute(String key) {
         if (key.equals("PASTE")) { pasteClipboard(); return; }

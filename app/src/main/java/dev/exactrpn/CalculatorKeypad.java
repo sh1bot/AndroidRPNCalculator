@@ -77,7 +77,7 @@ public final class CalculatorKeypad extends LinearLayout {
             fraction.setSpan(new RelativeSizeSpan(.7f),2,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.setText(fraction);
         } else b.setText(key.matches("[0-9.]") ? numbers.entry(label) : label);
-        if(key.matches("[0-9.]")) numberButtons.put(key,b);
+        if(key.matches("[0-9.]")) { b.setFontFeatureSettings("tnum"); numberButtons.put(key,b); }
         b.setTextColor(Color.rgb(229,237,245));
         b.setSingleLine(true); b.setHorizontallyScrolling(false); b.setIncludeFontPadding(false);
         b.setAutoSizeTextTypeUniformWithConfiguration(10,26,1,TypedValue.COMPLEX_UNIT_SP);
