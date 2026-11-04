@@ -12,6 +12,7 @@ public final class KeyboardInput {
                 case 123: return "END";
                 case 50: return "PASTE";
                 case 54: return "UNDO";
+                case 53: return "REDO";
                 case 32: return "DUP";
                 case 47: return "SWAP";
                 case 40: return "CLEAR";

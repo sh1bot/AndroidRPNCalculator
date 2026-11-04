@@ -19,7 +19,7 @@ public final class RpnCalculator {
     private NumberText.Profile inputProfile=new NumberText.Profile('.',',',3,3);
     private NumberText.Profile rawProfile=inputProfile;
     private final IdentityHashMap<UnifiedReal,SavedValue> savedValues=new IdentityHashMap<>();
-    private final Deque<State> undo=new ArrayDeque<>();
+    private final Deque<State> undo=new ArrayDeque<>(), redo=new ArrayDeque<>();
     private static final class State {
         final List<UnifiedReal> stack;
         final String entry;
@@ -38,10 +38,10 @@ public final class RpnCalculator {
         stack=new ArrayList<>(s.stack); entry=s.entry; editing=s.editing; raw=s.raw;
         selectionStart=s.start; selectionEnd=s.end; rawProfile=s.profile;
     }
-    private void remember(State s) { undo.push(s); if(undo.size()>100) undo.removeLast(); pruneSavedValues(); }
+    private void remember(State s) { redo.clear(); undo.push(s); if(undo.size()>100) undo.removeLast(); pruneSavedValues(); }
     public RpnCalculator copy() {
         RpnCalculator c=new RpnCalculator(); c.restore(new State(this));
-        c.angleUnit=angleUnit; c.inputProfile=inputProfile; c.undo.addAll(undo); c.savedValues.putAll(savedValues); return c;
+        c.angleUnit=angleUnit; c.inputProfile=inputProfile; c.undo.addAll(undo); c.redo.addAll(redo); c.savedValues.putAll(savedValues); return c;
     }
     public String entry() { return entry; }
     public boolean isEditing() { return editing; }
@@ -130,7 +130,14 @@ public final class RpnCalculator {
         }
         if(key.startsWith("PASTE:")) { paste(key.substring(6)); return; }
         if(key.equals("ANGLE")) { angleUnit=AngleUnit.values()[(angleUnit.ordinal()+1)%AngleUnit.values().length]; return; }
-        if(key.equals("UNDO")) { if(!undo.isEmpty()) restore(undo.pop()); return; }
+        if(key.equals("UNDO")) {
+            if(!undo.isEmpty()) { redo.push(new State(this)); restore(undo.pop()); }
+            return;
+        }
+        if(key.equals("REDO")) {
+            if(!redo.isEmpty()) { undo.push(new State(this)); restore(redo.pop()); }
+            return;
+        }
         State before=new State(this);
         try {
             if(key.matches("[0-9.]")) {
@@ -202,29 +209,40 @@ public final class RpnCalculator {
                 }
                 if(!stack.isEmpty()) ValueFormatter.format(top(),true,ValueFormatter.Notation.SCIENTIFIC);
             }
+            if(before.editing && !editing && !key.equals("CE") && !key.equals("CLEAR")) {
+                // Keep the complete entry for undoing the commit, but discard its intermediate edits.
+                while(!undo.isEmpty() && undo.peek().editing && sameStack(undo.peek().stack,before.stack)) undo.pop();
+            }
             remember(before);
         } catch(RuntimeException ex) { restore(before); throw ex; }
     }
+    private static boolean sameStack(List<UnifiedReal> a,List<UnifiedReal> b) {
+        if(a.size()!=b.size()) return false;
+        for(int i=0;i<a.size();i++) if(a.get(i)!=b.get(i)) return false;
+        return true;
+    }
     public boolean isEmpty() { return stack.isEmpty() && entry.isEmpty(); }
     public int undoCount() { return undo.size(); }
-    public void clearUndo() { undo.clear(); pruneSavedValues(); }
+    public int redoCount() { return redo.size(); }
+    public void clearUndo() { undo.clear(); redo.clear(); pruneSavedValues(); }
     private void pruneSavedValues() {
         Set<UnifiedReal> live=Collections.newSetFromMap(new IdentityHashMap<>());
         live.addAll(stack);
         for(State state:undo) live.addAll(state.stack);
+        for(State state:redo) live.addAll(state.stack);
         savedValues.keySet().retainAll(live);
     }
     /** At most 100 undo steps, with a 1 MiB storage budget including the active state.
      * Large active calculations are kept intact; only the oldest undo steps are evicted. */
     public byte[] save() throws IOException {
         byte[] result=encode();
-        while(result.length>1024*1024 && !undo.isEmpty()) {
-            undo.removeLast(); pruneSavedValues(); result=encode();
+        while(result.length>1024*1024 && (!undo.isEmpty() || !redo.isEmpty())) {
+            if(!undo.isEmpty()) undo.removeLast(); else redo.removeLast(); pruneSavedValues(); result=encode();
         }
         return result;
     }
     private byte[] encode() throws IOException {
-        List<State> states=new ArrayList<>(); states.add(new State(this)); states.addAll(undo);
+        List<State> states=new ArrayList<>(); states.add(new State(this)); states.addAll(undo); states.addAll(redo);
         IdentityHashMap<SavedValue,Integer> ids=new IdentityHashMap<>();
         List<SavedValue> nodes=new ArrayList<>();
         Deque<SavedValue> todo=new ArrayDeque<>();
@@ -242,13 +260,14 @@ public final class RpnCalculator {
         }
         ByteArrayOutputStream bytes=new ByteArrayOutputStream();
         DataOutputStream out=new DataOutputStream(bytes);
-        out.writeInt(0x52504e31); out.writeUTF(angleUnit.name()); writeProfile(out,inputProfile);
+        out.writeInt(0x52504e32); out.writeUTF(angleUnit.name()); writeProfile(out,inputProfile);
         out.writeInt(nodes.size());
         for(SavedValue node:nodes) {
             out.writeUTF(node.op); out.writeUTF(node.literal);
             out.writeInt(node.left==null ? -1 : ids.get(node.left));
             out.writeInt(node.right==null ? -1 : ids.get(node.right));
         }
+        out.writeInt(undo.size()); out.writeInt(redo.size());
         out.writeInt(states.size());
         for(State state:states) {
             out.writeInt(state.stack.size());
@@ -261,7 +280,8 @@ public final class RpnCalculator {
     public static RpnCalculator load(byte[] bytes) throws IOException {
         try {
             DataInputStream in=new DataInputStream(new ByteArrayInputStream(bytes));
-            if(in.readInt()!=0x52504e31) throw new IOException("Unknown saved state version");
+            int version=in.readInt();
+            if(version!=0x52504e31 && version!=0x52504e32) throw new IOException("Unknown saved state version");
             RpnCalculator c=new RpnCalculator();
             c.angleUnit=AngleUnit.valueOf(in.readUTF()); c.inputProfile=readProfile(in);
             int count=readCount(in,1000000);
@@ -274,7 +294,11 @@ public final class RpnCalculator {
                 UnifiedReal value=node.evaluate(left<0?null:values.get(left),right<0?null:values.get(right));
                 nodes.add(node); values.add(value); c.savedValues.put(value,node);
             }
+            int undos=version==0x52504e32 ? readCount(in,100) : -1;
+            int redos=version==0x52504e32 ? readCount(in,100) : 0;
             int states=readCount(in,101);
+            if(undos<0) undos=states-1;
+            if(states!=1+undos+redos) throw new IOException("Invalid undo/redo history");
             if(states==0) throw new IOException("Missing current state");
             for(int i=0;i<states;i++) {
                 int size=readCount(in,1000000); List<UnifiedReal> stack=new ArrayList<>();
@@ -283,7 +307,7 @@ public final class RpnCalculator {
                 boolean editing=in.readBoolean(),raw=in.readBoolean(); int start=in.readInt(),end=in.readInt();
                 if(start<0 || end<0 || start>entry.length() || end>entry.length() || (!editing && !entry.isEmpty())) throw new IOException("Invalid entry state");
                 State state=new State(stack,entry,editing,raw,start,end,readProfile(in));
-                if(i==0) c.restore(state); else c.undo.addLast(state);
+                if(i==0) c.restore(state); else if(i<=undos) c.undo.addLast(state); else c.redo.addLast(state);
             }
             if(in.available()!=0) throw new IOException("Trailing saved state data");
             c.pruneSavedValues(); return c;
