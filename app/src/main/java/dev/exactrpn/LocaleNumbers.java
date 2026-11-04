@@ -15,11 +15,15 @@ public final class LocaleNumbers {
     private final NumberFormat integers;
     private final DecimalFormatSymbols symbols;
     private final int primary, secondary;
-    public LocaleNumbers(Locale locale) {
-        integers = NumberFormat.getIntegerInstance(locale);
+    private final boolean computer;
+    public LocaleNumbers(Locale locale) { this(locale,false); }
+    public LocaleNumbers(Locale locale,boolean computer) {
+        this.computer=computer;
+        integers = NumberFormat.getIntegerInstance(computer ? Locale.US : locale);
         integers.setMaximumIntegerDigits(Integer.MAX_VALUE);
         DecimalFormat format = (DecimalFormat)integers;
         symbols = format.getDecimalFormatSymbols();
+        if (computer) { symbols.setGroupingSeparator('’'); format.setDecimalFormatSymbols(symbols); }
         primary = format.isGroupingUsed() ? format.getGroupingSize() : 0;
         secondary = format.getSecondaryGroupingSize();
     }
@@ -55,5 +59,15 @@ public final class LocaleNumbers {
         if (e>=0) text.append("e").append(entry(number.substring(e+1)));
         return text;
     }
-    public String paste(String text) { return NumberText.normalize(text,decimalSeparator(),symbols.getGroupingSeparator(),primary,secondary); }
+    public NumberText.Profile profile() { return new NumberText.Profile(decimalSeparator(),symbols.getGroupingSeparator(),primary,secondary); }
+    public String copy(String canonical) { return computer ? canonical : entry(canonical); }
+    public String canonicalEntry(String visible) {
+        StringBuilder text=new StringBuilder();
+        for(int i=0;i<visible.length();i++) {
+            char c=visible.charAt(i); int digit=Character.digit(c,10);
+            text.append(digit>=0 ? (char)('0'+digit) : c==decimalSeparator() ? '.' : c=='−' ? '-' : c);
+        }
+        return text.toString();
+    }
 }
+

@@ -14,24 +14,43 @@ import com.android.calculator2.UnifiedReal;
 /** Exact values and evaluation survive rotation; views consume immutable display snapshots. */
 public final class MainActivity extends Activity {
     private Session session;
-    private TextView entryView, status;
-    private Button notationButton, angleButton;
+    private EntryField entryView;
+    private TextView status;
+    private Button notationButton, angleButton, numberFormatButton;
     private CalculatorKeypad keys;
-    private LocaleNumbers numbers;
+    private LocaleNumbers numbers, localNumbers, computerNumbers;
+    private boolean changingEntry, entryShowsRaw;
     private String shownError = "";
     private android.window.OnBackInvokedCallback backCallback;
     private LinearLayout stackRows;
     private ScrollView scroll;
     private Display rendered;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    static final class EntryField extends EditText {
+        java.util.function.BiConsumer<Integer,Integer> selectionChanged;
+        Runnable paste;
+        EntryField(android.content.Context context) { super(context); }
+        @Override protected void onSelectionChanged(int start,int end) {
+            super.onSelectionChanged(start,end);
+            if(selectionChanged!=null) selectionChanged.accept(start,end);
+        }
+        @Override public boolean onTextContextMenuItem(int id) {
+            if((id==android.R.id.paste || id==android.R.id.pasteAsPlainText) && paste!=null) { paste.run(); return true; }
+            return super.onTextContextMenuItem(id);
+        }
+    }
     static final class Display {
-        final List<String> rows, clipboard;
-        final String entry;
+        final List<String> rows,clipboard;
+        final String entry,problem;
         final ValueFormatter.Notation notation;
-        final boolean editing;
+        final boolean editing,raw,computer,confirm;
+        final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
-        Display(List<String> r, List<String> c, String e, ValueFormatter.Notation n, boolean edit, RpnCalculator.AngleUnit angle) {
-            rows = r; clipboard = c; entry = e; notation = n; editing = edit; angleUnit = angle;
+        Display(List<String> rows,List<String> clipboard,RpnCalculator calculator,ValueFormatter.Notation notation,boolean computer) {
+            this.rows=rows; this.clipboard=clipboard; this.notation=notation; this.computer=computer;
+            entry=calculator.entry(); editing=calculator.isEditing(); raw=calculator.rawEntry(); confirm=calculator.requiresEnter();
+            start=calculator.selectionStart(); end=calculator.selectionEnd(); problem=calculator.entryProblem();
+            angleUnit=calculator.angleUnit();
         }
     }
     static final class Session {
@@ -44,19 +63,23 @@ public final class MainActivity extends Activity {
         volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
-        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle) {
-            notation = n; calculator.setAngleUnit(angle);
-            display = new Display(Collections.emptyList(), Collections.emptyList(), "", n, false, angle);
+        boolean computer;
+        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,boolean computer) {
+            notation = n; this.computer=computer; calculator.setAngleUnit(angle);
+            display = new Display(Collections.emptyList(),Collections.emptyList(),calculator,n,computer);
         }
     }
     @Override public Object onRetainNonConfigurationInstance() { return session; }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        numbers = new LocaleNumbers(getResources().getConfiguration().getLocales().get(0));
+        Locale locale=getResources().getConfiguration().getLocales().get(0);
+        localNumbers=new LocaleNumbers(locale); computerNumbers=new LocaleNumbers(locale,true);
         session = (Session)getLastNonConfigurationInstance();
         if (session == null) session = new Session(getPreferences(0).getBoolean("engineering", false)
             ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC,
-            RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")));
+            RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")),
+            getPreferences(0).getBoolean("computerNumbers",false));
+        numbers=session.computer ? computerNumbers : localNumbers;
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
         root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
         root.setOnApplyWindowInsetsListener((v,insets) -> {
@@ -73,6 +96,9 @@ public final class MainActivity extends Activity {
         notationButton = new Button(this); notationButton.setTextSize(13);
         notationButton.setOnClickListener(v -> execute("FORMAT"));
         header.addView(notationButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
+        numberFormatButton=new Button(this); numberFormatButton.setTextSize(13);
+        numberFormatButton.setOnClickListener(v -> execute("NUMBER_FORMAT"));
+        header.addView(numberFormatButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
         status = text(12); status.setGravity(Gravity.CENTER_VERTICAL); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END);
         header.addView(status,new LinearLayout.LayoutParams(0,dp(48),1));
         root.addView(header);
@@ -80,7 +106,29 @@ public final class MainActivity extends Activity {
         stackRows = new LinearLayout(this); stackRows.setOrientation(1); stackRows.setGravity(Gravity.BOTTOM);
         scroll.addView(stackRows,new ScrollView.LayoutParams(-1,-2));
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        entryView = text(32); entryView.setGravity(Gravity.START); digits(entryView); entryView.setTextIsSelectable(true);
+        entryView=new EntryField(this); entryView.setTextSize(32);
+        entryView.setGravity(Gravity.START); digits(entryView);
+        entryView.setPadding(dp(4),dp(6),dp(4),dp(6)); entryView.setBackground(null);
+        entryView.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
+        digits(entryView);
+        entryView.setSingleLine(true); entryView.setHint("▸"); entryView.setHintTextColor(Color.rgb(133,150,164));
+        entryView.setShowSoftInputOnFocus(false);
+        entryView.paste=() -> execute("PASTE");
+        entryView.selectionChanged=(start,end) -> {
+            if(!changingEntry && start>=0 && end>=0) execute("SELECT:"+start+":"+end);
+        };
+        entryView.addTextChangedListener(new android.text.TextWatcher() {
+            private int start,count;
+            @Override public void beforeTextChanged(CharSequence s,int start,int count,int after) {}
+            @Override public void onTextChanged(CharSequence s,int start,int before,int count) { this.start=start; this.count=count; }
+            @Override public void afterTextChanged(android.text.Editable text) {
+                if(changingEntry) return;
+                boolean explicit=count==1 && start<text.length() && text.charAt(start)==numbers.decimalSeparator();
+                String value=entryShowsRaw ? text.toString() : numbers.canonicalEntry(text.toString());
+                execute("EDIT:"+Math.max(0,entryView.getSelectionStart())+":"+Math.max(0,entryView.getSelectionEnd())
+                    +":"+entryShowsRaw+":"+explicit+":"+value);
+            }
+        });
         root.addView(entryView);
         keys = new CalculatorKeypad(this, this::execute,
             getPreferences(0).getBoolean("scientificExpanded",false),
@@ -106,7 +154,7 @@ public final class MainActivity extends Activity {
             start = !session.busy;
             if (start) { session.cancelRequested = false; session.busySince = SystemClock.elapsedRealtime(); session.busy = true; }
         }
-        refresh();
+        if(!key.startsWith("EDIT:") && !key.startsWith("SELECT:")) refresh();
         if (start) session.worker.submit(this::drainKeys);
     }
     private void pasteClipboard() {
@@ -115,12 +163,12 @@ public final class MainActivity extends Activity {
         if (clip==null || clip.getItemCount()==0 || clip.getItemAt(0).getText()==null) {
             Toast.makeText(this,"Clipboard does not contain a number",Toast.LENGTH_SHORT).show(); return;
         }
-        try { execute("PASTE:"+numbers.paste(clip.getItemAt(0).getText().toString())); }
+        try { execute("PASTE_RAW:"+clip.getItemAt(0).getText().toString()); }
         catch (IllegalArgumentException ex) { Toast.makeText(this,ex.getMessage(),Toast.LENGTH_LONG).show(); }
     }
     private void copyValue(String text) {
         android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Calculator value",text));
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Calculator value",numbers.copy(text)));
         if (Build.VERSION.SDK_INT<=32) Toast.makeText(this,"Copied",Toast.LENGTH_SHORT).show();
     }
     private void drainKeys() {
@@ -141,16 +189,27 @@ public final class MainActivity extends Activity {
                 // Private candidate includes undo; cancellation during formatting rolls back too.
                 RpnCalculator candidate = session.calculator.copy();
                 ValueFormatter.Notation notation = session.notation;
+                boolean computer=session.computer;
+                LocaleNumbers format=computer ? computerNumbers : localNumbers;
+                candidate.setInputProfile(format.profile());
                 if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
                     ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
-                else candidate.key(key);
+                else if(key.equals("NUMBER_FORMAT")) computer=!computer;
+                else if(key.startsWith("PASTE_RAW:")) candidate.pasteText(key.substring(10),localNumbers.profile());
+                else if(key.startsWith("SELECT:")) {
+                    String[] parts=key.split(":"); candidate.select(Integer.parseInt(parts[1]),Integer.parseInt(parts[2]));
+                } else if(key.startsWith("EDIT:")) {
+                    String[] parts=key.split(":",6);
+                    candidate.editText(parts[5],Integer.parseInt(parts[1]),Integer.parseInt(parts[2]),
+                        Boolean.parseBoolean(parts[3]),Boolean.parseBoolean(parts[4]),format.profile());
+                } else candidate.key(key);
                 List<String> rows = candidate.formattedValues(notation);
                 List<String> copies = new ArrayList<>();
                 for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation)); }
                 synchronized (session) {
                     checkCancelled();
-                    session.calculator = candidate; session.notation = notation;
-                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate.entry(),notation,candidate.isEditing(),candidate.angleUnit());
+                    session.calculator = candidate; session.notation = notation; session.computer=computer;
+                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate,notation,computer);
                     session.error = "";
                 }
             } catch (RuntimeException ex) {
@@ -176,7 +235,9 @@ public final class MainActivity extends Activity {
     private void refresh() {
         Display display = session.display;
         if (rendered != display) {
-            boolean stackChanged = rendered == null || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
+            numbers=display.computer ? computerNumbers : localNumbers;
+            keys.setNumberFormat(numbers);
+            boolean stackChanged = rendered == null || rendered.computer!=display.computer || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
             if (stackChanged) {
                 stackRows.removeAllViews();
                 if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(Color.rgb(133,150,164)); stackRows.addView(empty); }
@@ -200,8 +261,20 @@ public final class MainActivity extends Activity {
                     stackRows.addView(row);
                 }
             }
-            entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
-            entryView.setText(display.entry.isEmpty() ? "▸" : numbers.entry(display.entry));
+            changingEntry=true;
+            try {
+                entryShowsRaw=display.raw;
+                entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
+                String entry=display.raw ? display.entry : numbers.entry(display.entry);
+                if(!entryView.getText().toString().equals(entry)) entryView.setText(entry);
+                entryView.setTextColor(display.problem.isEmpty() ? Color.rgb(228,237,242) : Color.rgb(255,125,125));
+                if(Build.VERSION.SDK_INT>=30) entryView.setStateDescription(!display.problem.isEmpty() ? display.problem+" number" : display.confirm ? "Press Enter to accept pasted number" : "Number entry");
+                if(display.editing) {
+                    if(!entryView.hasFocus()) entryView.requestFocus();
+                    int start=Math.min(entry.length(),display.start),end=Math.min(entry.length(),display.end);
+                    if(entryView.getSelectionStart()!=start || entryView.getSelectionEnd()!=end) entryView.setSelection(start,end);
+                }
+            } finally { changingEntry=false; }
             keys.setEditing(display.editing);
             angleButton.setText(display.angleUnit.name());
             angleButton.setContentDescription("Angle unit: " + display.angleUnit.name() + ". Tap to switch.");
@@ -209,22 +282,29 @@ public final class MainActivity extends Activity {
             notationButton.setText(display.notation == ValueFormatter.Notation.ENGINEERING ? "ENG" : "SCI");
             notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
             getPreferences(0).edit().putBoolean("engineering",display.notation == ValueFormatter.Notation.ENGINEERING).apply();
+            numberFormatButton.setText(display.computer ? "DOT" : "LOC");
+            numberFormatButton.setContentDescription(display.computer
+                ? "Computer format: decimal dot, apostrophe grouping. Tap for phone locale."
+                : "Phone locale number format. Tap for computer format.");
+            getPreferences(0).edit().putBoolean("computerNumbers",display.computer).apply();
+            boolean follow = rendered==null || rendered.editing!=display.editing || !rendered.rows.equals(display.rows);
             rendered = display;
             // A second post runs after the updated rows have been measured. Do not repeatedly
             // scroll on polling ticks: the user must still be able to inspect older entries.
-            scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
+            if(follow) scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
         }
         // Brief input evaluations keep Undo visible; longer work turns the same key into Cancel.
         boolean showProgress = session.busy && (session.cancelRequested
             || SystemClock.elapsedRealtime() - session.busySince >= 250);
         status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Working…")
-            : display.editing ? "ENTRY" : "STACK");
-        status.setContentDescription(showProgress ? status.getText() : display.editing ? "Entry mode" : "Stack mode");
+            : !display.problem.isEmpty() ? display.problem.toUpperCase(Locale.ROOT) : display.confirm ? "CONFIRM" : display.editing ? "ENTRY" : "STACK");
+        status.setContentDescription(status.getText());
         if (!session.error.isEmpty() && !session.error.equals(shownError)) Toast.makeText(this,session.error,Toast.LENGTH_LONG).show();
         shownError = session.error;
         keys.setCalculating(showProgress);
         notationButton.setEnabled(!session.busy);
         angleButton.setEnabled(!session.busy);
+        numberFormatButton.setEnabled(!session.busy);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
@@ -247,4 +327,5 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 }
+
 
