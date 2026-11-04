@@ -5,7 +5,6 @@ import android.app.Instrumentation;
 import android.content.*;
 import android.os.SystemClock;
 import android.view.*;
-import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.*;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -16,6 +15,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import static org.junit.Assert.*;
+import static androidx.test.espresso.Espresso.onView;
+import static androidx.test.espresso.matcher.ViewMatchers.withText;
+import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
+import static androidx.test.espresso.action.ViewActions.click;
 
 @RunWith(AndroidJUnit4.class)
 public final class StackSelectionTest {
@@ -50,19 +53,7 @@ public final class StackSelectionTest {
         return null;
     }
     private void choose(String text) {
-        long until=SystemClock.elapsedRealtime()+5000;
-        do {
-            AccessibilityNodeInfo root=instrumentation.getUiAutomation().getRootInActiveWindow();
-            if(root!=null) for(AccessibilityNodeInfo node:root.findAccessibilityNodeInfosByText(text)) {
-                if(text.contentEquals(node.getText()==null ? "" : node.getText()) && "android.widget.TextView".contentEquals(node.getClassName())) {
-                    AccessibilityNodeInfo clickable=node;
-                    while(clickable!=null && !clickable.isClickable()) clickable=clickable.getParent();
-                    if(clickable!=null && clickable.performAction(AccessibilityNodeInfo.ACTION_CLICK)) return;
-                }
-            }
-            SystemClock.sleep(25);
-        } while(SystemClock.elapsedRealtime()<until);
-        fail("Missing popup action: "+text);
+        onView(withText(text)).inRoot(isPlatformPopup()).perform(click());
     }
     @Test public void selectionCopyDropAndUndoOperateOnWholeSelection() throws Exception {
         Context context=instrumentation.getTargetContext(); CalculatorStore store=new CalculatorStore(context.getNoBackupFilesDir());
