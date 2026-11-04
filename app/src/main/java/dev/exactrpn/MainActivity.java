@@ -347,8 +347,14 @@ public final class MainActivity extends Activity {
     private boolean toggleStackRow(int index,Display snapshot) {
         if(!stackActionAllowed(snapshot)) return false;
         int scrollY=scroll.getScrollY();
+        View oldRow=stackRows.findViewWithTag("stack-row:"+index);
+        int anchorCenter=oldRow==null ? 0 : oldRow.getTop()+oldRow.getHeight()/2-scrollY;
         if(!session.selectedRows.remove(index)) session.selectedRows.add(index);
-        selectionDirty=true; refresh(); scroll.post(() -> scroll.scrollTo(0,scrollY));
+        selectionDirty=true; refresh();
+        scroll.post(() -> {
+            View newRow=stackRows.findViewWithTag("stack-row:"+index);
+            scroll.scrollTo(0,oldRow==null || newRow==null ? scrollY : newRow.getTop()+newRow.getHeight()/2-anchorCenter);
+        });
         return true;
     }
     private void stackRowTapped(int index,Display snapshot) {
