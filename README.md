@@ -15,14 +15,11 @@ last digit leaves entry mode active; **Enter** on an empty entry returns to the
 stack. Results return to the bottom after operations; exact integers display in
 full there, while values above an entry use compact notation.
 
-The stack, entry and up to 100 undo steps are saved automatically and restored
-when the app reopens. Oldest undo steps are dropped if the saved history exceeds
-1 MiB; the current calculation is retained. **Clear** can be undone while the app
-stays open. Leaving the app with an empty stack and entry discards undo history.
+Your stack and entry are restored when you reopen the app.
 
-**Swap** exchanges X and Y; **Undo** restores the previous state and long-press
-Undo redoes it. Individual edits remain undoable until entry is committed; committing
-with Enter or an operation drops the intermediate edit history. **Functions**
+**Swap** exchanges X and Y. **Clear** clears the stack and entry. **Undo** reverses
+the last change; long-press Undo to redo. During a long calculation, Undo becomes
+**Cancel**. **Functions**
 expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
 **SCI/ENG** for display notation. **FRAC/DEC** switches known rational results
 between reduced fractions and decimals; irrational results remain decimal.
