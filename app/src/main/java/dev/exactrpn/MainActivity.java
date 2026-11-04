@@ -94,6 +94,17 @@ public final class MainActivity extends Activity {
         // setShowSoftInputOnFocus alone does not prevent restoration after another app closes.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
+        // Own the safe-area padding explicitly rather than combining decor fitting and app insets.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+        getWindow().setStatusBarColor(Color.TRANSPARENT); getWindow().setNavigationBarColor(Color.TRANSPARENT);
+        if(Build.VERSION.SDK_INT>=30) getWindow().setDecorFitsSystemWindows(false);
+        else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+            | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
+        if(Build.VERSION.SDK_INT>=28) {
+            WindowManager.LayoutParams window=getWindow().getAttributes();
+            window.layoutInDisplayCutoutMode=WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+            getWindow().setAttributes(window);
+        }
         Locale locale=getResources().getConfiguration().getLocales().get(0);
         localNumbers=new LocaleNumbers(locale); computerNumbers=new LocaleNumbers(locale,true); ungroupedNumbers=new LocaleNumbers(locale,false,false);
         session = (Session)getLastNonConfigurationInstance();
@@ -109,12 +120,23 @@ public final class MainActivity extends Activity {
         }
         numbers=numberFormat(session.numberMode);
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
-        root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
+        root.setPadding(dp(16),dp(4),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
         root.setOnApplyWindowInsetsListener((v,insets) -> {
+            int left,top,right,bottom;
             if (Build.VERSION.SDK_INT >= 30) {
-                android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
-                root.setPadding(dp(16)+bars.left,dp(16)+bars.top,dp(16)+bars.right,dp(12)+bars.bottom);
-            } else root.setPadding(dp(16),dp(16)+insets.getSystemWindowInsetTop(),dp(16),dp(12)+insets.getSystemWindowInsetBottom());
+                // getInsets unions the types, taking the maximum per edge rather than adding them.
+                android.graphics.Insets safe=insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                left=safe.left; top=safe.top; right=safe.right; bottom=safe.bottom;
+            } else {
+                left=insets.getSystemWindowInsetLeft(); top=insets.getSystemWindowInsetTop();
+                right=insets.getSystemWindowInsetRight(); bottom=insets.getSystemWindowInsetBottom();
+                if(Build.VERSION.SDK_INT>=28 && insets.getDisplayCutout()!=null) {
+                    DisplayCutout cutout=insets.getDisplayCutout();
+                    left=Math.max(left,cutout.getSafeInsetLeft()); top=Math.max(top,cutout.getSafeInsetTop());
+                    right=Math.max(right,cutout.getSafeInsetRight()); bottom=Math.max(bottom,cutout.getSafeInsetBottom());
+                }
+            }
+            root.setPadding(dp(16)+left,dp(4)+top,dp(16)+right,dp(12)+bottom);
             positionNotice(root);
             return insets;
         });
@@ -177,7 +199,7 @@ public final class MainActivity extends Activity {
         noticeBackground.setColor(Color.rgb(35,46,59)); noticeBackground.setCornerRadius(dp(12));
         noticeView.setBackground(noticeBackground); noticeView.setElevation(dp(8)); noticeView.setVisibility(View.GONE);
         screen.addView(noticeView,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
-        positionNotice(root); setContentView(screen);
+        positionNotice(root); setContentView(screen); screen.requestApplyInsets();
         if (Build.VERSION.SDK_INT >= 33) {
             backCallback = this::handleBack;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
