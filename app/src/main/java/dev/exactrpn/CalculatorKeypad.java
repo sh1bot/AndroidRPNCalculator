@@ -65,7 +65,7 @@ public final class CalculatorKeypad extends LinearLayout {
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String key, String label) {
-        Button b = new Button(getContext()); b.setAllCaps(false);
+        Button b = new Button(getContext()); b.setAllCaps(false); b.setTag(key);
         if (key.equals("1/x")) {
             // A diagonal (solidus) fraction, with raised numerator and lowered denominator.
             SpannableString fraction = new SpannableString("1⁄x");
@@ -78,7 +78,7 @@ public final class CalculatorKeypad extends LinearLayout {
         if(key.matches("[0-9.]")) numberButtons.put(key,b);
         b.setTextColor(Color.rgb(229,237,245));
         b.setSingleLine(true); b.setHorizontallyScrolling(false); b.setIncludeFontPadding(false);
-        b.setAutoSizeTextTypeUniformWithConfiguration(10,100,1,TypedValue.COMPLEX_UNIT_SP);
+        b.setAutoSizeTextTypeUniformWithConfiguration(10,26,1,TypedValue.COMPLEX_UNIT_SP);
         b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(0); b.setMinimumHeight(0);
         b.setPadding(dp(2),0,dp(2),0); b.setElevation(0); b.setStateListAnimator(null);
         boolean number = key.matches("[0-9.]");
@@ -128,7 +128,18 @@ public final class CalculatorKeypad extends LinearLayout {
     }
     private void fitLabel(Button button, int width, int height) {
         int minimum = Math.max(1,Math.round(10*getResources().getDisplayMetrics().scaledDensity));
-        int maximum = Math.max(minimum,Math.round(Math.min(width,height)*.8f));
+        String key=(String)button.getTag();
+        int preferred=16;
+        if(key.matches("[0-9.]")) preferred=26;
+        else if(key.matches("[+−×÷±]")) preferred=26;
+        else if(key.equals("BACK") && button.getText().toString().equals("⌫")) preferred=24;
+        else if(key.equals("π") || key.equals("e") || key.equals("√")) preferred=24;
+        else if(key.equals("1/x") || key.equals("eˣ") || key.equals("xʸ")) preferred=22;
+        else if(key.equals("sin") || key.equals("cos") || key.equals("tan") || key.equals("ln")) preferred=20;
+        else if(key.equals("ENTER")) preferred=18;
+        int preferredPixels=Math.round(preferred*getResources().getDisplayMetrics().scaledDensity);
+        // Grow only up to a consistent type size; smaller keys may shrink to fit.
+        int maximum = Math.max(minimum,Math.min(preferredPixels,Math.round(Math.min(width,height)*.55f)));
         if (button.getAutoSizeMaxTextSize()!=maximum || button.getAutoSizeMinTextSize()!=minimum)
             button.setAutoSizeTextTypeUniformWithConfiguration(minimum,maximum,1,TypedValue.COMPLEX_UNIT_PX);
     }
