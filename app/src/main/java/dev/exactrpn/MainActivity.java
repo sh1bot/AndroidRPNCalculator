@@ -15,7 +15,7 @@ import com.android.calculator2.UnifiedReal;
 public final class MainActivity extends Activity {
     private Session session;
     private TextView entryView, status;
-    private Button notationButton, angleButton, cancelButton;
+    private Button notationButton, angleButton;
     private CalculatorKeypad keys;
     private String shownError = "";
     private android.window.OnBackInvokedCallback backCallback;
@@ -73,10 +73,6 @@ public final class MainActivity extends Activity {
         header.addView(notationButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
         status = text(12); status.setGravity(Gravity.CENTER_VERTICAL); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END);
         header.addView(status,new LinearLayout.LayoutParams(0,dp(48),1));
-        cancelButton = new Button(this); cancelButton.setText("Cancel"); cancelButton.setAllCaps(false); cancelButton.setTextSize(12);
-        cancelButton.setMinWidth(0); cancelButton.setMinimumWidth(0); cancelButton.setPadding(0,0,0,0);
-        cancelButton.setOnClickListener(v -> cancelCalculation());
-        header.addView(cancelButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
         root.addView(header);
         scroll = new ScrollView(this); scroll.setFillViewport(true);
         stackRows = new LinearLayout(this); stackRows.setOrientation(1); stackRows.setGravity(Gravity.BOTTOM);
@@ -99,6 +95,8 @@ public final class MainActivity extends Activity {
     private void digits(TextView t) { t.setTypeface(Typeface.MONOSPACE); t.setFontFeatureSettings("tnum"); }
     private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(Color.rgb(228,237,242)); t.setPadding(dp(4),dp(6),dp(4),dp(6)); return t; }
     private void execute(String key) {
+        if (key.equals("CANCEL") || (key.equals("UNDO") && session.busy
+            && SystemClock.elapsedRealtime()-session.busySince >= 250)) { cancelCalculation(); return; }
         boolean start;
         synchronized (session) {
             session.pending.addLast(key);
@@ -194,7 +192,7 @@ public final class MainActivity extends Activity {
             // scroll on polling ticks: the user must still be able to inspect older entries.
             scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
         }
-        // Keep layout fixed and avoid flashing progress during brief entry evaluations.
+        // Brief input evaluations keep Undo visible; longer work turns the same key into Cancel.
         boolean showProgress = session.busy && (session.cancelRequested
             || SystemClock.elapsedRealtime() - session.busySince >= 250);
         status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Working…")
@@ -202,7 +200,7 @@ public final class MainActivity extends Activity {
         status.setContentDescription(showProgress ? status.getText() : display.editing ? "Entry mode" : "Stack mode");
         if (!session.error.isEmpty() && !session.error.equals(shownError)) Toast.makeText(this,session.error,Toast.LENGTH_LONG).show();
         shownError = session.error;
-        cancelButton.setVisibility(showProgress ? View.VISIBLE : View.INVISIBLE);
+        keys.setCalculating(showProgress);
         notationButton.setEnabled(!session.busy);
         angleButton.setEnabled(!session.busy);
     }
