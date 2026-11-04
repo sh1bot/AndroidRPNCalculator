@@ -25,7 +25,8 @@ public final class CalculatorKeypad extends LinearLayout {
     private final List<LinearLayout> scientificRows = new ArrayList<>();
     private final Button expand;
     private final LinearLayout controls;
-    private Button deleteButton;
+    private Button deleteButton, undoButton;
+    private boolean calculating;
     private boolean expanded;
     private final Consumer<Boolean> saveExpanded;
     private final Consumer<String> command;
@@ -47,6 +48,12 @@ public final class CalculatorKeypad extends LinearLayout {
     public void setEditing(boolean editing) {
         deleteButton.setText(editing ? "⌫" : "Drop");
         deleteButton.setContentDescription(editing ? "Backspace" : "Drop X");
+    }
+    public void setCalculating(boolean active) {
+        if (calculating == active) return;
+        calculating = active;
+        undoButton.setText(active ? "Cancel" : "Undo");
+        undoButton.setContentDescription(active ? "Cancel calculation" : "Undo");
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String key, String label) {
@@ -81,7 +88,8 @@ public final class CalculatorKeypad extends LinearLayout {
             case "1/x": description="Reciprocal of X"; break;
             default: description=key;
         }
-        b.setContentDescription(description); b.setOnClickListener(v -> command.accept(key));
+        b.setContentDescription(description);
+        b.setOnClickListener(v -> command.accept(key.equals("UNDO") && calculating ? "CANCEL" : key));
         return b;
     }
     private void addRows(String[][] keys, List<LinearLayout> rows) {
@@ -92,6 +100,7 @@ public final class CalculatorKeypad extends LinearLayout {
                 FrameLayout cell = new FrameLayout(getContext());
                 Button b = button(key,label);
                 if (key.equals("BACK")) deleteButton = b;
+                if (key.equals("UNDO")) undoButton = b;
                 cell.addView(b,new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.CENTER));
                 row.addView(cell,new LinearLayout.LayoutParams(0,-1,1));
             }
