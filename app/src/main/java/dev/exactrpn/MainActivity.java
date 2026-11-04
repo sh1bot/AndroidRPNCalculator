@@ -364,7 +364,7 @@ public final class MainActivity extends Activity {
             notationButton.setText(display.notation == ValueFormatter.Notation.ENGINEERING ? "ENG" : "SCI");
             notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
             getPreferences(0).edit().putBoolean("engineering",display.notation == ValueFormatter.Notation.ENGINEERING).apply();
-            fractionButton.setText(new String[]{"DEC","IMPR","MIX"}[display.fractionMode]);
+            fractionButton.setText(new String[]{"DEC","IMPR","FRAC"}[display.fractionMode]);
             fractionButton.setContentDescription(new String[]{
                 "Decimal display. Tap for improper fractions.",
                 "Improper fraction display. Tap for mixed fractions.",
