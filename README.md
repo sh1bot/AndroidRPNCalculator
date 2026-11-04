@@ -25,6 +25,11 @@ Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+S swaps, Ctrl+L clear
 and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 `s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, and `^` power.
 
+Tap a stack value to copy it as an ungrouped C-locale number. Long-press **Enter**
+(or Ctrl+V) to paste a C-locale or local decimal into entry. Stack grouping and
+the decimal key follow the phone's locale; entry is never grouped. Dot-only
+pasted input is interpreted as a C decimal when the meaning is ambiguous.
+
 ## Build
 
 Requires JDK 17, Android SDK 35, and Gradle 8.11.1. Set `ANDROID_HOME` to your SDK,
@@ -51,3 +56,4 @@ New code is licensed under [Apache 2.0](LICENSE). The arithmetic engine includes
   with AOSP Apache 2.0 additions and the original SGI/HP permissive notices.
 
 Upstream notices are retained in the source, [NOTICE](NOTICE), and [licenses](licenses).
+

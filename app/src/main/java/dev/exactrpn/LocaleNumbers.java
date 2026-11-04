@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: Apache-2.0
+package dev.exactrpn;
+
+import android.icu.text.DecimalFormat;
+import android.icu.text.DecimalFormatSymbols;
+import android.icu.text.NumberFormat;
+import android.text.SpannableStringBuilder;
+import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
+import java.math.BigInteger;
+import java.util.Locale;
+
+/** Use Android's own ICU formatter so grouping widths and suppression rules follow the OS. */
+public final class LocaleNumbers {
+    private final NumberFormat integers;
+    private final DecimalFormatSymbols symbols;
+    private final int primary, secondary;
+    public LocaleNumbers(Locale locale) {
+        integers = NumberFormat.getIntegerInstance(locale);
+        integers.setMaximumIntegerDigits(Integer.MAX_VALUE);
+        DecimalFormat format = (DecimalFormat)integers;
+        symbols = format.getDecimalFormatSymbols();
+        primary = format.isGroupingUsed() ? format.getGroupingSize() : 0;
+        secondary = format.getSecondaryGroupingSize();
+    }
+    public char decimalSeparator() { return symbols.getDecimalSeparator(); }
+    /** Entry localizes digits and decimal separator, but never inserts grouping. */
+    public String entry(String canonical) {
+        StringBuilder text = new StringBuilder();
+        for (int i=0;i<canonical.length();i++) {
+            char c = canonical.charAt(i);
+            text.append(c>='0' && c<='9' ? (char)(symbols.getZeroDigit()+c-'0') : c=='.' ? decimalSeparator() : c);
+        }
+        return text.toString();
+    }
+    public CharSequence stack(String canonical, int groupingColor) {
+        SpannableStringBuilder text = new SpannableStringBuilder();
+        String number = canonical;
+        if (number.startsWith("≈ ")) { text.append("≈ "); number = number.substring(2); }
+        // The display's explicit near-zero annotation is not a numeric literal.
+        if (number.contains("(")) return text.append(entry(number));
+        int e = number.indexOf('e');
+        String mantissa = e<0 ? number : number.substring(0,e);
+        int dot = mantissa.indexOf('.');
+        String whole = dot<0 ? mantissa : mantissa.substring(0,dot);
+        BigInteger integer = new BigInteger(whole);
+        String localized = integers.format(integer);
+        if (whole.startsWith("-") && integer.signum()==0) localized = ((DecimalFormat)integers).getNegativePrefix()+localized; // No double conversion or digit loss.
+        int start = text.length(); text.append(localized);
+        for (int i=0;i<localized.length();i++) {
+            if (localized.charAt(i)==symbols.getGroupingSeparator())
+                text.setSpan(new ForegroundColorSpan(groupingColor),start+i,start+i+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        if (dot>=0) text.append(Character.toString(decimalSeparator())).append(entry(mantissa.substring(dot+1)));
+        if (e>=0) text.append("e").append(entry(number.substring(e+1)));
+        return text;
+    }
+    public String paste(String text) { return NumberText.normalize(text,decimalSeparator(),symbols.getGroupingSeparator(),primary,secondary); }
+}

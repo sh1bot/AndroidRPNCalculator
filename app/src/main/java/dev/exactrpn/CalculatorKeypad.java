@@ -24,6 +24,7 @@ public final class CalculatorKeypad extends LinearLayout {
     private final List<LinearLayout> primaryRows = new ArrayList<>();
     private final List<LinearLayout> scientificRows = new ArrayList<>();
     private final Button expand;
+    private final LocaleNumbers numbers;
     private final LinearLayout controls;
     private Button deleteButton, undoButton;
     private boolean calculating;
@@ -33,6 +34,7 @@ public final class CalculatorKeypad extends LinearLayout {
 
     public CalculatorKeypad(Context context, Consumer<String> command, boolean expanded, Consumer<Boolean> saveExpanded) {
         super(context); this.command = command; this.expanded = expanded; this.saveExpanded = saveExpanded;
+        numbers = new LocaleNumbers(context.getResources().getConfiguration().getLocales().get(0));
         setOrientation(VERTICAL);
         controls = new LinearLayout(context);
         controls.addView(button("SWAP", "Swap"), new LinearLayout.LayoutParams(0,dp(44),1));
@@ -66,7 +68,7 @@ public final class CalculatorKeypad extends LinearLayout {
             fraction.setSpan(new SubscriptSpan(),2,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             fraction.setSpan(new RelativeSizeSpan(.7f),2,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.setText(fraction);
-        } else b.setText(label);
+        } else b.setText(key.matches("[0-9.]") ? numbers.entry(label) : label);
         b.setTextColor(Color.rgb(229,237,245));
         b.setSingleLine(true); b.setHorizontallyScrolling(false); b.setIncludeFontPadding(false);
         b.setAutoSizeTextTypeUniformWithConfiguration(10,100,1,TypedValue.COMPLEX_UNIT_SP);
@@ -79,6 +81,8 @@ public final class CalculatorKeypad extends LinearLayout {
         b.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(65,255,255,255)),shape,null));
         String description;
         switch (key) {
+            case "ENTER": description="Enter; long press to paste"; break;
+            case ".": description="Decimal separator"; break;
             case "BACK": description="Backspace"; break;
             case "CLEAR": description="Clear stack"; break;
             case "CE": description="Clear entry"; break;
@@ -90,6 +94,7 @@ public final class CalculatorKeypad extends LinearLayout {
         }
         b.setContentDescription(description);
         b.setOnClickListener(v -> command.accept(key.equals("UNDO") && calculating ? "CANCEL" : key));
+        if (key.equals("ENTER")) b.setOnLongClickListener(v -> { command.accept("PASTE"); return true; });
         return b;
     }
     private void addRows(String[][] keys, List<LinearLayout> rows) {
@@ -166,3 +171,4 @@ public final class CalculatorKeypad extends LinearLayout {
         super.onMeasure(widthSpec,heightSpec);
     }
 }
+
