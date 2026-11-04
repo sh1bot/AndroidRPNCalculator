@@ -20,7 +20,8 @@ expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
 **SCI/ENG** for display notation. **eˣ** calculates e to the power of X.
 
 Keyboard: digits, decimal point, and `+ - * /` enter numbers and operations.
-Enter/Space commits or duplicates; Backspace/Delete acts as backspace or Drop.
+Enter/Space commits or duplicates; Backspace/Delete edits or drops X.
+Left/Right and Home/End move the cursor; hold Shift to select.
 Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+S swaps, Ctrl+L clears,
 and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 `s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, and `^` power.

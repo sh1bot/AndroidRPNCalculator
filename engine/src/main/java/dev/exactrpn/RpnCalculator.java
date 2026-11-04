@@ -104,7 +104,25 @@ public final class RpnCalculator {
         String result=entry.substring(0,start)+text+entry.substring(end); checkLength(result);
         entry=result; select(start+text.length(),start+text.length());
     }
+    public void moveCursor(String direction,boolean extend) {
+        if(!editing) return;
+        int caret=selectionEnd,target=caret;
+        if(direction.equals("HOME")) target=0;
+        else if(direction.equals("END")) target=entry.length();
+        else if(direction.equals("LEFT")) {
+            if(!extend && selectionStart!=selectionEnd) target=Math.min(selectionStart,selectionEnd);
+            else if(caret>0) target=entry.offsetByCodePoints(caret,-1);
+        } else if(direction.equals("RIGHT")) {
+            if(!extend && selectionStart!=selectionEnd) target=Math.max(selectionStart,selectionEnd);
+            else if(caret<entry.length()) target=entry.offsetByCodePoints(caret,1);
+        }
+        select(extend ? selectionStart : target,target);
+    }
     public void key(String key) {
+        String direction=key.startsWith("SELECT_") ? key.substring(7) : key;
+        if(direction.equals("LEFT") || direction.equals("RIGHT") || direction.equals("HOME") || direction.equals("END")) {
+            moveCursor(direction,key.startsWith("SELECT_")); return;
+        }
         if(key.startsWith("PASTE:")) { paste(key.substring(6)); return; }
         if(key.equals("ANGLE")) { angleUnit=AngleUnit.values()[(angleUnit.ordinal()+1)%AngleUnit.values().length]; return; }
         if(key.equals("UNDO")) { if(!undo.isEmpty()) restore(undo.pop()); return; }
@@ -204,5 +222,6 @@ public final class RpnCalculator {
         return "≈ " + value.toStringTruncated(24);
     }
 }
+
 
 

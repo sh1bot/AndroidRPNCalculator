@@ -229,6 +229,27 @@ public final class Regression {
         catch(IllegalArgumentException expected) { check(true,"all public clipboard parsing rejects ambiguity"); }
         confirm.pasteText("",us); check(confirm.isEditing() && confirm.entry().isEmpty(),"empty paste remains in edit mode");
         confirm.key("ENTER"); check(!confirm.isEditing(),"Enter leaves empty pasted edit without pushing zero");
+        check("LEFT".equals(KeyboardInput.command(21,0,false,false,false)),"left key mapping");
+        check("RIGHT".equals(KeyboardInput.command(22,0,false,false,false)),"right key mapping");
+        check("HOME".equals(KeyboardInput.command(122,0,false,false,false)),"home key mapping");
+        check("END".equals(KeyboardInput.command(123,0,false,false,false)),"end key mapping");
+        check("HOME".equals(KeyboardInput.command(122,0,true,false,false)),"Ctrl Home mapping");
+        check("END".equals(KeyboardInput.command(123,0,true,false,false)),"Ctrl End mapping");
+        RpnCalculator nav=new RpnCalculator(); nav.paste("123.45");
+        nav.key("LEFT"); check(nav.selectionEnd()==5,"left moves one character");
+        nav.key("RIGHT"); check(nav.selectionEnd()==6,"right moves one character");
+        nav.key("HOME"); check(nav.selectionStart()==0 && nav.selectionEnd()==0,"home moves to entry start");
+        nav.key("LEFT"); check(nav.selectionEnd()==0,"left stays at start");
+        nav.key("END"); nav.key("RIGHT"); check(nav.selectionEnd()==6,"end and right stay at end");
+        nav.key("SELECT_LEFT"); check(nav.selectionStart()==6 && nav.selectionEnd()==5,"Shift Left extends backwards");
+        nav.key("SELECT_HOME"); check(nav.selectionStart()==6 && nav.selectionEnd()==0,"Shift Home selects to start");
+        nav.key("RIGHT"); check(nav.selectionStart()==6 && nav.selectionEnd()==6,"right collapses selection to right edge");
+        nav.key("HOME"); nav.key("SELECT_RIGHT"); check(nav.selectionStart()==0 && nav.selectionEnd()==1,"Shift Right extends forwards");
+        nav.key("SELECT_END"); check(nav.selectionStart()==0 && nav.selectionEnd()==6,"Shift End selects to end");
+        nav.key("LEFT"); check(nav.selectionStart()==0 && nav.selectionEnd()==0,"left collapses selection to left edge");
+        nav.key("RIGHT"); nav.key("RIGHT"); nav.key("9"); check(nav.entry().equals("1293.45"),"navigation places inserted digit correctly");
+        nav.key("UNDO"); check(nav.entry().equals("123.45") && nav.selectionEnd()==2,"undo restores edit and navigation position");
+        nav.key("ENTER"); nav.key("HOME"); check(!nav.isEditing() && nav.selectionEnd()==0,"navigation does not start editing stack");
         System.out.println("Passed " + checks + " regression checks");
     }
 }
