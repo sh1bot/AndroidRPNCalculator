@@ -16,7 +16,7 @@ public final class MainActivity extends Activity {
     private Session session;
     private EntryField entryView;
     private TextView status;
-    private Button notationButton, angleButton, numberFormatButton;
+    private Button notationButton, angleButton, numberFormatButton, fractionButton;
     private CalculatorKeypad keys;
     private LocaleNumbers numbers, localNumbers, computerNumbers;
     private boolean changingEntry, entryShowsRaw;
@@ -43,11 +43,11 @@ public final class MainActivity extends Activity {
         final List<String> rows,clipboard;
         final String entry,problem;
         final ValueFormatter.Notation notation;
-        final boolean editing,raw,computer;
+        final boolean editing,raw,computer,fractions;
         final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
-        Display(List<String> rows,List<String> clipboard,RpnCalculator calculator,ValueFormatter.Notation notation,boolean computer) {
-            this.rows=rows; this.clipboard=clipboard; this.notation=notation; this.computer=computer;
+        Display(List<String> rows,List<String> clipboard,RpnCalculator calculator,ValueFormatter.Notation notation,boolean computer,boolean fractions) {
+            this.rows=rows; this.clipboard=clipboard; this.notation=notation; this.computer=computer; this.fractions=fractions;
             entry=calculator.entry(); editing=calculator.isEditing(); raw=calculator.rawEntry();
             start=calculator.selectionStart(); end=calculator.selectionEnd(); problem=calculator.entryProblem();
             angleUnit=calculator.angleUnit();
@@ -63,10 +63,10 @@ public final class MainActivity extends Activity {
         volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
-        boolean computer;
-        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,boolean computer) {
-            notation = n; this.computer=computer; calculator.setAngleUnit(angle);
-            display = new Display(Collections.emptyList(),Collections.emptyList(),calculator,n,computer);
+        boolean computer,fractions;
+        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,boolean computer,boolean fractions) {
+            notation = n; this.computer=computer; this.fractions=fractions; calculator.setAngleUnit(angle);
+            display = new Display(Collections.emptyList(),Collections.emptyList(),calculator,n,computer,fractions);
         }
     }
     @Override public Object onRetainNonConfigurationInstance() { return session; }
@@ -78,7 +78,8 @@ public final class MainActivity extends Activity {
         if (session == null) session = new Session(getPreferences(0).getBoolean("engineering", false)
             ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC,
             RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")),
-            getPreferences(0).getBoolean("computerNumbers",false));
+            getPreferences(0).getBoolean("computerNumbers",false),
+            getPreferences(0).getBoolean("fractions",false));
         numbers=session.computer ? computerNumbers : localNumbers;
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
         root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
@@ -90,15 +91,18 @@ public final class MainActivity extends Activity {
             return insets;
         });
         LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
-        angleButton = new Button(this); angleButton.setTextSize(13);
+        angleButton = new Button(this); styleModeButton(angleButton);
         angleButton.setOnClickListener(v -> execute("ANGLE"));
-        header.addView(angleButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
-        notationButton = new Button(this); notationButton.setTextSize(13);
+        header.addView(angleButton,new LinearLayout.LayoutParams(dp(54),dp(48)));
+        notationButton = new Button(this); styleModeButton(notationButton);
         notationButton.setOnClickListener(v -> execute("FORMAT"));
-        header.addView(notationButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
-        numberFormatButton=new Button(this); numberFormatButton.setTextSize(13);
+        header.addView(notationButton,new LinearLayout.LayoutParams(dp(54),dp(48)));
+        numberFormatButton=new Button(this); styleModeButton(numberFormatButton);
         numberFormatButton.setOnClickListener(v -> execute("NUMBER_FORMAT"));
-        header.addView(numberFormatButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
+        header.addView(numberFormatButton,new LinearLayout.LayoutParams(dp(54),dp(48)));
+        fractionButton=new Button(this); styleModeButton(fractionButton);
+        fractionButton.setOnClickListener(v -> execute("FRACTION"));
+        header.addView(fractionButton,new LinearLayout.LayoutParams(dp(54),dp(48)));
         status = text(12); status.setGravity(Gravity.CENTER_VERTICAL); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END);
         header.addView(status,new LinearLayout.LayoutParams(0,dp(48),1));
         root.addView(header);
@@ -140,6 +144,10 @@ public final class MainActivity extends Activity {
                 android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
         }
         refresh();
+    }
+    private void styleModeButton(Button button) {
+        button.setTextSize(12); button.setMinWidth(0); button.setMinimumWidth(0);
+        button.setPadding(dp(4),0,dp(4),0);
     }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private void digits(TextView t) { t.setTypeface(Typeface.MONOSPACE); t.setFontFeatureSettings("tnum"); }
@@ -190,11 +198,13 @@ public final class MainActivity extends Activity {
                 RpnCalculator candidate = session.calculator.copy();
                 ValueFormatter.Notation notation = session.notation;
                 boolean computer=session.computer;
+                boolean fractions=session.fractions;
                 LocaleNumbers format=computer ? computerNumbers : localNumbers;
                 candidate.setInputProfile(format.profile());
                 if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
                     ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
                 else if(key.equals("NUMBER_FORMAT")) computer=!computer;
+                else if(key.equals("FRACTION")) fractions=!fractions;
                 else if(key.startsWith("PASTE_RAW:")) candidate.pasteText(key.substring(10),localNumbers.profile());
                 else if(key.startsWith("SELECT:")) {
                     String[] parts=key.split(":"); candidate.select(Integer.parseInt(parts[1]),Integer.parseInt(parts[2]));
@@ -203,13 +213,13 @@ public final class MainActivity extends Activity {
                     candidate.editText(parts[5],Integer.parseInt(parts[1]),Integer.parseInt(parts[2]),
                         Boolean.parseBoolean(parts[3]),Boolean.parseBoolean(parts[4]),format.profile());
                 } else candidate.key(key);
-                List<String> rows = candidate.formattedValues(notation);
+                List<String> rows = candidate.formattedValues(notation,fractions);
                 List<String> copies = new ArrayList<>();
                 for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation)); }
                 synchronized (session) {
                     checkCancelled();
-                    session.calculator = candidate; session.notation = notation; session.computer=computer;
-                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate,notation,computer);
+                    session.calculator = candidate; session.notation = notation; session.computer=computer; session.fractions=fractions;
+                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate,notation,computer,fractions);
                     session.error = "";
                 }
             } catch (RuntimeException ex) {
@@ -251,7 +261,8 @@ public final class MainActivity extends Activity {
                     boolean result = !display.editing && depth == 1;
                     TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(display.rows.get(i),Color.rgb(133,150,164)));
                     if (!result) {
-                        value.setSingleLine(true);
+                        value.setSingleLine(true); value.setHorizontallyScrolling(false);
+                        value.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         value.setAutoSizeTextTypeUniformWithConfiguration(12,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);
                     }
                     value.setTextIsSelectable(false); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
@@ -282,6 +293,11 @@ public final class MainActivity extends Activity {
             notationButton.setText(display.notation == ValueFormatter.Notation.ENGINEERING ? "ENG" : "SCI");
             notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
             getPreferences(0).edit().putBoolean("engineering",display.notation == ValueFormatter.Notation.ENGINEERING).apply();
+            fractionButton.setText(display.fractions ? "FRAC" : "DEC");
+            fractionButton.setContentDescription(display.fractions
+                ? "Known rational results as fractions. Tap for decimals."
+                : "Decimal results. Tap for fractions.");
+            getPreferences(0).edit().putBoolean("fractions",display.fractions).apply();
             numberFormatButton.setText(display.computer ? "DOT" : "LOC");
             numberFormatButton.setContentDescription(display.computer
                 ? "Computer format: decimal dot, apostrophe grouping. Tap for phone locale."
@@ -305,6 +321,7 @@ public final class MainActivity extends Activity {
         notationButton.setEnabled(!session.busy);
         angleButton.setEnabled(!session.busy);
         numberFormatButton.setEnabled(!session.busy);
+        fractionButton.setEnabled(!session.busy);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
@@ -332,6 +349,7 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 }
+
 
 
 

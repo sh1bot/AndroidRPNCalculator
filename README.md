@@ -17,7 +17,9 @@ full there, while values above an entry use compact notation.
 
 **Swap** exchanges X and Y; **Undo** restores the previous state. **Functions**
 expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
-**SCI/ENG** for display notation. **eˣ** calculates e to the power of X.
+**SCI/ENG** for display notation. **FRAC/DEC** switches known rational results
+between reduced fractions and decimals; irrational results remain decimal.
+**eˣ** calculates e to the power of X.
 
 Keyboard: digits, decimal point, and `+ - * /` enter numbers and operations.
 Enter/Space commits or duplicates; Backspace/Delete edits or drops X.
@@ -28,8 +30,8 @@ and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 
 **LOC/DOT** switches between phone-locale numbers and computer format (decimal
 dot, apostrophe display grouping). Copied numbers follow this choice but never
-include grouping. Tap a stack value to copy it; long-press **Enter** or Ctrl+V to
-paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
+include grouping. Copy remains decimal even in fraction display. Tap a stack value
+to copy it; long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
 a selected separator explicitly. Backspace/Delete edit at the cursor.
 
@@ -59,5 +61,6 @@ New code is licensed under [Apache 2.0](LICENSE). The arithmetic engine includes
   with AOSP Apache 2.0 additions and the original SGI/HP permissive notices.
 
 Upstream notices are retained in the source, [NOTICE](NOTICE), and [licenses](licenses).
+
 
 
