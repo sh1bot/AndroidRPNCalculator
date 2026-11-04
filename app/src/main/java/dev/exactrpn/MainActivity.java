@@ -272,6 +272,15 @@ public final class MainActivity extends Activity {
     }
     private void handleBack() { if (session.busy) cancelCalculation(); else if (session.display.editing) execute("CE"); else finish(); }
     private final Runnable tick = new Runnable() { public void run() { refresh(); handler.postDelayed(this,100); } };
+    private static String withoutApproximation(String number) {
+        return number.startsWith("≈ ") ? number.substring(2) : number;
+    }
+    private void updateStackLabel(TextView label,int depth,String number) {
+        boolean approximate=number.startsWith("≈ ");
+        String name=depth==1 ? "x" : depth==2 ? "y" : Integer.toString(depth);
+        label.setText(name+(approximate ? "≈" : ":"));
+        label.setContentDescription("Stack " + name + (approximate ? ", approximate value" : ""));
+    }
     private void refresh() {
         Display display = session.display;
         if (rendered != display) {
@@ -284,20 +293,21 @@ public final class MainActivity extends Activity {
                 for (int i=0;i<display.rows.size();i++) {
                     int depth = display.rows.size()-i;
                     LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.BOTTOM);
-                    TextView label = text(12); digits(label); label.setText(depth==1 ? "x:" : depth==2 ? "y:" : depth + ":");
+                    TextView label = text(12); digits(label); label.setSingleLine(true);
+                    updateStackLabel(label,depth,display.rows.get(i));
                     label.setGravity(Gravity.START | Gravity.BOTTOM); label.setTextColor(Color.rgb(133,150,164));
-                    label.setContentDescription(depth==1 ? "Stack X" : depth==2 ? "Stack Y" : "Stack level " + depth);
                     row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
                     boolean result = !display.editing && depth == 1;
-                    TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(display.rows.get(i),Color.rgb(133,150,164)));
+                    TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(withoutApproximation(display.rows.get(i)),Color.rgb(133,150,164)));
                     if (!result) {
                         value.setSingleLine(true); value.setHorizontallyScrolling(false);
                         value.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         value.setAutoSizeTextTypeUniformWithConfiguration(12,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);
                     }
                     if(result && !display.fractions && display.rows.get(i).contains(".") && !display.rows.get(i).startsWith("≈")) {
-                        final CharSequence full=numbers.stack(display.rows.get(i),Color.rgb(133,150,164));
-                        final CharSequence compact=numbers.stack(display.compactRows.get(i),Color.rgb(133,150,164));
+                        final String fullNumber=display.rows.get(i), compactNumber=display.compactRows.get(i);
+                        final CharSequence full=numbers.stack(withoutApproximation(fullNumber),Color.rgb(133,150,164));
+                        final CharSequence compact=numbers.stack(withoutApproximation(compactNumber),Color.rgb(133,150,164));
                         value.setSingleLine(true); value.setHorizontallyScrolling(false);
                         value.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
                             int available=r-l-value.getPaddingLeft()-value.getPaddingRight();
@@ -307,7 +317,10 @@ public final class MainActivity extends Activity {
                             int size=32;
                             for(;size>21;size--) { measure.setTextSize(size*scale); if(measure.measureText(full.toString())<=available) break; }
                             measure.setTextSize(size*scale);
-                            CharSequence chosen=measure.measureText(full.toString())<=available ? full : compact;
+                            boolean fits=measure.measureText(full.toString())<=available;
+                            CharSequence chosen=fits ? full : compact;
+                            updateStackLabel(label,depth,fits ? fullNumber : compactNumber);
+                            row.setContentDescription("Copy stack level " + depth + (fits || !compactNumber.startsWith("≈ ") ? ": " : ", approximately: ") + chosen);
                             if(!value.getText().toString().equals(chosen.toString())) value.setText(chosen);
                             if(value.getTextSize()!=size*scale) value.setTextSize(size);
                         });
@@ -315,7 +328,7 @@ public final class MainActivity extends Activity {
                     value.setTextIsSelectable(false); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
                     final String copy = display.clipboard.get(i);
                     row.setOnClickListener(v -> copyValue(copy));
-                    row.setContentDescription("Copy stack level " + depth + ": " + value.getText());
+                    row.setContentDescription("Copy stack level " + depth + (display.rows.get(i).startsWith("≈ ") ? ", approximately: " : ": ") + value.getText());
                     stackRows.addView(row);
                 }
             }
