@@ -18,7 +18,7 @@ public final class MainActivity extends Activity {
     private TextView status;
     private Button notationButton, angleButton, numberFormatButton, fractionButton;
     private CalculatorKeypad keys;
-    private LocaleNumbers numbers, localNumbers, computerNumbers;
+    private LocaleNumbers numbers, localNumbers, computerNumbers, ungroupedNumbers;
     private boolean changingEntry, entryShowsRaw;
     private String shownError = "";
     private android.window.OnBackInvokedCallback backCallback;
@@ -43,11 +43,12 @@ public final class MainActivity extends Activity {
         final List<String> rows,clipboard;
         final String entry,problem;
         final ValueFormatter.Notation notation;
-        final boolean editing,raw,computer,fractions;
+        final boolean editing,raw,fractions;
+        final int numberMode;
         final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
-        Display(List<String> rows,List<String> clipboard,RpnCalculator calculator,ValueFormatter.Notation notation,boolean computer,boolean fractions) {
-            this.rows=rows; this.clipboard=clipboard; this.notation=notation; this.computer=computer; this.fractions=fractions;
+        Display(List<String> rows,List<String> clipboard,RpnCalculator calculator,ValueFormatter.Notation notation,int numberMode,boolean fractions) {
+            this.rows=rows; this.clipboard=clipboard; this.notation=notation; this.numberMode=numberMode; this.fractions=fractions;
             entry=calculator.entry(); editing=calculator.isEditing(); raw=calculator.rawEntry();
             start=calculator.selectionStart(); end=calculator.selectionEnd(); problem=calculator.entryProblem();
             angleUnit=calculator.angleUnit();
@@ -63,24 +64,28 @@ public final class MainActivity extends Activity {
         volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
-        boolean computer,fractions;
-        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,boolean computer,boolean fractions) {
-            notation = n; this.computer=computer; this.fractions=fractions; calculator.setAngleUnit(angle);
-            display = new Display(Collections.emptyList(),Collections.emptyList(),calculator,n,computer,fractions);
+        int numberMode;
+        boolean fractions;
+        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,int numberMode,boolean fractions) {
+            notation = n; this.numberMode=numberMode; this.fractions=fractions; calculator.setAngleUnit(angle);
+            display = new Display(Collections.emptyList(),Collections.emptyList(),calculator,n,numberMode,fractions);
         }
+    }
+    private LocaleNumbers numberFormat(int mode) {
+        return mode==1 ? computerNumbers : mode==2 ? ungroupedNumbers : localNumbers;
     }
     @Override public Object onRetainNonConfigurationInstance() { return session; }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         Locale locale=getResources().getConfiguration().getLocales().get(0);
-        localNumbers=new LocaleNumbers(locale); computerNumbers=new LocaleNumbers(locale,true);
+        localNumbers=new LocaleNumbers(locale); computerNumbers=new LocaleNumbers(locale,true); ungroupedNumbers=new LocaleNumbers(locale,false,false);
         session = (Session)getLastNonConfigurationInstance();
         if (session == null) session = new Session(getPreferences(0).getBoolean("engineering", false)
             ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC,
             RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")),
-            getPreferences(0).getBoolean("computerNumbers",false),
+            getPreferences(0).getInt("numberMode",getPreferences(0).getBoolean("computerNumbers",false) ? 1 : 0),
             getPreferences(0).getBoolean("fractions",false));
-        numbers=session.computer ? computerNumbers : localNumbers;
+        numbers=numberFormat(session.numberMode);
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
         root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
         root.setOnApplyWindowInsetsListener((v,insets) -> {
@@ -197,13 +202,13 @@ public final class MainActivity extends Activity {
                 // Private candidate includes undo; cancellation during formatting rolls back too.
                 RpnCalculator candidate = session.calculator.copy();
                 ValueFormatter.Notation notation = session.notation;
-                boolean computer=session.computer;
+                int numberMode=session.numberMode;
                 boolean fractions=session.fractions;
-                LocaleNumbers format=computer ? computerNumbers : localNumbers;
+                LocaleNumbers format=numberFormat(numberMode);
                 candidate.setInputProfile(format.profile());
                 if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
                     ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
-                else if(key.equals("NUMBER_FORMAT")) computer=!computer;
+                else if(key.equals("NUMBER_FORMAT")) numberMode=(numberMode+1)%3;
                 else if(key.equals("FRACTION")) fractions=!fractions;
                 else if(key.startsWith("PASTE_RAW:")) candidate.pasteText(key.substring(10),localNumbers.profile());
                 else if(key.startsWith("SELECT:")) {
@@ -218,8 +223,8 @@ public final class MainActivity extends Activity {
                 for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation)); }
                 synchronized (session) {
                     checkCancelled();
-                    session.calculator = candidate; session.notation = notation; session.computer=computer; session.fractions=fractions;
-                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate,notation,computer,fractions);
+                    session.calculator = candidate; session.notation = notation; session.numberMode=numberMode; session.fractions=fractions;
+                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate,notation,numberMode,fractions);
                     session.error = "";
                 }
             } catch (RuntimeException ex) {
@@ -245,9 +250,9 @@ public final class MainActivity extends Activity {
     private void refresh() {
         Display display = session.display;
         if (rendered != display) {
-            numbers=display.computer ? computerNumbers : localNumbers;
+            numbers=numberFormat(display.numberMode);
             keys.setNumberFormat(numbers);
-            boolean stackChanged = rendered == null || rendered.computer!=display.computer || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
+            boolean stackChanged = rendered == null || rendered.numberMode!=display.numberMode || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
             if (stackChanged) {
                 stackRows.removeAllViews();
                 if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(Color.rgb(133,150,164)); stackRows.addView(empty); }
@@ -298,11 +303,13 @@ public final class MainActivity extends Activity {
                 ? "Known rational results as fractions. Tap for decimals."
                 : "Decimal results. Tap for fractions.");
             getPreferences(0).edit().putBoolean("fractions",display.fractions).apply();
-            numberFormatButton.setText(display.computer ? "DOT" : "LOC");
-            numberFormatButton.setContentDescription(display.computer
-                ? "Computer format: decimal dot, apostrophe grouping. Tap for phone locale."
-                : "Phone locale number format. Tap for computer format.");
-            getPreferences(0).edit().putBoolean("computerNumbers",display.computer).apply();
+            numberFormatButton.setText(new String[]{"LOC","DOT","NONE"}[display.numberMode]);
+            numberFormatButton.setContentDescription(new String[]{
+                "Phone locale number format. Tap for decimal dot with thin space grouping.",
+                "Decimal dot with thin space grouping. Tap for locale decimal without grouping.",
+                "Locale decimal without grouping. Tap for phone locale grouping."
+            }[display.numberMode]);
+            getPreferences(0).edit().putInt("numberMode",display.numberMode).apply();
             boolean follow = rendered==null || rendered.editing!=display.editing || !rendered.rows.equals(display.rows);
             rendered = display;
             // A second post runs after the updated rows have been measured. Do not repeatedly

@@ -28,8 +28,8 @@ Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+S swaps, Ctrl+L clear
 and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 `s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, and `^` power.
 
-**LOC/DOT** switches between phone-locale numbers and computer format (decimal
-dot, apostrophe display grouping). Copied numbers follow this choice but never
+**LOC/DOT/NONE** cycles between phone-locale numbers, decimal dot with thin-space
+display grouping, and the locale decimal with no grouping. Copied numbers follow this choice but never
 include grouping. Copy remains decimal even in fraction display. Tap a stack value
 to copy it; long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces

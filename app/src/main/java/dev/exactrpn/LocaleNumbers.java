@@ -16,14 +16,16 @@ public final class LocaleNumbers {
     private final DecimalFormatSymbols symbols;
     private final int primary, secondary;
     private final boolean computer;
-    public LocaleNumbers(Locale locale) { this(locale,false); }
-    public LocaleNumbers(Locale locale,boolean computer) {
+    public LocaleNumbers(Locale locale) { this(locale,false,true); }
+    public LocaleNumbers(Locale locale,boolean computer) { this(locale,computer,true); }
+    public LocaleNumbers(Locale locale,boolean computer,boolean grouping) {
         this.computer=computer;
         integers = NumberFormat.getIntegerInstance(computer ? Locale.US : locale);
         integers.setMaximumIntegerDigits(Integer.MAX_VALUE);
         DecimalFormat format = (DecimalFormat)integers;
         symbols = format.getDecimalFormatSymbols();
-        if (computer) { symbols.setGroupingSeparator('’'); format.setDecimalFormatSymbols(symbols); }
+        if (computer) { symbols.setGroupingSeparator('\u2009'); format.setDecimalFormatSymbols(symbols); }
+        format.setGroupingUsed(grouping && format.isGroupingUsed());
         primary = format.isGroupingUsed() ? format.getGroupingSize() : 0;
         secondary = format.getSecondaryGroupingSize();
     }
