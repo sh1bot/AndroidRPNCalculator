@@ -88,6 +88,10 @@ public final class MainActivity extends Activity {
     @Override public Object onRetainNonConfigurationInstance() { return session; }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        // Keep cursor/selection and hardware keys, but never connect this window to an IME.
+        // setShowSoftInputOnFocus alone does not prevent restoration after another app closes.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
+        getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         Locale locale=getResources().getConfiguration().getLocales().get(0);
         localNumbers=new LocaleNumbers(locale); computerNumbers=new LocaleNumbers(locale,true); ungroupedNumbers=new LocaleNumbers(locale,false,false);
         session = (Session)getLastNonConfigurationInstance();
