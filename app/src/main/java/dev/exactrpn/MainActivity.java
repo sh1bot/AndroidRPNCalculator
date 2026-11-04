@@ -259,9 +259,9 @@ public final class MainActivity extends Activity {
                 for (int i=0;i<display.rows.size();i++) {
                     int depth = display.rows.size()-i;
                     LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.BOTTOM);
-                    TextView label = text(12); digits(label); label.setText(depth + ":");
+                    TextView label = text(12); digits(label); label.setText(depth==1 ? "x:" : depth==2 ? "y:" : depth + ":");
                     label.setGravity(Gravity.START | Gravity.BOTTOM); label.setTextColor(Color.rgb(133,150,164));
-                    label.setContentDescription("Stack level " + depth);
+                    label.setContentDescription(depth==1 ? "Stack X" : depth==2 ? "Stack Y" : "Stack level " + depth);
                     row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
                     boolean result = !display.editing && depth == 1;
                     TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(display.rows.get(i),Color.rgb(133,150,164)));

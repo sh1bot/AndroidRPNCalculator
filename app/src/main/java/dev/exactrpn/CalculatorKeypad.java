@@ -67,6 +67,7 @@ public final class CalculatorKeypad extends LinearLayout {
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String key, String label) {
         Button b = new Button(getContext()); b.setAllCaps(false); b.setTag(key);
+        if (key.equals("xʸ")) label="yˣ";
         if (key.equals("1/x")) {
             // A diagonal (solidus) fraction, with raised numerator and lowered denominator.
             SpannableString fraction = new SpannableString("1⁄x");
@@ -94,6 +95,7 @@ public final class CalculatorKeypad extends LinearLayout {
             case "BACK": description="Backspace"; break;
             case "CLEAR": description="Clear stack"; break;
             case "CE": description="Clear entry"; break;
+            case "xʸ": description="Y to the power of X"; break;
             case "eˣ": description="e to the power of X"; break;
             case "e": description="Euler’s number"; break;
             case "π": description="Pi"; break;
@@ -192,5 +194,6 @@ public final class CalculatorKeypad extends LinearLayout {
         super.onMeasure(widthSpec,heightSpec);
     }
 }
+
 
 
