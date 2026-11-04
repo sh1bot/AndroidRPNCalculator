@@ -3,20 +3,26 @@ package dev.exactrpn;
 
 import android.util.AtomicFile;
 import java.io.*;
+import java.nio.file.Files;
 
-/** App-private, atomic checkpoint. Lives outside Android's cloud-backup directory. */
+/** Only the UI process can commit a result; cancelled workers never overwrite this file. */
 final class CalculatorStore {
     private final AtomicFile file;
-    CalculatorStore(File directory) { file=new AtomicFile(new File(directory,"calculator-state.bin")); }
-    RpnCalculator load() throws IOException {
+    private final File directory;
+    CalculatorStore(File directory) { this.directory=directory; file=new AtomicFile(new File(directory,"calculator-state.bin")); }
+    String checkpoint() throws IOException {
         if(!file.getBaseFile().exists() && !new File(file.getBaseFile()+".bak").exists()) return null;
-        return RpnCalculator.load(file.readFully());
+        try(FileInputStream ignored=file.openRead()) { return file.getBaseFile().getAbsolutePath(); }
     }
-    void save(RpnCalculator calculator,boolean discardEmpty) throws IOException {
-        if(discardEmpty && calculator.isEmpty()) { calculator.clearUndo(); file.delete(); return; }
-        byte[] bytes=calculator.save();
+    void save(String checkpoint) throws IOException {
+        byte[] bytes=Files.readAllBytes(new File(checkpoint).toPath());
         FileOutputStream out=file.startWrite();
         try { out.write(bytes); file.finishWrite(out); }
         catch(IOException | RuntimeException ex) { file.failWrite(out); throw ex; }
+    }
+    void clear() { file.delete(); }
+    void cleanWorkFiles(String keep) {
+        File[] files=directory.listFiles((dir,name) -> name.startsWith("calculation-"));
+        if(files!=null) for(File temporary:files) if(!temporary.getAbsolutePath().equals(keep)) temporary.delete();
     }
 }
