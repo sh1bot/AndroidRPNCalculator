@@ -1,0 +1,12 @@
+<resources>
+    <style name="Theme.ExactRpn" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:windowBackground">@color/calculator_background</item>
+        <item name="android:colorAccent">@color/calculator_accent</item>
+        <item name="android:colorControlHighlight">@color/calculator_ripple</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

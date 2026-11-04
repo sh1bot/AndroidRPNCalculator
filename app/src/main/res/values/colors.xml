@@ -1,0 +1,12 @@
+<resources>
+    <color name="calculator_background">#F7F9FC</color>
+    <color name="calculator_text">#17232F</color>
+    <color name="calculator_muted">#657383</color>
+    <color name="calculator_number_key">#E7EDF4</color>
+    <color name="calculator_function_key">#D6E1EC</color>
+    <color name="calculator_enter_key">#195B8A</color>
+    <color name="calculator_enter_text">#FFFFFF</color>
+    <color name="calculator_accent">#0A5C99</color>
+    <color name="calculator_error">#B3261E</color>
+    <color name="calculator_ripple">#260C2C48</color>
+</resources>

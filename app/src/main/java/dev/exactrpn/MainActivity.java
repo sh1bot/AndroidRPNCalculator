@@ -13,6 +13,7 @@ import java.util.concurrent.*;
 /** Exact values and evaluation survive rotation; views consume immutable display snapshots. */
 public final class MainActivity extends Activity {
     private Session session;
+    private ThemeColors colors;
     private EntryField entryView;
     private TextView status, noticeView;
     private Button notationButton, angleButton, numberFormatButton, fractionButton;
@@ -90,6 +91,7 @@ public final class MainActivity extends Activity {
     @Override public Object onRetainNonConfigurationInstance() { return session; }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        colors=new ThemeColors(this);
         // Keep cursor/selection and hardware keys, but never connect this window to an IME.
         // setShowSoftInputOnFocus alone does not prevent restoration after another app closes.
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM);
@@ -98,7 +100,7 @@ public final class MainActivity extends Activity {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
         getWindow().setStatusBarColor(Color.TRANSPARENT); getWindow().setNavigationBarColor(Color.TRANSPARENT);
         if(Build.VERSION.SDK_INT>=30) getWindow().setDecorFitsSystemWindows(false);
-        else getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+        else getWindow().getDecorView().setSystemUiVisibility(getWindow().getDecorView().getSystemUiVisibility() | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
             | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION);
         if(Build.VERSION.SDK_INT>=28) {
             WindowManager.LayoutParams window=getWindow().getAttributes();
@@ -120,7 +122,7 @@ public final class MainActivity extends Activity {
         }
         numbers=numberFormat(session.numberMode);
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
-        root.setPadding(dp(16),dp(4),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
+        root.setPadding(dp(16),dp(4),dp(16),dp(12)); root.setBackgroundColor(colors.background);
         root.setOnApplyWindowInsetsListener((v,insets) -> {
             int left,top,right,bottom;
             if (Build.VERSION.SDK_INT >= 30) {
@@ -165,7 +167,7 @@ public final class MainActivity extends Activity {
         entryView.setPadding(dp(4),dp(6),dp(4),dp(6)); entryView.setBackground(null);
         entryView.setInputType(android.text.InputType.TYPE_CLASS_TEXT|android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
         digits(entryView);
-        entryView.setSingleLine(true); entryView.setHint("▸"); entryView.setHintTextColor(Color.rgb(133,150,164));
+        entryView.setSingleLine(true); entryView.setHint("▸"); entryView.setHintTextColor(colors.muted);
         entryView.setShowSoftInputOnFocus(false);
         entryView.paste=() -> execute("PASTE");
         entryView.selectionChanged=(start,end) -> {
@@ -196,7 +198,7 @@ public final class MainActivity extends Activity {
         noticeView.setMaxLines(3); noticeView.setEllipsize(android.text.TextUtils.TruncateAt.END);
         noticeView.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         android.graphics.drawable.GradientDrawable noticeBackground=new android.graphics.drawable.GradientDrawable();
-        noticeBackground.setColor(Color.rgb(35,46,59)); noticeBackground.setCornerRadius(dp(12));
+        noticeBackground.setColor(colors.numberKey); noticeBackground.setCornerRadius(dp(12));
         noticeView.setBackground(noticeBackground); noticeView.setElevation(dp(8)); noticeView.setVisibility(View.GONE);
         screen.addView(noticeView,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
         positionNotice(root); setContentView(screen); screen.requestApplyInsets();
@@ -215,17 +217,17 @@ public final class MainActivity extends Activity {
         layout.topMargin=content.getPaddingTop()+dp(52); noticeView.setLayoutParams(layout);
     }
     private void showNotice(String message,boolean error) {
-        noticeView.setText(message); noticeView.setTextColor(error ? Color.rgb(255,125,125) : Color.rgb(228,237,242));
+        noticeView.setText(message); noticeView.setTextColor(error ? colors.error : colors.text);
         noticeView.setVisibility(View.VISIBLE); noticeView.bringToFront();
         handler.removeCallbacks(hideNotice); handler.postDelayed(hideNotice,error ? 5000 : 2000);
     }
     private void styleModeButton(Button button) {
-        button.setTextSize(12); button.setMinWidth(0); button.setMinimumWidth(0);
+        button.setTextColor(colors.text); button.setTextSize(12); button.setMinWidth(0); button.setMinimumWidth(0);
         button.setPadding(dp(4),0,dp(4),0);
     }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private void digits(TextView t) { t.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL)); t.setFontFeatureSettings("tnum"); }
-    private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(Color.rgb(228,237,242)); t.setPadding(dp(4),dp(6),dp(4),dp(6)); return t; }
+    private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(colors.text); t.setPadding(dp(4),dp(6),dp(4),dp(6)); return t; }
     private void execute(String key) {
         if(key.equals("INVERSE")) { session.inverse=!session.inverse; keys.setInverse(session.inverse); return; }
         if (key.equals("PASTE")) { pasteClipboard(); return; }
@@ -344,16 +346,16 @@ public final class MainActivity extends Activity {
             boolean stackChanged = rendered == null || rendered.numberMode!=display.numberMode || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
             if (stackChanged) {
                 stackRows.removeAllViews();
-                if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(Color.rgb(133,150,164)); stackRows.addView(empty); }
+                if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(colors.muted); stackRows.addView(empty); }
                 for (int i=0;i<display.rows.size();i++) {
                     int depth = display.rows.size()-i;
                     LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.BOTTOM);
                     TextView label = text(12); digits(label); label.setSingleLine(true);
                     updateStackLabel(label,depth,display.rows.get(i));
-                    label.setGravity(Gravity.START | Gravity.BOTTOM); label.setTextColor(Color.rgb(133,150,164));
+                    label.setGravity(Gravity.START | Gravity.BOTTOM); label.setTextColor(colors.muted);
                     row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
                     boolean result = !display.editing && depth == 1;
-                    TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(withoutApproximation(display.rows.get(i)),Color.rgb(133,150,164)));
+                    TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(withoutApproximation(display.rows.get(i)),colors.muted));
                     if (!result) {
                         value.setSingleLine(true); value.setHorizontallyScrolling(false);
                         value.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -361,8 +363,8 @@ public final class MainActivity extends Activity {
                     }
                     if(result && display.fractionMode==0 && display.rows.get(i).contains(".") && !display.rows.get(i).startsWith("≈")) {
                         final String fullNumber=display.rows.get(i), compactNumber=display.compactRows.get(i);
-                        final CharSequence full=numbers.stack(withoutApproximation(fullNumber),Color.rgb(133,150,164));
-                        final CharSequence compact=numbers.stack(withoutApproximation(compactNumber),Color.rgb(133,150,164));
+                        final CharSequence full=numbers.stack(withoutApproximation(fullNumber),colors.muted);
+                        final CharSequence compact=numbers.stack(withoutApproximation(compactNumber),colors.muted);
                         value.setSingleLine(true); value.setHorizontallyScrolling(false);
                         value.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
                             int available=r-l-value.getPaddingLeft()-value.getPaddingRight();
@@ -394,7 +396,7 @@ public final class MainActivity extends Activity {
                 String entry=display.raw ? display.entry : numbers.entry(display.entry);
                 if(!entryView.getText().toString().equals(entry)) entryView.setText(entry);
                 numbers.styleDecimal(entryView.getText());
-                entryView.setTextColor(display.problem.isEmpty() ? Color.rgb(228,237,242) : Color.rgb(255,125,125));
+                entryView.setTextColor(display.problem.isEmpty() ? colors.text : colors.error);
                 if(Build.VERSION.SDK_INT>=30) entryView.setStateDescription(!display.problem.isEmpty() ? display.problem+" number" : "Number entry");
                 if(display.editing) {
                     if(!entryView.hasFocus()) entryView.requestFocus();

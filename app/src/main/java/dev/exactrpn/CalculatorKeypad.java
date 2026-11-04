@@ -3,7 +3,6 @@ package dev.exactrpn;
 
 import android.content.Context;
 import android.content.res.ColorStateList;
-import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
@@ -24,6 +23,7 @@ public final class CalculatorKeypad extends LinearLayout {
     private final List<LinearLayout> primaryRows = new ArrayList<>();
     private final List<LinearLayout> scientificRows = new ArrayList<>();
     private final Button expand;
+    private final ThemeColors colors;
     private LocaleNumbers numbers;
     private final Map<String,Button> numberButtons=new HashMap<>();
     private final LinearLayout controls;
@@ -36,6 +36,7 @@ public final class CalculatorKeypad extends LinearLayout {
 
     public CalculatorKeypad(Context context, Consumer<String> command, boolean expanded, Consumer<Boolean> saveExpanded) {
         super(context); this.command = command; this.expanded = expanded; this.saveExpanded = saveExpanded;
+        colors=new ThemeColors(context);
         numbers = new LocaleNumbers(context.getResources().getConfiguration().getLocales().get(0));
         setOrientation(VERTICAL);
         controls = new LinearLayout(context);
@@ -68,7 +69,7 @@ public final class CalculatorKeypad extends LinearLayout {
             button.setText(functionLabel(effective));
             button.setContentDescription(key.equals("INVERSE") ? "Inverse functions " + (active ? "on" : "off") : effective.equals("root") ? "Xth root of Y" : effective);
             if(key.equals("INVERSE")) {
-                button.setTextColor(active ? Color.rgb(147,201,246) : Color.rgb(229,237,245));
+                button.setTextColor(active ? colors.accent : colors.text);
                 if(Build.VERSION.SDK_INT>=30) button.setStateDescription(active ? "On" : "Off");
             }
         }
@@ -104,16 +105,16 @@ public final class CalculatorKeypad extends LinearLayout {
             b.setText(fraction);
         } else b.setText(key.matches("[0-9.]") ? numbers.entry(label) : label);
         if(key.matches("[0-9.]")) { b.setFontFeatureSettings("tnum"); numberButtons.put(key,b); }
-        b.setTextColor(Color.rgb(229,237,245));
+        b.setTextColor(colors.text);
         b.setSingleLine(true); b.setHorizontallyScrolling(false); b.setIncludeFontPadding(false);
         b.setAutoSizeTextTypeUniformWithConfiguration(10,26,1,TypedValue.COMPLEX_UNIT_SP);
         b.setMinWidth(0); b.setMinimumWidth(0); b.setMinHeight(0); b.setMinimumHeight(0);
         b.setPadding(dp(2),0,dp(2),0); b.setElevation(0); b.setStateListAnimator(null);
         boolean number = key.matches("[0-9.]");
-        int color = key.equals("ENTER") ? Color.rgb(147,201,246) : number ? Color.rgb(35,46,59) : Color.rgb(51,68,87);
-        if (key.equals("ENTER")) b.setTextColor(Color.rgb(12,31,48));
+        int color = key.equals("ENTER") ? colors.enterKey : number ? colors.numberKey : colors.functionKey;
+        if (key.equals("ENTER")) b.setTextColor(colors.enterText);
         GradientDrawable shape = new GradientDrawable(); shape.setColor(color); shape.setCornerRadius(dp(100));
-        b.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(65,255,255,255)),shape,null));
+        b.setBackground(new RippleDrawable(ColorStateList.valueOf(colors.ripple),shape,null));
         String description;
         switch (key) {
             case "INVERSE": description="Inverse functions off"; break;
