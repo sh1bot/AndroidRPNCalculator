@@ -21,21 +21,28 @@ Your stack and entry are restored when you reopen the app.
 the last change; long-press Undo to redo. During a long calculation, Undo becomes
 **Cancel**. **Functions**
 expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
-**SCI/ENG** for display notation. **FRAC/DEC** switches known rational results
-between reduced fractions and decimals; irrational results remain decimal.
-**eˣ** calculates e to the power of X.
+**SCI/ENG** for display notation. **DEC/IMPR/MIX** cycles between decimals,
+improper fractions (`7/3`) and mixed fractions (`2 1/3`). Irrational results remain decimal.
+
+**INV** switches sin/cos/tan to asin/acos/atan, ln to eˣ, square root to square,
+power to the Xth root of Y, and remainder to modulo. Inverse trig results use the
+selected angle unit. **rem** calculates Y remainder X, with the sign of Y;
+**mod** uses the sign of X. Both accept exact rational operands. **x!** computes
+factorial for nonnegative integers. **Factor** replaces a positive integer greater
+than 1 with its prime factors, pushed smallest first: `84 Factor` gives `2, 2, 3, 7`
+(with 7 at X). Large factorisations may take time; Cancel stops them.
 
 Keyboard: digits, decimal point, and `+ - * /` enter numbers and operations.
 Enter/Space commits or duplicates; Backspace/Delete edits or drops X.
 Left/Right and Home/End move the cursor; hold Shift to select.
 Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+Y redoes, Ctrl+S swaps, Ctrl+L clears,
 and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
-`s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, and `^` power.
+`s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, `^` power, `%` remainder, `!` factorial, and `f` factorisation.
 
 **LOC/DOT/NONE** cycles between phone-locale numbers, decimal dot with thin-space
 display grouping, and the locale decimal with no grouping. Copied numbers follow this choice but never
-include grouping. Copy follows **FRAC/DEC**: known rationals copy as reduced `numerator/denominator`
-fractions in FRAC mode; DEC mode preserves exact terminating decimals. Tap a stack value
+include grouping. Copy follows **DEC/IMPR/MIX**, using plain text such as `7/3` or `2 1/3`;
+DEC preserves exact terminating decimals. Tap a stack value
 to copy it; long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
 a selected separator explicitly. Backspace/Delete edit at the cursor.

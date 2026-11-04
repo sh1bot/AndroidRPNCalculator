@@ -14,7 +14,7 @@ final class SavedValue {
     }
     static SavedValue of(UnifiedReal value,String op,SavedValue left,SavedValue right) {
         BoundedRational rational=value.boundedRationalValue();
-        return rational!=null ? new SavedValue("r",rational.toString(),null,null)
+        return rational!=null && rational.toString().length()<60000 ? new SavedValue("r",rational.toString(),null,null)
             : new SavedValue(op,"",left,right);
     }
     UnifiedReal evaluate(UnifiedReal a,UnifiedReal b) {
@@ -33,8 +33,12 @@ final class SavedValue {
             case "×": return a.multiply(b);
             case "÷": return a.divide(b);
             case "xʸ": return a.pow(b);
+            case "root": return a.pow(b.inverse());
+            case "rem": case "mod": return ExactFunctions.remainder(a,b,op.equals("mod"));
             case "±": return a.negate();
             case "√": return a.sqrt();
+            case "x²": return a.multiply(a);
+            case "!": return a.fact();
             case "1/x": return a.inverse();
             case "ln": return a.ln();
             case "exp": case "eˣ": return a.exp();
@@ -42,6 +46,10 @@ final class SavedValue {
                 String[] parts=op.split(":",-1);
                 if(parts.length!=2) throw new IllegalArgumentException("Unknown saved operation");
                 RpnCalculator.AngleUnit unit=RpnCalculator.AngleUnit.valueOf(parts[1]);
+                if(parts[0].equals("asin") || parts[0].equals("acos") || parts[0].equals("atan")) {
+                    UnifiedReal angle=parts[0].equals("asin") ? a.asin() : parts[0].equals("acos") ? a.acos() : a.atan();
+                    return unit==RpnCalculator.AngleUnit.RAD ? angle : angle.divide(UnifiedReal.PI).multiply(new UnifiedReal(unit==RpnCalculator.AngleUnit.DEG?180:200));
+                }
                 UnifiedReal radians=unit==RpnCalculator.AngleUnit.RAD ? a
                     : a.multiply(UnifiedReal.PI).divide(new UnifiedReal(unit==RpnCalculator.AngleUnit.DEG ? 180 : 200));
                 switch(parts[0]) {

@@ -29,7 +29,8 @@ public final class CalculatorKeypad extends LinearLayout {
     private final LinearLayout controls;
     private Button deleteButton, undoButton;
     private boolean calculating;
-    private boolean expanded;
+    private boolean expanded, inverse;
+    private final Map<String,Button> inverseButtons=new HashMap<>();
     private final Consumer<Boolean> saveExpanded;
     private final Consumer<String> command;
 
@@ -43,11 +44,35 @@ public final class CalculatorKeypad extends LinearLayout {
         expand.setOnClickListener(v -> { this.expanded = !this.expanded; updateExpansion(); saveExpanded.accept(this.expanded); });
         controls.addView(expand,new LinearLayout.LayoutParams(0,dp(44),3));
         addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
-        addRows(new String[][] {{"sin","cos","tan","√","1/x"},{"ln","eˣ","xʸ","π","e"}}, scientificRows);
+        addRows(new String[][] {{"INVERSE","sin","cos","tan","1/x"},{"ln","√","xʸ","π","e"},{"rem","!","Factor"}}, scientificRows);
         addRows(new String[][] {{"UNDO","SWAP","±","÷"}}, primaryRows);
         addRows(new String[][] {{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{".","0","BACK","ENTER"}}, primaryRows);
         setEditing(false);
         updateExpansion();
+    }
+    private String effectiveKey(String key) {
+        if(!inverse) return key;
+        switch(key) {
+            case "sin": return "asin"; case "cos": return "acos"; case "tan": return "atan";
+            case "ln": return "eˣ"; case "√": return "x²"; case "xʸ": return "root"; case "rem": return "mod";
+            default: return key;
+        }
+    }
+    private String functionLabel(String key) {
+        switch(key) { case "INVERSE": return "INV"; case "xʸ": return "yˣ"; case "root": return "ˣ√y"; case "!": return "x!"; default: return key; }
+    }
+    public void setInverse(boolean active) {
+        inverse=active;
+        for(Map.Entry<String,Button> item:inverseButtons.entrySet()) {
+            String key=item.getKey(); Button button=item.getValue(); String effective=effectiveKey(key);
+            button.setText(functionLabel(effective));
+            button.setContentDescription(key.equals("INVERSE") ? "Inverse functions " + (active ? "on" : "off") : effective.equals("root") ? "Xth root of Y" : effective);
+            if(key.equals("INVERSE")) {
+                button.setTextColor(active ? Color.rgb(147,201,246) : Color.rgb(229,237,245));
+                if(Build.VERSION.SDK_INT>=30) button.setStateDescription(active ? "On" : "Off");
+            }
+        }
+        requestLayout();
     }
     public void setNumberFormat(LocaleNumbers format) {
         if(numbers==format) return;
@@ -67,7 +92,8 @@ public final class CalculatorKeypad extends LinearLayout {
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String key, String label) {
         Button b = new Button(getContext()); b.setAllCaps(false); b.setTag(key);
-        if (key.equals("xʸ")) label="yˣ";
+        if(Arrays.asList("INVERSE","sin","cos","tan","ln","√","xʸ","rem").contains(key)) inverseButtons.put(key,b);
+        if (key.equals("xʸ") || key.equals("INVERSE") || key.equals("!")) label=functionLabel(key);
         if (key.equals("1/x")) {
             // A diagonal (solidus) fraction, with raised numerator and lowered denominator.
             SpannableString fraction = new SpannableString("1⁄x");
@@ -90,6 +116,10 @@ public final class CalculatorKeypad extends LinearLayout {
         b.setBackground(new RippleDrawable(ColorStateList.valueOf(Color.argb(65,255,255,255)),shape,null));
         String description;
         switch (key) {
+            case "INVERSE": description="Inverse functions off"; break;
+            case "!": description="Factorial of X"; break;
+            case "Factor": description="Replace X with prime factors, smallest first"; break;
+            case "rem": description="Y remainder X"; break;
             case "UNDO": description="Undo; long press to redo"; break;
             case "ENTER": description="Enter; long press to paste"; break;
             case ".": description="Decimal separator"; break;
@@ -104,7 +134,7 @@ public final class CalculatorKeypad extends LinearLayout {
             default: description=key;
         }
         b.setContentDescription(description);
-        b.setOnClickListener(v -> command.accept(key.equals("UNDO") && calculating ? "CANCEL" : key));
+        b.setOnClickListener(v -> command.accept(key.equals("UNDO") && calculating ? "CANCEL" : effectiveKey(key)));
         if (key.equals("UNDO")) b.setOnLongClickListener(v -> { command.accept(calculating ? "CANCEL" : "REDO"); return true; });
         if (key.equals("ENTER")) b.setOnLongClickListener(v -> { command.accept("PASTE"); return true; });
         return b;
@@ -133,14 +163,14 @@ public final class CalculatorKeypad extends LinearLayout {
     }
     private void fitLabel(Button button, int width, int height) {
         int minimum = Math.max(1,Math.round(10*getResources().getDisplayMetrics().scaledDensity));
-        String key=(String)button.getTag();
+        String key=effectiveKey((String)button.getTag());
         int preferred=16;
         if(key.matches("[0-9.]")) preferred=26;
         else if(key.matches("[+−×÷±]")) preferred=26;
         else if(key.equals("BACK") && button.getText().toString().equals("⌫")) preferred=24;
         else if(key.equals("π") || key.equals("e") || key.equals("√")) preferred=24;
-        else if(key.equals("1/x") || key.equals("eˣ") || key.equals("xʸ")) preferred=22;
-        else if(key.equals("sin") || key.equals("cos") || key.equals("tan") || key.equals("ln")) preferred=20;
+        else if(key.equals("1/x") || key.equals("eˣ") || key.equals("xʸ") || key.equals("root") || key.equals("x²") || key.equals("!")) preferred=22;
+        else if(key.equals("sin") || key.equals("cos") || key.equals("tan") || key.equals("ln") || key.equals("asin") || key.equals("acos") || key.equals("atan") || key.equals("rem") || key.equals("mod")) preferred=20;
         else if(key.equals("ENTER")) preferred=18;
         int preferredPixels=Math.round(preferred*getResources().getDisplayMetrics().scaledDensity);
         // Grow only up to a consistent type size; smaller keys may shrink to fit.

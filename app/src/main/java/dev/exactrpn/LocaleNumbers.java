@@ -48,7 +48,11 @@ public final class LocaleNumbers {
         if (number.contains("(")) return text.append(entry(number));
         int slash=number.indexOf('/');
         if(slash>=0) {
-            appendInteger(text,number.substring(0,slash),groupingColor);
+            int whole=number.indexOf(' ');
+            if(whole>=0 && whole<slash) {
+                appendInteger(text,number.substring(0,whole),groupingColor); text.append("\u202f");
+                appendInteger(text,number.substring(whole+1,slash),groupingColor);
+            } else appendInteger(text,number.substring(0,slash),groupingColor);
             // U+2044 triggers automatic numerator/denominator shaping in some fonts.
             // An ordinary solidus keeps every digit on the same baseline.
             text.append("\u202f/\u202f");

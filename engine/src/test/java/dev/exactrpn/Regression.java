@@ -393,6 +393,86 @@ public final class Regression {
         RpnCalculator legacyRestored=RpnCalculator.load(legacyBytes.toByteArray());
         check(legacyRestored.entry().equals("12.3") && legacyRestored.selectionStart()==2 && legacyRestored.selectionEnd()==4,"restore previous saved-state format");
         legacyRestored.key("ENTER"); check(top(legacyRestored).definitelyEquals(RpnCalculator.parse("12.3")),"legacy state remains usable");
+        UnifiedReal sevenThirds=RpnCalculator.parse("7").divide(RpnCalculator.parse("3"));
+        check(ValueFormatter.format(sevenThirds,true,sci,1).equals("7/3"),"improper fraction display");
+        check(ValueFormatter.format(sevenThirds,true,sci,2).equals("2 1/3"),"mixed fraction display");
+        check(ValueFormatter.clipboard(sevenThirds.negate(),sci,2).equals("-2 1/3"),"mixed negative sign applies to whole value");
+        check(ValueFormatter.format(third.negate(),true,sci,2).equals("-1/3"),"proper fraction remains proper in mixed mode");
+        check(ValueFormatter.format(UnifiedReal.TWO,true,sci,2).equals("2"),"mixed mode leaves integer natural");
+        check(ValueFormatter.format(UnifiedReal.PI,true,sci,2).equals(ValueFormatter.format(UnifiedReal.PI,true,sci)),"mixed mode irrational fallback");
+        for(String[] example:new String[][]{{"7","3","1"},{"-7","3","-1"},{"7","-3","1"},{"-7","-3","-1"},{"5.5","2","1.5"},{"0.3","0.1","0"}}) {
+            RpnCalculator remainder=new RpnCalculator(); remainder.paste(example[0]); remainder.key("ENTER"); remainder.paste(example[1]); remainder.key("rem");
+            check(top(remainder).definitelyEquals(RpnCalculator.parse(example[2])),"exact remainder "+example[0]+" rem "+example[1]);
+            RpnCalculator remainderSaved=RpnCalculator.load(remainder.save());
+            check(top(remainderSaved).definitelyEquals(top(remainder)),"remainder survives restore");
+        }
+        RpnCalculator modular=new RpnCalculator(); modular.paste("-7"); modular.key("ENTER"); modular.paste("3"); modular.key("mod");
+        check(top(modular).definitelyEquals(UnifiedReal.TWO),"modulo has divisor sign");
+        modular.key("UNDO"); check(modular.entry().equals("3") && top(modular).definitelyEquals(new UnifiedReal(-7)),"remainder undo restores pending divisor");
+        modular.key("REDO"); check(top(modular).definitelyEquals(UnifiedReal.TWO),"remainder redo");
+        RpnCalculator negativeMod=new RpnCalculator(); negativeMod.paste("7"); negativeMod.key("ENTER"); negativeMod.paste("-3"); negativeMod.key("mod");
+        check(top(negativeMod).definitelyEquals(new UnifiedReal(-2)),"negative-divisor modulo");
+        RpnCalculator zeroDivisor=new RpnCalculator(); keys(zeroDivisor,"7","ENTER","0");
+        try { zeroDivisor.key("rem"); throw new AssertionError("zero remainder divisor accepted"); } catch(ArithmeticException expected) {}
+        check(top(zeroDivisor).definitelyEquals(new UnifiedReal(7)) && zeroDivisor.entry().equals("0"),"zero-divisor remainder leaves state intact");
+        RpnCalculator irrationalRem=new RpnCalculator(); keys(irrationalRem,"π","2");
+        try { irrationalRem.key("rem"); throw new AssertionError("irrational remainder accepted"); } catch(IllegalArgumentException expected) {}
+        check(top(irrationalRem).definitelyEquals(UnifiedReal.PI) && irrationalRem.entry().equals("2"),"irrational remainder is rejected without changing state");
+        RpnCalculator factorial=new RpnCalculator(); keys(factorial,"0","!");
+        check(top(factorial).definitelyOne(),"zero factorial"); keys(factorial,"CLEAR","2","0","!");
+        check(top(factorial).bigIntegerValue().toString().equals("2432902008176640000"),"factorial is exact beyond double precision");
+        factorial.key("UNDO"); check(factorial.entry().equals("20"),"factorial undo restores full entry");
+        factorial.key("REDO"); check(top(factorial).bigIntegerValue().toString().equals("2432902008176640000"),"factorial redo");
+        for(String invalid:new String[]{"-1","1.5"}) {
+            RpnCalculator rejected=new RpnCalculator(); rejected.paste(invalid);
+            try { rejected.key("!"); throw new AssertionError("invalid factorial accepted"); } catch(IllegalArgumentException expected) {}
+            check(rejected.entry().equals(invalid) && rejected.values().isEmpty(),"invalid factorial leaves entry intact");
+        }
+        RpnCalculator largeFactorial=new RpnCalculator(); largeFactorial.paste("20000"); largeFactorial.key("!");
+        check(top(largeFactorial).bigIntegerValue().toString().length()>65535,"large factorial exceeds legacy UTF literal limit");
+        check(top(RpnCalculator.load(largeFactorial.save())).bigIntegerValue().equals(top(largeFactorial).bigIntegerValue()),"large factorial saves as exact expression");
+        for(String[] example:new String[][]{{"84","2,2,3,7"},{"2","2"},{"81","3,3,3,3"},{"1000000016000000063","1000000007,1000000009"},{"2305843009213693951","2305843009213693951"},{"18446744073709551615","3,5,17,257,641,65537,6700417"},{"1208925819614629174706176","2"}}) {
+            RpnCalculator factorised=new RpnCalculator(); factorised.paste(example[0]); factorised.key("Factor");
+            java.math.BigInteger product=java.math.BigInteger.ONE, previous=java.math.BigInteger.ZERO;
+            java.util.List<String> actual=new java.util.ArrayList<>();
+            for(UnifiedReal factor:factorised.values()) {
+                java.math.BigInteger n=factor.bigIntegerValue(); check(n.compareTo(previous)>=0,"factors pushed smallest first");
+                product=product.multiply(n); previous=n; actual.add(n.toString());
+            }
+            check(product.equals(new java.math.BigInteger(example[0])),"factor product is original integer");
+            if(!example[0].equals("1208925819614629174706176")) check(String.join(",",actual).equals(example[1]),"prime factor multiplicities "+example[0]);
+            else check(actual.size()==80,"large integer factorisation preserves multiplicity");
+            RpnCalculator factorRestored=RpnCalculator.load(factorised.save());
+            check(factorRestored.values().size()==factorised.values().size(),"factor stack survives restore");
+            factorRestored.key("UNDO"); check(factorRestored.entry().equals(example[0]) && factorRestored.values().isEmpty(),"factor undo restores original input");
+            factorRestored.key("REDO"); check(factorRestored.values().size()==factorised.values().size(),"factor redo restores all factors");
+        }
+        for(String invalid:new String[]{"0","1","-12","1.5"}) {
+            RpnCalculator rejected=new RpnCalculator(); rejected.paste(invalid);
+            try { rejected.key("Factor"); throw new AssertionError("invalid factorisation accepted"); } catch(IllegalArgumentException expected) {}
+            check(rejected.entry().equals(invalid) && rejected.values().isEmpty(),"invalid factorisation is transactional");
+        }
+        RpnCalculator interruptedFactors=new RpnCalculator(); interruptedFactors.paste("170141183460469231731687303715884105727");
+        int factorUndo=interruptedFactors.undoCount(); Thread.currentThread().interrupt();
+        try { interruptedFactors.key("Factor"); throw new AssertionError("factorisation ignored cancellation"); }
+        catch(com.hp.creals.CR.AbortedException expected) { } finally { Thread.interrupted(); }
+        check(interruptedFactors.entry().equals("170141183460469231731687303715884105727") && interruptedFactors.values().isEmpty() && interruptedFactors.undoCount()==factorUndo,"factorisation cancellation is transactional");
+        RpnCalculator inverseTrig=new RpnCalculator(); inverseTrig.setAngleUnit(RpnCalculator.AngleUnit.DEG); inverseTrig.paste("0.5"); inverseTrig.key("asin");
+        check(top(inverseTrig).definitelyEquals(new UnifiedReal(30)),"asin degrees exact");
+        keys(inverseTrig,"CLEAR","0","acos"); check(top(inverseTrig).definitelyEquals(new UnifiedReal(90)),"acos degrees exact");
+        keys(inverseTrig,"CLEAR","1","atan"); check(top(inverseTrig).definitelyEquals(new UnifiedReal(45)),"atan degrees exact");
+        inverseTrig.setAngleUnit(RpnCalculator.AngleUnit.GRAD); keys(inverseTrig,"CLEAR","1","atan");
+        check(top(inverseTrig).definitelyEquals(new UnifiedReal(50)),"atan gradians exact");
+        inverseTrig.setAngleUnit(RpnCalculator.AngleUnit.RAD); keys(inverseTrig,"CLEAR","0","asin"); check(top(inverseTrig).definitelyZero(),"asin radians");
+        inverseTrig.paste("0.25"); inverseTrig.key("asin");
+        RpnCalculator inverseSaved=RpnCalculator.load(inverseTrig.save());
+        check(top(inverseSaved).toStringTruncated(60).equals(top(inverseTrig).toStringTruncated(60)),"inverse trig expression survives restore");
+        RpnCalculator square=new RpnCalculator(); keys(square,"π","x²");
+        check(top(RpnCalculator.load(square.save())).toStringTruncated(60).equals(top(square).toStringTruncated(60)),"square expression survives restore");
+        RpnCalculator root=new RpnCalculator(); keys(root,"9","ENTER","2","root"); check(top(root).definitelyEquals(new UnifiedReal(3)),"Xth root of Y operand order");
+        check("rem".equals(KeyboardInput.command(0,'%',false,false,false)),"remainder keyboard shortcut");
+        check("!".equals(KeyboardInput.command(0,'!',false,false,false)),"factorial keyboard shortcut");
+        check("Factor".equals(KeyboardInput.command(0,'f',false,false,false)),"factorise keyboard shortcut");
         byte[] valid=durable.save();
         try { RpnCalculator.load(java.util.Arrays.copyOf(valid,valid.length-1)); throw new AssertionError("truncated state accepted"); }
         catch(java.io.IOException expected) { check(true,"reject truncated state"); }

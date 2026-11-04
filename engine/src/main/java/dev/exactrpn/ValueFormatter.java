@@ -38,19 +38,29 @@ public final class ValueFormatter {
             && RpnCalculator.parse(approximation.toString()).definitelyEquals(value);
         return (exact ? "" : "≈ ") + decimal(approximation, notation);
     }
-    public static String format(UnifiedReal value, boolean newest, Notation notation, boolean fractions) {
-        if(fractions) {
+    public static String format(UnifiedReal value, boolean newest, Notation notation, boolean fractions) { return format(value,newest,notation,fractions?1:0); }
+    public static String format(UnifiedReal value, boolean newest, Notation notation, int fractionMode) {
+        if(fractionMode!=0) {
             BoundedRational rational=value.boundedRationalValue();
-            if(rational!=null && value.bigIntegerValue()==null) return rational.toNiceString();
+            if(rational!=null && value.bigIntegerValue()==null) return fraction(rational,fractionMode==2);
         }
         return format(value,newest,notation);
     }
-    public static String clipboard(UnifiedReal value, Notation notation, boolean fractions) {
-        if(fractions) {
+    public static String clipboard(UnifiedReal value, Notation notation, boolean fractions) { return clipboard(value,notation,fractions?1:0); }
+    public static String clipboard(UnifiedReal value, Notation notation, int fractionMode) {
+        if(fractionMode!=0) {
             BoundedRational rational=value.boundedRationalValue();
-            if(rational!=null) return rational.toNiceString();
+            if(rational!=null) return fraction(rational,fractionMode==2);
         }
         return clipboard(value,notation);
+    }
+    private static String fraction(BoundedRational rational,boolean mixed) {
+        String text=rational.toNiceString();
+        if(!mixed || !text.contains("/")) return text;
+        String[] parts=text.split("/"); BigInteger numerator=new BigInteger(parts[0]), denominator=new BigInteger(parts[1]);
+        BigInteger[] divided=numerator.abs().divideAndRemainder(denominator);
+        if(divided[0].signum()==0) return text;
+        return (numerator.signum()<0 ? "-" : "")+divided[0]+" "+divided[1]+"/"+denominator;
     }
     public static String clipboard(UnifiedReal value, Notation notation) {
         BigInteger integer = value.bigIntegerValue();

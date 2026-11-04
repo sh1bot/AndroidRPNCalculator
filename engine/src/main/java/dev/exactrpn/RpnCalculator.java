@@ -62,11 +62,12 @@ public final class RpnCalculator {
     }
     public List<UnifiedReal> values() { return Collections.unmodifiableList(new ArrayList<>(stack)); }
     public List<String> formattedValues(ValueFormatter.Notation notation) { return formattedValues(notation,false); }
-    public List<String> formattedValues(ValueFormatter.Notation notation,boolean fractions) {
+    public List<String> formattedValues(ValueFormatter.Notation notation,boolean fractions) { return formattedValues(notation,fractions?1:0); }
+    public List<String> formattedValues(ValueFormatter.Notation notation,int fractionMode) {
         List<String> rows=new ArrayList<>();
         for(int i=0;i<stack.size();i++) {
             if(Thread.currentThread().isInterrupted()) throw new com.hp.creals.CR.AbortedException();
-            rows.add(ValueFormatter.format(stack.get(i),!editing && i==stack.size()-1,notation,fractions));
+            rows.add(ValueFormatter.format(stack.get(i),!editing && i==stack.size()-1,notation,fractionMode));
         }
         return Collections.unmodifiableList(rows);
     }
@@ -176,9 +177,18 @@ public final class RpnCalculator {
                 switch(key) {
                     case "π": stack.add(UnifiedReal.PI); savedValues.put(UnifiedReal.PI,SavedValue.of(UnifiedReal.PI,key,null,null)); break;
                     case "e": stack.add(UnifiedReal.E); savedValues.put(UnifiedReal.E,SavedValue.of(UnifiedReal.E,key,null,null)); break;
+                    case "Factor":
+                        need(1);
+                        List<BigInteger> factors=ExactFunctions.factors(ExactFunctions.integer(top(),"Factorisation"));
+                        stack.remove(stack.size()-1);
+                        for(BigInteger factor:factors) {
+                            UnifiedReal value=new UnifiedReal(factor); stack.add(value);
+                            savedValues.put(value,SavedValue.of(value,"r",null,null));
+                        }
+                        break;
                     case "DUP": need(1); stack.add(top()); break;
                     case "SWAP": need(2); Collections.swap(stack,stack.size()-1,stack.size()-2); break;
-                    case "+": case "−": case "×": case "÷": case "xʸ":
+                    case "+": case "−": case "×": case "÷": case "xʸ": case "root": case "rem": case "mod":
                         need(2);
                         UnifiedReal x=top(),y=stack.get(stack.size()-2),result;
                         switch(key) {
@@ -186,6 +196,8 @@ public final class RpnCalculator {
                             case "−": result=y.subtract(x); break;
                             case "×": result=y.multiply(x); break;
                             case "÷": result=y.divide(x); break;
+                            case "rem": case "mod": result=ExactFunctions.remainder(y,x,key.equals("mod")); break;
+                            case "root": result=y.pow(x.inverse()); break;
                             default: result=y.pow(x);
                         }
                         savedValues.put(result,SavedValue.of(result,key,savedValues.get(y),savedValues.get(x)));
@@ -195,15 +207,23 @@ public final class RpnCalculator {
                         switch(key) {
                             case "±": r=a.negate(); break;
                             case "√": r=a.sqrt(); break;
+                            case "x²": r=a.multiply(a); break;
+                            case "!":
+                                BigInteger n=ExactFunctions.integer(a,"Factorial");
+                                if(n.signum()<0) throw new IllegalArgumentException("Factorial requires a nonnegative integer");
+                                r=a.fact(); break;
                             case "1/x": r=a.inverse(); break;
                             case "sin": r=radians(a).sin(); break;
                             case "cos": r=radians(a).cos(); break;
                             case "tan": r=radians(a).tan(); break;
+                            case "asin": r=fromRadians(a.asin()); break;
+                            case "acos": r=fromRadians(a.acos()); break;
+                            case "atan": r=fromRadians(a.atan()); break;
                             case "ln": r=a.ln(); break;
                             case "exp": case "eˣ": r=a.exp(); break;
                             default: throw new IllegalArgumentException("Unknown operation");
                         }
-                        String operation=(key.equals("sin") || key.equals("cos") || key.equals("tan")) ? key+":"+angleUnit.name() : key;
+                        String operation=key.matches("a?(sin|cos|tan)") ? key+":"+angleUnit.name() : key;
                         savedValues.put(r,SavedValue.of(r,operation,savedValues.get(a),null));
                         stack.set(stack.size()-1,r);
                 }
@@ -336,6 +356,9 @@ public final class RpnCalculator {
     }
     private UnifiedReal radians(UnifiedReal value) {
         return angleUnit==AngleUnit.RAD ? value : value.multiply(UnifiedReal.PI).divide(new UnifiedReal(angleUnit==AngleUnit.DEG?180:200));
+    }
+    private UnifiedReal fromRadians(UnifiedReal value) {
+        return angleUnit==AngleUnit.RAD ? value : value.divide(UnifiedReal.PI).multiply(new UnifiedReal(angleUnit==AngleUnit.DEG?180:200));
     }
     public static UnifiedReal parse(String text) {
         BigDecimal d = new BigDecimal(text);
