@@ -24,7 +24,8 @@ public final class CalculatorKeypad extends LinearLayout {
     private final List<LinearLayout> primaryRows = new ArrayList<>();
     private final List<LinearLayout> scientificRows = new ArrayList<>();
     private final Button expand;
-    private final LocaleNumbers numbers;
+    private LocaleNumbers numbers;
+    private final Map<String,Button> numberButtons=new HashMap<>();
     private final LinearLayout controls;
     private Button deleteButton, undoButton;
     private boolean calculating;
@@ -46,6 +47,11 @@ public final class CalculatorKeypad extends LinearLayout {
         addRows(new String[][] {{"CLEAR","±","BACK","÷"},{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{"UNDO","0",".","ENTER"}}, primaryRows);
         setEditing(false);
         updateExpansion();
+    }
+    public void setNumberFormat(LocaleNumbers format) {
+        if(numbers==format) return;
+        numbers=format;
+        for(Map.Entry<String,Button> item:numberButtons.entrySet()) item.getValue().setText(numbers.entry(item.getKey()));
     }
     public void setEditing(boolean editing) {
         deleteButton.setText(editing ? "⌫" : "Drop");
@@ -69,6 +75,7 @@ public final class CalculatorKeypad extends LinearLayout {
             fraction.setSpan(new RelativeSizeSpan(.7f),2,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.setText(fraction);
         } else b.setText(key.matches("[0-9.]") ? numbers.entry(label) : label);
+        if(key.matches("[0-9.]")) numberButtons.put(key,b);
         b.setTextColor(Color.rgb(229,237,245));
         b.setSingleLine(true); b.setHorizontallyScrolling(false); b.setIncludeFontPadding(false);
         b.setAutoSizeTextTypeUniformWithConfiguration(10,100,1,TypedValue.COMPLEX_UNIT_SP);
@@ -171,4 +178,5 @@ public final class CalculatorKeypad extends LinearLayout {
         super.onMeasure(widthSpec,heightSpec);
     }
 }
+
 

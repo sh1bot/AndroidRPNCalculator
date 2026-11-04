@@ -2,12 +2,52 @@
 package dev.exactrpn;
 
 import java.util.regex.Pattern;
+import java.math.BigDecimal;
+import java.util.*;
 
-/** Exact, locale-aware clipboard parsing. Dot-only ambiguity deliberately favors C decimals. */
+/** Exact numeric parsing, with explicit ambiguity detection for untrusted clipboard text. */
 public final class NumberText {
     private static final Pattern C_NUMBER = Pattern.compile("[+-]?(?:[0-9]+(?:\\.[0-9]*)?|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?");
+    public static final class Profile {
+        public final char decimal, grouping;
+        public final int primary, secondary;
+        public Profile(char decimal, char grouping, int primary, int secondary) {
+            this.decimal=decimal; this.grouping=grouping; this.primary=primary; this.secondary=secondary;
+        }
+    }
+    public static final Profile COMPUTER = new Profile('.', '’', 3, 3);
+    public static final class Analysis {
+        public final List<String> candidates;
+        private Analysis(List<String> values) { candidates=Collections.unmodifiableList(values); }
+        public boolean ambiguous() { return candidates.size()>1; }
+        public boolean valid() { return !candidates.isEmpty(); }
+        public String canonical() {
+            if (candidates.size()!=1) throw new IllegalArgumentException(ambiguous()
+                ? "Ambiguous separators: edit the decimal mark or remove grouping"
+                : "Enter one valid number");
+            return candidates.get(0);
+        }
+    }
     private NumberText() {}
+    public static Analysis analyze(String text, Profile local) {
+        LinkedHashMap<String,String> values=new LinkedHashMap<>();
+        Profile[] profiles={new Profile('.',(char)0,0,0),local,COMPUTER,
+            new Profile('.',',',3,3),new Profile(',','.',3,3),new Profile(',','\u202f',3,3)};
+        for (Profile p:profiles) {
+            try {
+                String canonical=parse(text,p.decimal,p.grouping,p.primary,p.secondary);
+                values.putIfAbsent(new BigDecimal(canonical).stripTrailingZeros().toString(),canonical);
+            } catch (IllegalArgumentException ignored) {}
+        }
+        return new Analysis(new ArrayList<>(values.values()));
+    }
+    public static String selected(String text, Profile p) {
+        return parse(text,p.decimal,p.grouping,p.primary,p.secondary);
+    }
     public static String normalize(String text, char decimal, char grouping, int primary, int secondary) {
+        return analyze(text,new Profile(decimal,grouping,primary,secondary)).canonical();
+    }
+    private static String parse(String text, char decimal, char grouping, int primary, int secondary) {
         if (text == null || text.length() > 4096) throw invalid();
         StringBuilder cleaned = new StringBuilder();
         for (int i=0;i<text.length();i++) {
@@ -20,7 +60,6 @@ public final class NumberText {
             else cleaned.append(c);
         }
         String s = trim(cleaned.toString());
-        if (C_NUMBER.matcher(s).matches()) return validate(s);
         String exponent = "";
         int e = Math.max(s.indexOf('e'),s.indexOf('E'));
         if (e>=0) {
@@ -63,3 +102,4 @@ public final class NumberText {
     }
     private static IllegalArgumentException invalid() { return new IllegalArgumentException("Clipboard must contain one valid number"); }
 }
+

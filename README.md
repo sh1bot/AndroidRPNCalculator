@@ -25,10 +25,12 @@ Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+S swaps, Ctrl+L clear
 and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 `s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, and `^` power.
 
-Tap a stack value to copy it as an ungrouped C-locale number. Long-press **Enter**
-(or Ctrl+V) to paste a C-locale or local decimal into entry. Stack grouping and
-the decimal key follow the phone's locale; entry is never grouped. Dot-only
-pasted input is interpreted as a C decimal when the meaning is ambiguous.
+**LOC/DOT** switches between phone-locale numbers and computer format (decimal
+dot, apostrophe display grouping). Copied numbers follow this choice but never
+include grouping. Tap a stack value to copy it; long-press **Enter** or Ctrl+V to
+paste into entry, then press **Enter** to accept it. Ambiguous or invalid input
+stays red and cannot commit until corrected. Tap to position the cursor or select text; the decimal key replaces
+a selected separator explicitly. Backspace/Delete edit at the cursor.
 
 ## Build
 
@@ -56,4 +58,5 @@ New code is licensed under [Apache 2.0](LICENSE). The arithmetic engine includes
   with AOSP Apache 2.0 additions and the original SGI/HP permissive notices.
 
 Upstream notices are retained in the source, [NOTICE](NOTICE), and [licenses](licenses).
+
 

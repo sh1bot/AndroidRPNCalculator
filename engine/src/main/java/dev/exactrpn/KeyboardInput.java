@@ -19,7 +19,7 @@ public final class KeyboardInput {
         switch(code) {
             case 66: case 160: case 62: return "ENTER"; // Enter, numpad Enter, Space.
             case 67: return "BACK";
-            case 112: return "DROP"; // Forward Delete.
+            case 112: return "DELETE"; // Forward Delete while editing; Drop in stack mode.
             case 111: return "ESCAPE";
             case 139: return "±"; // F9.
             case 154: return "÷";
@@ -50,4 +50,5 @@ public final class KeyboardInput {
         }
     }
 }
+
 

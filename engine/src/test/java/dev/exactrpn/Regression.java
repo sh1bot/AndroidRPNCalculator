@@ -77,7 +77,7 @@ public final class Regression {
         check("ENTER".equals(KeyboardInput.command(160,0,false,false,false)),"numpad enter mapping");
         check("ENTER".equals(KeyboardInput.command(62,' ',false,false,false)),"space mapping");
         check("BACK".equals(KeyboardInput.command(67,0,false,false,false)),"backspace mapping");
-        check("DROP".equals(KeyboardInput.command(112,0,false,false,false)),"delete mapping");
+        check("DELETE".equals(KeyboardInput.command(112,0,false,false,false)),"delete mapping");
         check("ESCAPE".equals(KeyboardInput.command(111,0,false,false,false)),"escape mapping");
         check("UNDO".equals(KeyboardInput.command(54,0,true,false,false)),"undo shortcut");
         check("DUP".equals(KeyboardInput.command(32,0,true,false,false)),"duplicate shortcut");
@@ -133,13 +133,13 @@ public final class Regression {
         hp.key("ANGLE"); check(hp.angleUnit()==RpnCalculator.AngleUnit.GRAD, "cycle to gradians");
         hp.key("ANGLE"); check(hp.angleUnit()==RpnCalculator.AngleUnit.RAD, "cycle to radians");
         check(NumberText.normalize("1234.56",',','.',3,3).equals("1234.56"),"C decimal in comma locale");
-        check(NumberText.normalize("1.234",',','.',3,3).equals("1.234"),"dot-only ambiguity favors C");
+        check(NumberText.analyze("1.234",new NumberText.Profile(',','.',3,3)).ambiguous(),"dot-only ambiguity is never guessed");
         check(NumberText.normalize("1.234,56",',','.',3,3).equals("1234.56"),"German grouped decimal");
-        check(NumberText.normalize("-0,125",',','.',3,3).equals("-0.125"),"negative local subunit");
+        check(NumberText.normalize("-0,1250",',','.',3,3).equals("-0.1250"),"negative local subunit");
         check(NumberText.normalize(",5",',','.',3,3).equals("0.5"),"local leading decimal");
         check(NumberText.normalize("1,234.56",'.',',',3,3).equals("1234.56"),"US grouped decimal");
-        check(NumberText.normalize("1,234",'.',',',3,3).equals("1234"),"US grouped integer");
-        check(NumberText.normalize("1,234",',','.',3,3).equals("1.234"),"local decimal takes comma");
+        check(NumberText.analyze("1,234",new NumberText.Profile('.',',',3,3)).ambiguous(),"US grouped integer can be a foreign decimal");
+        check(NumberText.analyze("1,234",new NumberText.Profile(',','.',3,3)).ambiguous(),"local decimal can be foreign grouping");
         check(NumberText.normalize("12,34,567.89",'.',',',3,2).equals("1234567.89"),"Indian grouping");
         check(NumberText.normalize("1 234,5",',','\u202f',3,3).equals("1234.5"),"French space grouping");
         check(NumberText.normalize("1\u00a0234,5",',','\u202f',3,3).equals("1234.5"),"French nonbreaking space grouping");
@@ -152,7 +152,7 @@ public final class Regression {
             try { NumberText.normalize(invalid,'.',',',3,3); throw new AssertionError("accepted invalid paste: "+invalid); }
             catch (IllegalArgumentException expected) { check(true,"reject invalid clipboard number"); }
         }
-        try { NumberText.normalize("123,456",'.',',',3,2); throw new AssertionError("bad Indian grouping accepted"); }
+        try { NumberText.selected("123,456",new NumberText.Profile('.',',',3,2)); throw new AssertionError("bad Indian grouping accepted"); }
         catch (IllegalArgumentException expected) { check(true,"Indian secondary width enforced"); }
         RpnCalculator pasted = new RpnCalculator(); keys(pasted,"7","ENTER","8");
         pasted.paste(NumberText.normalize("1.234,56",',','.',3,3));
@@ -169,7 +169,68 @@ public final class Regression {
         check("5".equals(KeyboardInput.command(0,'٥',false,false,false)),"localized hardware digits");
         pasted.paste("1e-3"); pasted.key(".");
         check(pasted.entry().equals("1e-3"),"decimal key does not corrupt pasted exponent");
+        NumberText.Profile us=new NumberText.Profile('.',',',3,3);
+        NumberText.Profile de=new NumberText.Profile(',','.',3,3);
+        check(NumberText.analyze("1,234",us).ambiguous(),"comma can be decimal or grouping");
+        check(NumberText.analyze("1.234",us).ambiguous(),"dot can be decimal or foreign grouping");
+        check(NumberText.analyze("1.234",de).ambiguous(),"locale does not resolve unknown clipboard");
+        check(NumberText.analyze("1.234,56",us).canonical().equals("1234.56"),"explicit European format is unambiguous");
+        check(NumberText.analyze("1,234.56",de).canonical().equals("1234.56"),"explicit US format is unambiguous");
+        check(NumberText.analyze("1’234.56",de).canonical().equals("1234.56"),"apostrophe grouping is explicit");
+        check(NumberText.analyze("1.2340",de).canonical().equals("1.2340"),"trailing zero resolves ambiguity");
+        check(!NumberText.analyze("hello",us).valid(),"invalid pasted text has no guessed value");
+        RpnCalculator cursor=new RpnCalculator(); keys(cursor,"9","ENTER");
+        cursor.pasteText("1,234",us);
+        check(cursor.isEditing() && cursor.rawEntry() && cursor.entryProblem().equals("Ambiguous"),"ambiguous paste stays raw and red");
+        check(cursor.values().size()==1 && cursor.entry().equals("1,234"),"paste never commits");
+        try { cursor.key("ENTER"); throw new AssertionError("ambiguous number committed"); } catch(IllegalArgumentException expected) {}
+        check(cursor.values().size()==1 && cursor.entry().equals("1,234"),"ambiguous Enter preserves text and stack");
+        try { cursor.key("+"); throw new AssertionError("ambiguous arithmetic accepted"); } catch(IllegalArgumentException expected) {}
+        check(cursor.values().size()==1 && cursor.rawEntry(),"arithmetic also cannot guess ambiguity");
+        cursor.select(1,2); cursor.key(".");
+        check(cursor.entry().equals("1.234") && !cursor.rawEntry() && cursor.entryProblem().isEmpty(),"explicit decimal replaces selected comma");
+        check(cursor.selectionStart()==2 && cursor.selectionEnd()==2,"cursor stays next to replaced decimal");
+        cursor.key("ENTER"); check(top(cursor).definitelyEquals(RpnCalculator.parse("1.234")),"corrected decimal commits exactly");
+        cursor.key("UNDO"); check(cursor.isEditing() && cursor.entry().equals("1.234") && cursor.selectionStart()==2,"undo restores editing and caret");
+        cursor.select(1,1); cursor.key("DELETE");
+        check(cursor.entry().equals("1234") && cursor.selectionStart()==1,"Delete removes character after cursor");
+        cursor.key("UNDO"); cursor.select(2,2); cursor.key("BACK");
+        check(cursor.entry().equals("1234") && cursor.selectionStart()==1,"Backspace removes character before cursor");
+        cursor.select(1,3); cursor.key("8"); check(cursor.entry().equals("184"),"digit replaces selected range");
+        cursor.key("UNDO"); check(cursor.entry().equals("1234") && cursor.selectionStart()==1 && cursor.selectionEnd()==3,"undo restores selection");
+        cursor.pasteText("1,234",us); cursor.key("BACK");
+        check(cursor.entry().equals("1.23") && !cursor.rawEntry(),"editing into unambiguous decimal clears warning");
+        cursor.pasteText("not a number",us); check(cursor.entryProblem().equals("Invalid") && cursor.isEditing(),"invalid paste remains editable");
+        cursor.select(0,cursor.entry().length()); cursor.key("7"); check(cursor.entry().equals("7") && cursor.entryProblem().isEmpty(),"replace invalid paste with valid input");
+        cursor.pasteText("1234,56",de); check(cursor.entry().equals("1234.56") && cursor.isEditing(),"unambiguous local paste stays uncommitted");
+        cursor.setInputProfile(de); cursor.pasteText("1.234",de); cursor.select(1,2); cursor.key(".");
+        check(!cursor.rawEntry() && cursor.entry().equals("1.234"),"locale decimal key explicitly resolves dot grouping");
+        cursor.pasteText("1.234",de);
+        cursor.editText("1,234",2,2,true,true,de);
+        check(!cursor.rawEntry() && cursor.entry().equals("1.234"),"native single-decimal edit resolves meaning");
+        cursor.pasteText("1,234",us); RpnCalculator cursorCopy=cursor.copy(); cursorCopy.select(1,2); cursorCopy.key(".");
+        check(cursor.rawEntry() && cursor.entryProblem().equals("Ambiguous"),"candidate edits cannot change live ambiguous entry");
+        cursor.pasteText("1.23",us); cursor.select(0,0); cursor.key("8");
+        check(cursor.entry().equals("81.23"),"insert at beginning");
+        cursor.select(cursor.entry().length(),cursor.entry().length()); cursor.key("BACK");
+        check(cursor.entry().equals("81.2"),"append-end deletion remains supported");
+        cursor.pasteText("123",us); cursor.key("ENTER"); cursor.key("DELETE");
+        check(!cursor.isEditing(),"Delete in stack mode drops without opening entry");
+        RpnCalculator confirm=new RpnCalculator(); keys(confirm,"2","ENTER"); confirm.pasteText("12.34",us);
+        check(confirm.requiresEnter() && confirm.isEditing() && confirm.values().size()==1,"even valid paste waits for explicit Enter");
+        try { confirm.key("+"); throw new AssertionError("paste committed through arithmetic"); } catch(IllegalArgumentException expected) {}
+        check(confirm.requiresEnter() && confirm.entry().equals("12.34"),"arithmetic cannot accept a paste preview");
+        confirm.key("ENTER"); check(!confirm.requiresEnter() && confirm.values().size()==2,"Enter accepts valid pasted number");
+        confirm.key("UNDO"); check(confirm.requiresEnter() && confirm.isEditing(),"undo restores paste confirmation");
+        confirm.key("CE"); check(!confirm.requiresEnter(),"cancel entry clears paste confirmation");
+        confirm.pasteText("1.234",us); confirm.select(1,1); confirm.key("DELETE");
+        check(confirm.entry().equals("1234") && confirm.entryProblem().isEmpty() && confirm.requiresEnter(),"remove ambiguous separator but still require Enter");
+        try { NumberText.normalize("1.234",'.',',',3,3); throw new AssertionError("normalizer guessed ambiguity"); }
+        catch(IllegalArgumentException expected) { check(true,"all public clipboard parsing rejects ambiguity"); }
+        confirm.pasteText("",us); check(confirm.isEditing() && confirm.entry().isEmpty(),"empty paste remains in edit mode");
+        confirm.key("ENTER"); check(!confirm.isEditing(),"Enter leaves empty pasted edit without pushing zero");
         System.out.println("Passed " + checks + " regression checks");
     }
 }
+
 
