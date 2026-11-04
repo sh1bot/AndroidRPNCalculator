@@ -136,7 +136,7 @@ jobs:
           Download **ExactRPN.apk** to install or update. Signed with the project's permanent key.
           EOF
           # Keep one release entry, but advance its version tag so Obtainium detects updates.
-          current_tag=$(gh api --paginate --slurp "repos/$GH_REPO/releases" --jq '[.[][] | select(.name == "Latest development build")][0].tag_name // empty')
+          current_tag=$(gh api --paginate --slurp "repos/$GH_REPO/releases" | jq -r '[.[][] | select(.name == "Latest development build")][0].tag_name // empty')
           if [[ -z "$current_tag" ]]; then
             current_tag="$tag"
             gh release create "$tag" --target "$BUILD_SHA" --title "Latest development build" --draft --notes-file "$RUNNER_TEMP/release-notes.md"
