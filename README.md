@@ -18,8 +18,7 @@ full there, while values above an entry use compact notation.
 The stack, entry and up to 100 undo steps are saved automatically and restored
 when the app reopens. Oldest undo steps are dropped if the saved history exceeds
 1 MiB; the current calculation is retained. **Clear** can be undone while the app
-stays open. Leaving the app with an empty stack and entry discards undo and deletes
-the saved calculation.
+stays open. Leaving the app with an empty stack and entry discards undo history.
 
 **Swap** exchanges X and Y; **Undo** restores the previous state. **Functions**
 expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
