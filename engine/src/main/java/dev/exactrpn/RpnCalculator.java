@@ -11,7 +11,7 @@ import java.util.*;
 public final class RpnCalculator {
     private List<UnifiedReal> stack=new ArrayList<>();
     private String entry="";
-    private boolean editing, raw, confirmPaste;
+    private boolean editing, raw;
     private int selectionStart, selectionEnd;
     public enum AngleUnit { RAD, DEG, GRAD }
     private AngleUnit angleUnit=AngleUnit.RAD;
@@ -21,16 +21,16 @@ public final class RpnCalculator {
     private static final class State {
         final List<UnifiedReal> stack;
         final String entry;
-        final boolean editing,raw,confirm;
+        final boolean editing,raw;
         final int start,end;
         final NumberText.Profile profile;
         State(RpnCalculator c) {
-            stack=new ArrayList<>(c.stack); entry=c.entry; editing=c.editing; raw=c.raw; confirm=c.confirmPaste;
+            stack=new ArrayList<>(c.stack); entry=c.entry; editing=c.editing; raw=c.raw;
             start=c.selectionStart; end=c.selectionEnd; profile=c.rawProfile;
         }
     }
     private void restore(State s) {
-        stack=new ArrayList<>(s.stack); entry=s.entry; editing=s.editing; raw=s.raw; confirmPaste=s.confirm;
+        stack=new ArrayList<>(s.stack); entry=s.entry; editing=s.editing; raw=s.raw;
         selectionStart=s.start; selectionEnd=s.end; rawProfile=s.profile;
     }
     private void remember(State s) { undo.push(s); if(undo.size()>100) undo.removeLast(); }
@@ -41,7 +41,6 @@ public final class RpnCalculator {
     public String entry() { return entry; }
     public boolean isEditing() { return editing; }
     public boolean rawEntry() { return raw; }
-    public boolean requiresEnter() { return confirmPaste; }
     public int selectionStart() { return selectionStart; }
     public int selectionEnd() { return selectionEnd; }
     public void select(int start,int end) {
@@ -68,12 +67,12 @@ public final class RpnCalculator {
     /** Trusted canonical paste, also used by programmatic callers. */
     public void paste(String canonical) {
         parse(canonical); State before=new State(this);
-        entry=canonical; editing=true; raw=false; confirmPaste=false; select(entry.length(),entry.length()); remember(before);
+        entry=canonical; editing=true; raw=false; select(entry.length(),entry.length()); remember(before);
     }
     /** Clipboard text is retained, including ambiguous or invalid punctuation, for correction. */
     public void pasteText(String text,NumberText.Profile locale) {
         checkLength(text); State before=new State(this);
-        entry=text; editing=true; raw=true; rawProfile=locale; confirmPaste=true;
+        entry=text; editing=true; raw=true; rawProfile=locale;
         select(entry.length(),entry.length()); resolveRaw(); remember(before);
     }
     public void editText(String text,int start,int end,boolean rawText,boolean explicitDecimal,NumberText.Profile profile) {
@@ -156,11 +155,10 @@ public final class RpnCalculator {
                 select(selectionStart+(negative?-1:1),selectionEnd+(negative?-1:1)); resolveRaw();
             } else if(key.equals("CE") || key.equals("CLEAR")) {
                 if(key.equals("CLEAR")) stack.clear();
-                entry=""; editing=false; raw=false; confirmPaste=false; select(0,0);
+                entry=""; editing=false; raw=false; select(0,0);
             } else if(key.equals("ENTER")) {
                 if(editing) commit(); else { need(1); stack.add(top()); }
             } else {
-                if(confirmPaste) throw new IllegalArgumentException("Press Enter to accept the pasted number");
                 commit();
                 switch(key) {
                     case "π": stack.add(UnifiedReal.PI); break;
@@ -204,7 +202,7 @@ public final class RpnCalculator {
         resolveRaw();
         if(raw) NumberText.analyze(entry,rawProfile).canonical(); // Throws instead of guessing.
         if(!entry.isEmpty()) stack.add(parse(entry));
-        entry=""; editing=false; raw=false; confirmPaste=false; select(0,0);
+        entry=""; editing=false; raw=false; select(0,0);
     }
     private UnifiedReal radians(UnifiedReal value) {
         return angleUnit==AngleUnit.RAD ? value : value.multiply(UnifiedReal.PI).divide(new UnifiedReal(angleUnit==AngleUnit.DEG?180:200));

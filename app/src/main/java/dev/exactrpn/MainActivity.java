@@ -43,12 +43,12 @@ public final class MainActivity extends Activity {
         final List<String> rows,clipboard;
         final String entry,problem;
         final ValueFormatter.Notation notation;
-        final boolean editing,raw,computer,confirm;
+        final boolean editing,raw,computer;
         final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
         Display(List<String> rows,List<String> clipboard,RpnCalculator calculator,ValueFormatter.Notation notation,boolean computer) {
             this.rows=rows; this.clipboard=clipboard; this.notation=notation; this.computer=computer;
-            entry=calculator.entry(); editing=calculator.isEditing(); raw=calculator.rawEntry(); confirm=calculator.requiresEnter();
+            entry=calculator.entry(); editing=calculator.isEditing(); raw=calculator.rawEntry();
             start=calculator.selectionStart(); end=calculator.selectionEnd(); problem=calculator.entryProblem();
             angleUnit=calculator.angleUnit();
         }
@@ -268,7 +268,7 @@ public final class MainActivity extends Activity {
                 String entry=display.raw ? display.entry : numbers.entry(display.entry);
                 if(!entryView.getText().toString().equals(entry)) entryView.setText(entry);
                 entryView.setTextColor(display.problem.isEmpty() ? Color.rgb(228,237,242) : Color.rgb(255,125,125));
-                if(Build.VERSION.SDK_INT>=30) entryView.setStateDescription(!display.problem.isEmpty() ? display.problem+" number" : display.confirm ? "Press Enter to accept pasted number" : "Number entry");
+                if(Build.VERSION.SDK_INT>=30) entryView.setStateDescription(!display.problem.isEmpty() ? display.problem+" number" : "Number entry");
                 if(display.editing) {
                     if(!entryView.hasFocus()) entryView.requestFocus();
                     int start=Math.min(entry.length(),display.start),end=Math.min(entry.length(),display.end);
@@ -297,7 +297,7 @@ public final class MainActivity extends Activity {
         boolean showProgress = session.busy && (session.cancelRequested
             || SystemClock.elapsedRealtime() - session.busySince >= 250);
         status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Working…")
-            : !display.problem.isEmpty() ? display.problem.toUpperCase(Locale.ROOT) : display.confirm ? "CONFIRM" : display.editing ? "ENTRY" : "STACK");
+            : !display.problem.isEmpty() ? display.problem.toUpperCase(Locale.ROOT) : display.editing ? "ENTRY" : "STACK");
         status.setContentDescription(status.getText());
         if (!session.error.isEmpty() && !session.error.equals(shownError)) Toast.makeText(this,session.error,Toast.LENGTH_LONG).show();
         shownError = session.error;
