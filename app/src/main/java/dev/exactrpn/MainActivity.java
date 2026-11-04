@@ -237,7 +237,7 @@ public final class MainActivity extends Activity {
         if (key.equals("CANCEL") || (key.equals("UNDO") && session.busy
             && SystemClock.elapsedRealtime()-session.busySince >= 250)) { cancelCalculation(); return; }
         if(!key.equals("FORMAT") && !key.equals("NUMBER_FORMAT") && !key.equals("FRACTION")
-            && !key.equals("ANGLE") && !key.equals("CHECKPOINT") && !key.startsWith("SELECT:")) clearStackSelection(false);
+            && !key.equals("ANGLE") && !key.equals("CHECKPOINT") && !key.startsWith("SELECT:") && !key.startsWith("DROP_ROWS:")) clearStackSelection(false);
         boolean start;
         synchronized (session) {
             session.pending.addLast(key);
@@ -290,19 +290,41 @@ public final class MainActivity extends Activity {
                 request.putInt("fractionMode",session.fractionMode);
                 Bundle result=session.remote.evaluate(request);
                 Display display=new Display(result);
-                synchronized (session) {
-                    checkCancelled();
-                    session.checkpoint=result.getString("checkpoint");
-                    session.notation=display.notation; session.numberMode=display.numberMode; session.fractionMode=display.fractionMode;
-                    session.display=display; session.error="";
-                    if(!key.equals("CHECKPOINT")) session.loaded=true;
-                }
+                publishResult(result,display,key);
                 persistSession(false);
             } catch (RuntimeException ex) {
                 session.error = session.cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
                     ? "Calculation cancelled" : "Error: " + (ex.getMessage()==null ? "Undefined result" : ex.getMessage());
                 synchronized (session) { session.pending.clear(); }
             } finally { Thread.interrupted(); }
+        }
+    }
+    private void publishResult(Bundle result,Display display,String key) {
+        Runnable accept=() -> {
+            synchronized(session) {
+                checkCancelled();
+                if(key.startsWith("DROP_ROWS:")) {
+                    SortedSet<Integer> removed=new TreeSet<>();
+                    for(String index:key.substring(10).split(",")) removed.add(Integer.parseInt(index));
+                    SortedSet<Integer> remaining=new TreeSet<>();
+                    for(int index:session.selectedRows) if(!removed.contains(index)) remaining.add(index-removed.headSet(index).size());
+                    session.selectedRows.clear(); session.selectedRows.addAll(remaining);
+                }
+                session.checkpoint=result.getString("checkpoint");
+                session.notation=display.notation; session.numberMode=display.numberMode; session.fractionMode=display.fractionMode;
+                session.display=display; session.error="";
+                if(!key.equals("CHECKPOINT")) session.loaded=true;
+            }
+        };
+        if(!key.startsWith("DROP_ROWS:")) { accept.run(); return; }
+        // Publish selection remapping and the new rows together on the UI thread, before
+        // another queued result can overtake this one. Failed/cancelled drops leave selection intact.
+        FutureTask<Void> commit=new FutureTask<>(accept,null); handler.post(commit);
+        try { commit.get(); }
+        catch(InterruptedException ex) { commit.cancel(false); Thread.currentThread().interrupt(); throw new com.hp.creals.CR.AbortedException(); }
+        catch(ExecutionException ex) {
+            if(ex.getCause() instanceof RuntimeException) throw (RuntimeException)ex.getCause();
+            throw new IllegalStateException("Could not update stack selection",ex.getCause());
         }
     }
     private void persistSession(boolean idle) {
@@ -367,8 +389,9 @@ public final class MainActivity extends Activity {
         menu.getMenu().add(0,1,0,"Drop"); menu.getMenu().add(0,2,1,"Copy");
         menu.setOnMenuItemClickListener(item -> {
             if(!stackActionAllowed(snapshot)) return true;
-            SortedSet<Integer> rows=new TreeSet<>(session.selectedRows);
-            if(rows.isEmpty()) rows.add(index);
+            SortedSet<Integer> rows=new TreeSet<>();
+            if(session.selectedRows.contains(index)) rows.addAll(session.selectedRows);
+            else rows.add(index);
             if(item.getItemId()==1) {
                 List<String> indices=new ArrayList<>(); for(int row:rows) indices.add(Integer.toString(row));
                 execute("DROP_ROWS:"+String.join(",",indices));

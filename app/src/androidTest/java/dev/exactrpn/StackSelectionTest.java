@@ -77,21 +77,42 @@ public final class StackSelectionTest {
                 assertFalse(((CheckBox)tagged(activity,"stack-checkbox:1")).isChecked());
                 tagged(activity,"stack-checkbox:2").performClick();
             });
-            instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:1").performLongClick()); choose("Copy");
             ClipboardManager clipboard=(ClipboardManager)context.getSystemService(Context.CLIPBOARD_SERVICE);
-            await(() -> clipboard.getPrimaryClip()!=null && "1\n3".contentEquals(clipboard.getPrimaryClip().getItemAt(0).getText()));
-            instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:1").performLongClick()); choose("Drop");
-            await(() -> !session.busy && tagged(activity,"stack-value:1")==null && tagged(activity,"stack-value:0")!=null && ((TextView)tagged(activity,"stack-value:0")).getText().toString().equals("2") && button(activity.getWindow().getDecorView(),"Undo")!=null);
-            instrumentation.runOnMainSync(() -> { assertNull(tagged(activity,"stack-checkbox:0")); button(activity.getWindow().getDecorView(),"Undo").performClick(); });
-            await(() -> !session.busy && tagged(activity,"stack-value:2")!=null);
+            // Unselected row acts alone, without disturbing the existing selection.
             instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:1").performLongClick()); choose("Copy");
             await(() -> clipboard.getPrimaryClip()!=null && "2".contentEquals(clipboard.getPrimaryClip().getItemAt(0).getText()));
+            instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:2").performLongClick()); choose("Copy");
+            await(() -> clipboard.getPrimaryClip()!=null && "1\n3".contentEquals(clipboard.getPrimaryClip().getItemAt(0).getText()));
             instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:1").performLongClick()); choose("Drop");
-            await(() -> !session.busy && tagged(activity,"stack-value:2")==null && tagged(activity,"stack-value:1")!=null && ((TextView)tagged(activity,"stack-value:1")).getText().toString().equals("3"));
+            await(() -> !session.busy && tagged(activity,"stack-value:2")==null && tagged(activity,"stack-value:1")!=null
+                && ((TextView)tagged(activity,"stack-value:1")).getText().toString().equals("3"));
             instrumentation.runOnMainSync(() -> {
-                tagged(activity,"stack-label:0").performLongClick(); assertNotNull(tagged(activity,"stack-checkbox:0"));
+                assertEquals(new java.util.TreeSet<>(java.util.Arrays.asList(0,1)),session.selectedRows);
+                assertTrue(((CheckBox)tagged(activity,"stack-checkbox:0")).isChecked());
+                assertTrue(((CheckBox)tagged(activity,"stack-checkbox:1")).isChecked());
+                tagged(activity,"stack-value:1").performLongClick();
+            }); choose("Copy");
+            await(() -> clipboard.getPrimaryClip()!=null && "1\n3".contentEquals(clipboard.getPrimaryClip().getItemAt(0).getText()));
+            instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:1").performLongClick()); choose("Drop");
+            await(() -> !session.busy && tagged(activity,"stack-value:0")==null && button(activity.getWindow().getDecorView(),"Undo")!=null);
+            instrumentation.runOnMainSync(() -> button(activity.getWindow().getDecorView(),"Undo").performClick());
+            await(() -> !session.busy && tagged(activity,"stack-value:1")!=null);
+            // Deleting a row before the sole selected value must not select its replacement by index.
+            instrumentation.runOnMainSync(() -> tagged(activity,"stack-label:1").performLongClick());
+            instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:0").performLongClick()); choose("Drop");
+            await(() -> !session.busy && tagged(activity,"stack-value:1")==null && tagged(activity,"stack-value:0")!=null
+                && ((TextView)tagged(activity,"stack-value:0")).getText().toString().equals("3"));
+            instrumentation.runOnMainSync(() -> {
+                assertEquals(new java.util.TreeSet<>(java.util.Arrays.asList(0)),session.selectedRows);
+                assertTrue(((CheckBox)tagged(activity,"stack-checkbox:0")).isChecked());
+                tagged(activity,"stack-value:0").performLongClick();
+            }); choose("Copy");
+            await(() -> clipboard.getPrimaryClip()!=null && "3".contentEquals(clipboard.getPrimaryClip().getItemAt(0).getText()));
+            instrumentation.runOnMainSync(() -> {
                 activity.onBackPressed(); assertNull(tagged(activity,"stack-checkbox:0")); assertFalse(activity.isFinishing());
-            });
+                tagged(activity,"stack-value:0").performLongClick();
+            }); choose("Drop");
+            await(() -> !session.busy && tagged(activity,"stack-value:0")==null);
         } finally { finish(activity); store.clear(); store.cleanWorkFiles(null); seed.delete(); }
     }
 }
