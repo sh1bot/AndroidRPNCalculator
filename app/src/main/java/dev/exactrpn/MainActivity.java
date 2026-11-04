@@ -15,7 +15,9 @@ import com.android.calculator2.UnifiedReal;
 public final class MainActivity extends Activity {
     private Session session;
     private TextView entryView, status;
-    private Button notationButton, cancelButton;
+    private Button notationButton, angleButton, cancelButton;
+    private CalculatorKeypad keys;
+    private String shownError = "";
     private android.window.OnBackInvokedCallback backCallback;
     private LinearLayout stackRows;
     private ScrollView scroll;
@@ -25,26 +27,34 @@ public final class MainActivity extends Activity {
         final List<String> rows;
         final String entry;
         final ValueFormatter.Notation notation;
-        Display(List<String> r, String e, ValueFormatter.Notation n) { rows = r; entry = e; notation = n; }
+        final boolean editing;
+        final RpnCalculator.AngleUnit angleUnit;
+        Display(List<String> r, String e, ValueFormatter.Notation n, boolean edit, RpnCalculator.AngleUnit angle) {
+            rows = r; entry = e; notation = n; editing = edit; angleUnit = angle;
+        }
     }
     static final class Session {
         RpnCalculator calculator = new RpnCalculator();
         final ExecutorService worker = Executors.newSingleThreadExecutor();
         volatile Display display;
-        volatile String error = "Radians · exact values";
+        volatile String error = "";
         final Deque<String> pending = new ArrayDeque<>();
         volatile boolean busy, cancelRequested;
         volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
-        Session(ValueFormatter.Notation n) { notation = n; display = new Display(Collections.emptyList(), "", n); }
+        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle) {
+            notation = n; calculator.setAngleUnit(angle);
+            display = new Display(Collections.emptyList(), "", n, false, angle);
+        }
     }
     @Override public Object onRetainNonConfigurationInstance() { return session; }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
         session = (Session)getLastNonConfigurationInstance();
         if (session == null) session = new Session(getPreferences(0).getBoolean("engineering", false)
-            ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC);
+            ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC,
+            RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")));
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
         root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
         root.setOnApplyWindowInsetsListener((v,insets) -> {
@@ -55,29 +65,26 @@ public final class MainActivity extends Activity {
             return insets;
         });
         LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView title = text(24); title.setText("EXACT / RPN"); header.addView(title,new LinearLayout.LayoutParams(0,-2,1));
+        angleButton = new Button(this); angleButton.setTextSize(13);
+        angleButton.setOnClickListener(v -> execute("ANGLE"));
+        header.addView(angleButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
         notationButton = new Button(this); notationButton.setTextSize(13);
-        notationButton.setOnClickListener(v -> execute("FORMAT")); header.addView(notationButton);
-        Button help = new Button(this); help.setText("?"); help.setContentDescription("Keyboard shortcuts");
-        help.setMinWidth(0); help.setMinimumWidth(0);
-        help.setOnClickListener(v -> new AlertDialog.Builder(this).setTitle("Keyboard shortcuts")
-            .setMessage("0–9 and .: number entry\n+ − * /: arithmetic\nEnter or Space: enter / duplicate X\nBackspace: edit entry\nDelete: drop X\nEscape: cancel calculation / clear entry\nCtrl+Z: undo\nCtrl+D: duplicate X\nCtrl+S: swap X and Y\nCtrl+L: clear stack\nF9: change sign\n^: Y to the power X\nr: square root · i: reciprocal\ns/c/t: sin/cos/tan\nl: natural logarithm\np: π · e: Euler’s number · E: eˣ\n\nTrig functions use radians. Click/tap calculator buttons if your emulator does not forward a key.")
-            .setPositiveButton("OK",null).show());
-        header.addView(help,new LinearLayout.LayoutParams(dp(40),-2));
+        notationButton.setOnClickListener(v -> execute("FORMAT"));
+        header.addView(notationButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
+        status = text(12); status.setGravity(Gravity.CENTER_VERTICAL); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        header.addView(status,new LinearLayout.LayoutParams(0,dp(48),1));
+        cancelButton = new Button(this); cancelButton.setText("Cancel"); cancelButton.setAllCaps(false); cancelButton.setTextSize(12);
+        cancelButton.setMinWidth(0); cancelButton.setMinimumWidth(0); cancelButton.setPadding(0,0,0,0);
+        cancelButton.setOnClickListener(v -> cancelCalculation());
+        header.addView(cancelButton,new LinearLayout.LayoutParams(dp(70),dp(48)));
         root.addView(header);
-        LinearLayout statusRow = new LinearLayout(this); statusRow.setGravity(Gravity.CENTER_VERTICAL);
-        status = text(13); status.setSingleLine(true); status.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        statusRow.addView(status,new LinearLayout.LayoutParams(0,-2,1));
-        cancelButton = new Button(this); cancelButton.setText("Cancel"); cancelButton.setTextSize(13);
-        cancelButton.setOnClickListener(v -> cancelCalculation()); statusRow.addView(cancelButton);
-        root.addView(statusRow);
         scroll = new ScrollView(this); scroll.setFillViewport(true);
         stackRows = new LinearLayout(this); stackRows.setOrientation(1); stackRows.setGravity(Gravity.BOTTOM);
         scroll.addView(stackRows,new ScrollView.LayoutParams(-1,-2));
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         entryView = text(32); entryView.setGravity(Gravity.END); digits(entryView); entryView.setTextIsSelectable(true);
         root.addView(entryView);
-        CalculatorKeypad keys = new CalculatorKeypad(this, this::execute,
+        keys = new CalculatorKeypad(this, this::execute,
             getPreferences(0).getBoolean("scientificExpanded",false),
             expanded -> getPreferences(0).edit().putBoolean("scientificExpanded",expanded).apply());
         root.addView(keys); setContentView(root);
@@ -122,17 +129,12 @@ public final class MainActivity extends Activity {
                 if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
                     ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
                 else candidate.key(key);
-                List<UnifiedReal> values = candidate.values();
-                List<String> rows = new ArrayList<>();
-                for (int i=0;i<values.size();i++) {
-                    checkCancelled();
-                    rows.add(ValueFormatter.format(values.get(i),i==values.size()-1,notation));
-                }
+                List<String> rows = candidate.formattedValues(notation);
                 synchronized (session) {
                     checkCancelled();
                     session.calculator = candidate; session.notation = notation;
-                    session.display = new Display(Collections.unmodifiableList(rows),candidate.entry(),notation);
-                    session.error = "Radians · exact values";
+                    session.display = new Display(rows,candidate.entry(),notation,candidate.isEditing(),candidate.angleUnit());
+                    session.error = "";
                 }
             } catch (RuntimeException ex) {
                 session.error = session.cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
@@ -152,12 +154,12 @@ public final class MainActivity extends Activity {
         }
         refresh();
     }
-    private void handleBack() { if (session.busy) cancelCalculation(); else finish(); }
+    private void handleBack() { if (session.busy) cancelCalculation(); else if (session.display.editing) execute("CE"); else finish(); }
     private final Runnable tick = new Runnable() { public void run() { refresh(); handler.postDelayed(this,100); } };
     private void refresh() {
         Display display = session.display;
         if (rendered != display) {
-            boolean stackChanged = rendered == null || !rendered.rows.equals(display.rows);
+            boolean stackChanged = rendered == null || rendered.editing != display.editing || !rendered.rows.equals(display.rows);
             if (stackChanged) {
                 stackRows.removeAllViews();
                 if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(Color.rgb(133,150,164)); stackRows.addView(empty); }
@@ -168,12 +170,22 @@ public final class MainActivity extends Activity {
                     label.setGravity(Gravity.START | Gravity.BOTTOM); label.setTextColor(Color.rgb(133,150,164));
                     label.setContentDescription("Stack level " + depth);
                     row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
-                    TextView value = text(21); digits(value); value.setGravity(Gravity.END); value.setText(display.rows.get(i));
+                    boolean result = !display.editing && depth == 1;
+                    TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(display.rows.get(i));
+                    if (!result) {
+                        value.setSingleLine(true);
+                        value.setAutoSizeTextTypeUniformWithConfiguration(12,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+                    }
                     value.setTextIsSelectable(true); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
                     stackRows.addView(row);
                 }
             }
-            entryView.setText(display.entry.isEmpty()?"▸":display.entry);
+            entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
+            entryView.setText(display.entry.isEmpty() ? "▸" : display.entry);
+            keys.setEditing(display.editing);
+            angleButton.setText(display.angleUnit.name());
+            angleButton.setContentDescription("Angle unit: " + display.angleUnit.name() + ". Tap to switch.");
+            getPreferences(0).edit().putString("angleUnit",display.angleUnit.name()).apply();
             notationButton.setText(display.notation == ValueFormatter.Notation.ENGINEERING ? "ENG" : "SCI");
             notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
             getPreferences(0).edit().putBoolean("engineering",display.notation == ValueFormatter.Notation.ENGINEERING).apply();
@@ -185,9 +197,14 @@ public final class MainActivity extends Activity {
         // Keep layout fixed and avoid flashing progress during brief entry evaluations.
         boolean showProgress = session.busy && (session.cancelRequested
             || SystemClock.elapsedRealtime() - session.busySince >= 250);
-        status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Calculating… Back to cancel") : session.error);
+        status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Working…")
+            : display.editing ? "ENTRY" : "STACK");
+        status.setContentDescription(showProgress ? status.getText() : display.editing ? "Entry mode" : "Stack mode");
+        if (!session.error.isEmpty() && !session.error.equals(shownError)) Toast.makeText(this,session.error,Toast.LENGTH_LONG).show();
+        shownError = session.error;
         cancelButton.setVisibility(showProgress ? View.VISIBLE : View.INVISIBLE);
         notationButton.setEnabled(!session.busy);
+        angleButton.setEnabled(!session.busy);
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();

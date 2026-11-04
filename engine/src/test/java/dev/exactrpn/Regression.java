@@ -87,6 +87,51 @@ public final class Regression {
         keys(original,"4","5","CE"); check(original.entry().isEmpty() && top(original).definitelyEquals(new UnifiedReal(3)),"clear entry preserves stack");
         RpnCalculator branch = original.copy(); branch.key("UNDO"); branch.key("ENTER");
         original.key("UNDO"); check(original.entry().equals("45") && original.values().size()==1,"undo history independent across candidates");
+        RpnCalculator hp = new RpnCalculator();
+        check(!hp.isEditing() && hp.entry().isEmpty(), "initial stack mode");
+        hp.key("BACK"); check(hp.values().isEmpty() && !hp.isEditing(), "drop on empty stack");
+        number(hp, "123456789012345678901234567890"); hp.key("ENTER");
+        check(!hp.isEditing() && hp.formattedValues(sci).get(0).equals("123456789012345678901234567890"), "bottom integer expands in stack mode");
+        hp.key("4");
+        check(hp.isEditing() && hp.formattedValues(sci).get(0).contains("e+29"), "typing moves prior integer to compact stack");
+        hp.key("BACK");
+        check(hp.isEditing() && hp.entry().isEmpty() && hp.values().size()==1, "backspace to empty stays editing");
+        hp.key("BACK");
+        check(hp.isEditing() && hp.values().size()==1, "empty backspace never drops stack");
+        hp.key("DROP");
+        check(hp.isEditing() && hp.values().size()==1, "delete key also respects empty entry mode");
+        hp.key("ENTER");
+        check(!hp.isEditing() && hp.values().size()==1, "enter on blank entry returns to stack without duplication");
+        hp.key("ENTER");
+        check(hp.values().size()==2 && !hp.isEditing(), "enter duplicates in stack mode");
+        hp.key("BACK");
+        check(hp.values().size()==1 && !hp.isEditing(), "context key drops result");
+        hp.key("UNDO");
+        check(hp.values().size()==2 && !hp.isEditing(), "undo drop restores stack mode");
+        keys(hp,"5","BACK","CE","UNDO");
+        check(hp.isEditing() && hp.entry().isEmpty(), "undo restores explicitly empty editing mode");
+        RpnCalculator editCopy = hp.copy(); editCopy.key("6");
+        check(hp.isEditing() && hp.entry().isEmpty() && editCopy.entry().equals("6"), "copy preserves independent empty edit");
+        keys(hp,"CE","CLEAR","9","ENTER","0");
+        try { hp.key("÷"); throw new AssertionError("division accepted"); } catch(ArithmeticException expected) {}
+        check(hp.isEditing() && hp.entry().equals("0") && top(hp).definitelyEquals(new UnifiedReal(9)), "error restores edit mode and entry");
+        hp.key("BACK");
+        try { hp.key("+"); throw new AssertionError("underflow accepted"); } catch(IllegalArgumentException expected) {}
+        check(hp.isEditing() && hp.entry().isEmpty(), "failed operation preserves empty edit");
+        keys(hp,"CLEAR","2","ENTER","3","+");
+        check(!hp.isEditing() && top(hp).definitelyEquals(new UnifiedReal(5)), "operation ends entry mode");
+        hp.setAngleUnit(RpnCalculator.AngleUnit.DEG);
+        keys(hp,"CLEAR","9","0","sin"); check(top(hp).definitelyOne(), "sin 90 degrees exactly one");
+        keys(hp,"CLEAR","4","5","tan"); check(top(hp).definitelyOne(), "tan 45 degrees exactly one");
+        hp.setAngleUnit(RpnCalculator.AngleUnit.GRAD);
+        keys(hp,"CLEAR","1","0","0","sin"); check(top(hp).definitelyOne(), "sin 100 gradians exactly one");
+        keys(hp,"CLEAR","2","0","0","cos"); check(top(hp).definitelyEquals(UnifiedReal.MINUS_ONE), "cos 200 gradians exactly minus one");
+        hp.setAngleUnit(RpnCalculator.AngleUnit.RAD);
+        keys(hp,"CLEAR","π","2","÷","sin"); check(top(hp).definitelyOne(), "radians unchanged");
+        hp.key("7"); hp.key("ANGLE");
+        check(hp.angleUnit()==RpnCalculator.AngleUnit.DEG && hp.isEditing() && hp.entry().equals("7"), "angle toggle preserves entry and stack");
+        hp.key("ANGLE"); check(hp.angleUnit()==RpnCalculator.AngleUnit.GRAD, "cycle to gradians");
+        hp.key("ANGLE"); check(hp.angleUnit()==RpnCalculator.AngleUnit.RAD, "cycle to radians");
         System.out.println("Passed " + checks + " regression checks");
     }
 }
