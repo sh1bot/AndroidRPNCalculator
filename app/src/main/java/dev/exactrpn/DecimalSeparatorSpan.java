@@ -5,23 +5,20 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.text.style.ReplacementSpan;
 
-/** Give the decimal mark weight and breathing room without enlarging the whole line. */
+/** A tabular decimal mark: the normal glyph centered in one localized digit cell. */
 final class DecimalSeparatorSpan extends ReplacementSpan {
-    private Paint markPaint(Paint original) {
-        Paint mark=new Paint(original); mark.setFakeBoldText(true); mark.setTextSize(original.getTextSize()*1.3f);
-        return mark;
-    }
-    private int width(Paint original,Paint mark,String text) {
-        return (int)Math.ceil(Math.max(original.getTextSize()*.45f,mark.measureText(text)));
+    private final String zero;
+    DecimalSeparatorSpan(char zeroDigit) { zero=Character.toString(zeroDigit); }
+    private int width(Paint paint,String separator) {
+        return (int)Math.ceil(Math.max(paint.measureText(zero),paint.measureText(separator)));
     }
     @Override public int getSize(Paint paint,CharSequence text,int start,int end,Paint.FontMetricsInt metrics) {
         if(metrics!=null) paint.getFontMetricsInt(metrics);
-        String separator=text.subSequence(start,end).toString();
-        return width(paint,markPaint(paint),separator);
+        return width(paint,text.subSequence(start,end).toString());
     }
     @Override public void draw(Canvas canvas,CharSequence text,int start,int end,float x,int top,int y,int bottom,Paint paint) {
-        String separator=text.subSequence(start,end).toString(); Paint mark=markPaint(paint);
-        float offset=(width(paint,mark,separator)-mark.measureText(separator))/2;
-        canvas.drawText(separator,x+offset,y,mark);
+        String separator=text.subSequence(start,end).toString();
+        float offset=(width(paint,separator)-paint.measureText(separator))/2;
+        canvas.drawText(separator,x+offset,y,paint);
     }
 }
