@@ -43,10 +43,23 @@ public final class LocaleNumbers {
         if (number.startsWith("≈ ")) { text.append("≈ "); number = number.substring(2); }
         // The display's explicit near-zero annotation is not a numeric literal.
         if (number.contains("(")) return text.append(entry(number));
+        int slash=number.indexOf('/');
+        if(slash>=0) {
+            appendInteger(text,number.substring(0,slash),groupingColor);
+            text.append("⁄");
+            appendInteger(text,number.substring(slash+1),groupingColor);
+            return text;
+        }
         int e = number.indexOf('e');
         String mantissa = e<0 ? number : number.substring(0,e);
         int dot = mantissa.indexOf('.');
         String whole = dot<0 ? mantissa : mantissa.substring(0,dot);
+        appendInteger(text,whole,groupingColor);
+        if (dot>=0) text.append(Character.toString(decimalSeparator())).append(entry(mantissa.substring(dot+1)));
+        if (e>=0) text.append("e").append(entry(number.substring(e+1)));
+        return text;
+    }
+    private void appendInteger(SpannableStringBuilder text,String whole,int groupingColor) {
         BigInteger integer = new BigInteger(whole);
         String localized = integers.format(integer);
         if (whole.startsWith("-") && integer.signum()==0) localized = ((DecimalFormat)integers).getNegativePrefix()+localized; // No double conversion or digit loss.
@@ -55,9 +68,6 @@ public final class LocaleNumbers {
             if (localized.charAt(i)==symbols.getGroupingSeparator())
                 text.setSpan(new ForegroundColorSpan(groupingColor),start+i,start+i+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
-        if (dot>=0) text.append(Character.toString(decimalSeparator())).append(entry(mantissa.substring(dot+1)));
-        if (e>=0) text.append("e").append(entry(number.substring(e+1)));
-        return text;
     }
     public NumberText.Profile profile() { return new NumberText.Profile(decimalSeparator(),symbols.getGroupingSeparator(),primary,secondary); }
     public String copy(String canonical) { return computer ? canonical : entry(canonical); }
@@ -70,4 +80,5 @@ public final class LocaleNumbers {
         return text.toString();
     }
 }
+
 

@@ -263,8 +263,25 @@ public final class Regression {
         nav.key("RIGHT"); nav.key("RIGHT"); nav.key("9"); check(nav.entry().equals("1293.45"),"navigation places inserted digit correctly");
         nav.key("UNDO"); check(nav.entry().equals("123.45") && nav.selectionEnd()==2,"undo restores edit and navigation position");
         nav.key("ENTER"); nav.key("HOME"); check(!nav.isEditing() && nav.selectionEnd()==0,"navigation does not start editing stack");
+        check(ValueFormatter.format(RpnCalculator.parse("0.3"),true,sci,true).equals("3/10"),"fraction mode displays exact decimal rational");
+        check(ValueFormatter.format(third,true,sci,true).equals("1/3"),"fraction mode preserves recurring rational");
+        check(ValueFormatter.format(new UnifiedReal(new com.android.calculator2.BoundedRational(6,-8)),true,sci,true).equals("-3/4"),"fraction sign and reduction");
+        check(ValueFormatter.format(UnifiedReal.TWO,true,sci,true).equals("2"),"fraction mode leaves integers natural");
+        check(ValueFormatter.format(UnifiedReal.ZERO,true,sci,true).equals("0"),"fraction mode zero");
+        check(ValueFormatter.format(huge,true,sci,true).equals(huge.bigIntegerValue().toString()),"fraction mode retains full newest integer");
+        check(ValueFormatter.format(huge,false,sci,true).contains("e+29"),"older integer remains compact in fraction mode");
+        UnifiedReal rootTwo=UnifiedReal.TWO.sqrt();
+        check(ValueFormatter.format(rootTwo,true,sci,true).equals(ValueFormatter.format(rootTwo,true,sci)),"irrational fraction fallback");
+        check(ValueFormatter.format(UnifiedReal.PI,true,sci,true).equals(ValueFormatter.format(UnifiedReal.PI,true,sci)),"pi fraction fallback");
+        check(ValueFormatter.format(RpnCalculator.parse("1e-20"),true,eng,true).equals("1/100000000000000000000"),"tiny rational remains exact fraction");
+        RpnCalculator fractions=new RpnCalculator(); keys(fractions,"1","ENTER","3","÷");
+        check(fractions.formattedValues(sci,true).get(0).equals("1/3"),"stack fraction display");
+        check(fractions.formattedValues(sci,false).get(0).equals("≈ 0.333333333333"),"stack decimal display");
+        check(top(fractions).multiply(new UnifiedReal(3)).definitelyOne(),"display mode leaves exact arithmetic unchanged");
+        check(ValueFormatter.clipboard(top(fractions),sci).equals("0.333333333333"),"fraction display keeps clipboard decimal");
         System.out.println("Passed " + checks + " regression checks");
     }
 }
+
 
 

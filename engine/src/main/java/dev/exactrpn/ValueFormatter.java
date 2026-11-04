@@ -2,6 +2,7 @@
 package dev.exactrpn;
 
 import com.android.calculator2.UnifiedReal;
+import com.android.calculator2.BoundedRational;
 import com.hp.creals.StringFloatRep;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -30,6 +31,13 @@ public final class ValueFormatter {
             && RpnCalculator.parse(approximation.toString()).definitelyEquals(value);
         return (exact ? "" : "≈ ") + decimal(approximation, notation);
     }
+    public static String format(UnifiedReal value, boolean newest, Notation notation, boolean fractions) {
+        if(fractions) {
+            BoundedRational rational=value.boundedRationalValue();
+            if(rational!=null && value.bigIntegerValue()==null) return rational.toNiceString();
+        }
+        return format(value,newest,notation);
+    }
     public static String clipboard(UnifiedReal value, Notation notation) {
         String text = format(value,true,notation);
         if (text.startsWith("≈ ")) text = text.substring(2);
@@ -44,4 +52,5 @@ public final class ValueFormatter {
         return d.scaleByPowerOfTen(-power).toPlainString() + "e" + (power >= 0 ? "+" : "−") + Math.abs(power);
     }
 }
+
 

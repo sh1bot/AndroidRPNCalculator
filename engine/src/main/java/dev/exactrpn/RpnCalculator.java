@@ -56,11 +56,12 @@ public final class RpnCalculator {
         try { parse(entry); return ""; } catch(IllegalArgumentException ex) { return "Invalid"; }
     }
     public List<UnifiedReal> values() { return Collections.unmodifiableList(new ArrayList<>(stack)); }
-    public List<String> formattedValues(ValueFormatter.Notation notation) {
+    public List<String> formattedValues(ValueFormatter.Notation notation) { return formattedValues(notation,false); }
+    public List<String> formattedValues(ValueFormatter.Notation notation,boolean fractions) {
         List<String> rows=new ArrayList<>();
         for(int i=0;i<stack.size();i++) {
             if(Thread.currentThread().isInterrupted()) throw new com.hp.creals.CR.AbortedException();
-            rows.add(ValueFormatter.format(stack.get(i),!editing && i==stack.size()-1,notation));
+            rows.add(ValueFormatter.format(stack.get(i),!editing && i==stack.size()-1,notation,fractions));
         }
         return Collections.unmodifiableList(rows);
     }
@@ -220,6 +221,7 @@ public final class RpnCalculator {
         return "≈ " + value.toStringTruncated(24);
     }
 }
+
 
 
 
