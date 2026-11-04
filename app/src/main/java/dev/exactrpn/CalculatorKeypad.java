@@ -20,6 +20,7 @@ public final class CalculatorKeypad extends LinearLayout {
     private final List<Button> primaryButtons = new ArrayList<>();
     private final List<Button> scientificButtons = new ArrayList<>();
     private final Button expand;
+    private Button deleteButton;
     private boolean expanded;
     private final Consumer<Boolean> saveExpanded;
     private final Consumer<String> command;
@@ -29,14 +30,19 @@ public final class CalculatorKeypad extends LinearLayout {
         setOrientation(VERTICAL);
         LinearLayout controls = new LinearLayout(context);
         controls.addView(button("SWAP", "Swap"), new LinearLayout.LayoutParams(0,dp(44),1));
-        controls.addView(button("DROP", "Drop"), new LinearLayout.LayoutParams(0,dp(44),1));
         expand = button("", "");
         expand.setOnClickListener(v -> { this.expanded = !this.expanded; updateExpansion(); saveExpanded.accept(this.expanded); });
-        controls.addView(expand,new LinearLayout.LayoutParams(0,dp(44),2));
+        controls.addView(expand,new LinearLayout.LayoutParams(0,dp(44),3));
         addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
-        addRows(new String[][] {{"sin","cos","tan","π"},{"√","ln","eˣ","e"},{"1/x","xʸ","DUP","CE"}}, scientificRows, scientificButtons);
+        addRows(new String[][] {{"sin","cos","tan","√","1/x"},{"ln","eˣ","xʸ","π","e"}}, scientificRows, scientificButtons);
         addRows(new String[][] {{"CLEAR","±","BACK","÷"},{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{"UNDO","0",".","ENTER"}}, primaryRows, primaryButtons);
+        setEditing(false);
         updateExpansion();
+    }
+    public void setEditing(boolean editing) {
+        deleteButton.setText(editing ? "⌫" : "Drop");
+        deleteButton.setTextSize(editing ? 21 : 14);
+        deleteButton.setContentDescription(editing ? "Backspace" : "Drop X");
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String key, String label) {
@@ -70,6 +76,7 @@ public final class CalculatorKeypad extends LinearLayout {
                 String label = key.equals("BACK") ? "⌫" : key.equals("CLEAR") ? "Clear" : key.equals("UNDO") ? "Undo" : key.equals("ENTER") ? "Enter" : key.equals("DUP") ? "Dup" : key;
                 FrameLayout cell = new FrameLayout(getContext());
                 Button b = button(key,label); buttons.add(b);
+                if (key.equals("BACK")) deleteButton = b;
                 if (key.matches("[0-9.]")) b.setTextSize(26);
                 cell.addView(b,new FrameLayout.LayoutParams(dp(48),dp(48),Gravity.CENTER));
                 row.addView(cell,new LinearLayout.LayoutParams(0,-1,1));
@@ -88,7 +95,7 @@ public final class CalculatorKeypad extends LinearLayout {
         int cellWidth = Math.max(dp(40), MeasureSpec.getSize(widthSpec)/4);
         int budget = Math.min(dp(500),Math.round(getResources().getDisplayMetrics().heightPixels * .62f));
         if (MeasureSpec.getMode(heightSpec)!=MeasureSpec.UNSPECIFIED) budget = Math.min(budget,MeasureSpec.getSize(heightSpec));
-        int height = expanded ? Math.min(dp(56),Math.max(dp(40),(budget-dp(48))/8))
+        int height = expanded ? Math.min(dp(56),Math.max(dp(40),(budget-dp(48))/7))
             : Math.min(cellWidth,Math.max(dp(40),(budget-dp(48))/5));
         for (LinearLayout row : primaryRows) row.getLayoutParams().height = height;
         for (LinearLayout row : scientificRows) row.getLayoutParams().height = height;
@@ -99,7 +106,7 @@ public final class CalculatorKeypad extends LinearLayout {
         }
         for (Button b : scientificButtons) {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams)b.getLayoutParams();
-            lp.height = Math.max(dp(32),height-dp(8)); lp.width = Math.max(dp(32),cellWidth-dp(8));
+            lp.height = Math.max(dp(32),height-dp(8)); lp.width = Math.max(dp(32),MeasureSpec.getSize(widthSpec)/5-dp(8));
         }
         super.onMeasure(widthSpec,heightSpec);
     }

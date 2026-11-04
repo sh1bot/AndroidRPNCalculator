@@ -9,11 +9,21 @@ Enter a number, press **Enter**, enter another number, then choose an operation:
 `12 Enter 3 ÷` gives `4`. The newest stack value is X (level 1); the value above it
 is Y. Binary operations calculate **Y op X**.
 
-**Enter** with no pending input duplicates X. **Swap** exchanges X and Y;
-**Drop** removes X; **Undo** restores the previous state. **Functions** expands
-the scientific keypad. Trigonometry uses radians; **eˣ** calculates e to the power
-of X. **SCI/ENG** selects display notation without changing the exact values.
-Tap **?** for keyboard shortcuts.
+In stack mode, **Enter** duplicates X and **Drop** removes it. Typing starts entry
+mode: the stack moves above the input and Drop becomes backspace. Deleting the
+last digit leaves entry mode active; **Enter** on an empty entry returns to the
+stack. Results return to the bottom after operations; exact integers display in
+full there, while values above an entry use compact notation.
+
+**Swap** exchanges X and Y; **Undo** restores the previous state. **Functions**
+expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
+**SCI/ENG** for display notation. **eˣ** calculates e to the power of X.
+
+Keyboard: digits, decimal point, and `+ - * /` enter numbers and operations.
+Enter/Space commits or duplicates; Backspace/Delete acts as backspace or Drop.
+Escape cancels a calculation or entry. Ctrl+Z undoes, Ctrl+S swaps, Ctrl+L clears,
+and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
+`s/c/t` sin/cos/tan, `l` ln, `p` π, `e` Euler's number, `E` eˣ, and `^` power.
 
 ## Build
 
