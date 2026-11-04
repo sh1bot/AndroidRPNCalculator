@@ -6,6 +6,7 @@ import android.icu.text.DecimalFormatSymbols;
 import android.icu.text.NumberFormat;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.Spannable;
 import android.text.style.ForegroundColorSpan;
 import java.math.BigInteger;
 import java.util.Locale;
@@ -57,9 +58,22 @@ public final class LocaleNumbers {
         int dot = mantissa.indexOf('.');
         String whole = dot<0 ? mantissa : mantissa.substring(0,dot);
         appendInteger(text,whole,groupingColor);
-        if (dot>=0) text.append(Character.toString(decimalSeparator())).append(entry(mantissa.substring(dot+1)));
+        if (dot>=0) {
+            int start=text.length(); text.append(Character.toString(decimalSeparator()));
+            text.setSpan(new DecimalSeparatorSpan(),start,start+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.append(entry(mantissa.substring(dot+1)));
+        }
         if (e>=0) text.append("e").append(entry(number.substring(e+1)));
         return text;
+    }
+    /** Styling only: preserve characters, caret offsets, locale and validation colors. */
+    public void styleDecimal(Spannable text) {
+        for(DecimalSeparatorSpan span:text.getSpans(0,text.length(),DecimalSeparatorSpan.class)) text.removeSpan(span);
+        for(int i=0;i<text.length();i++) {
+            char c=text.charAt(i);
+            if(c=='e' || c=='E') break;
+            if(c==decimalSeparator()) text.setSpan(new DecimalSeparatorSpan(),i,i+1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
     }
     private void appendInteger(SpannableStringBuilder text,String whole,int groupingColor) {
         BigInteger integer = new BigInteger(whole);

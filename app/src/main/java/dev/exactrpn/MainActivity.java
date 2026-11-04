@@ -152,6 +152,7 @@ public final class MainActivity extends Activity {
             @Override public void onTextChanged(CharSequence s,int start,int before,int count) { this.start=start; this.count=count; }
             @Override public void afterTextChanged(android.text.Editable text) {
                 if(changingEntry) return;
+                numbers.styleDecimal(text);
                 boolean explicit=count==1 && start<text.length() && text.charAt(start)==numbers.decimalSeparator();
                 String value=entryShowsRaw ? text.toString() : numbers.canonicalEntry(text.toString());
                 execute("EDIT:"+Math.max(0,entryView.getSelectionStart())+":"+Math.max(0,entryView.getSelectionEnd())
@@ -321,9 +322,9 @@ public final class MainActivity extends Activity {
                             android.text.TextPaint measure=new android.text.TextPaint(value.getPaint());
                             float scale=getResources().getDisplayMetrics().scaledDensity;
                             int size=32;
-                            for(;size>21;size--) { measure.setTextSize(size*scale); if(measure.measureText(full.toString())<=available) break; }
+                            for(;size>21;size--) { measure.setTextSize(size*scale); if(android.text.Layout.getDesiredWidth(full,measure)<=available) break; }
                             measure.setTextSize(size*scale);
-                            boolean fits=measure.measureText(full.toString())<=available;
+                            boolean fits=android.text.Layout.getDesiredWidth(full,measure)<=available;
                             CharSequence chosen=fits ? full : compact;
                             updateStackLabel(label,depth,fits ? fullNumber : compactNumber);
                             row.setContentDescription("Copy stack level " + depth + (fits || !compactNumber.startsWith("≈ ") ? ": " : ", approximately: ") + chosen);
@@ -344,6 +345,7 @@ public final class MainActivity extends Activity {
                 entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
                 String entry=display.raw ? display.entry : numbers.entry(display.entry);
                 if(!entryView.getText().toString().equals(entry)) entryView.setText(entry);
+                numbers.styleDecimal(entryView.getText());
                 entryView.setTextColor(display.problem.isEmpty() ? Color.rgb(228,237,242) : Color.rgb(255,125,125));
                 if(Build.VERSION.SDK_INT>=30) entryView.setStateDescription(!display.problem.isEmpty() ? display.problem+" number" : "Number entry");
                 if(display.editing) {
