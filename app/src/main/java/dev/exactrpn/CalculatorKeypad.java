@@ -38,13 +38,14 @@ public final class CalculatorKeypad extends LinearLayout {
         numbers = new LocaleNumbers(context.getResources().getConfiguration().getLocales().get(0));
         setOrientation(VERTICAL);
         controls = new LinearLayout(context);
-        controls.addView(button("SWAP", "Swap"), new LinearLayout.LayoutParams(0,dp(44),1));
+        controls.addView(button("CLEAR", "Clear"), new LinearLayout.LayoutParams(0,dp(44),1));
         expand = button("", "");
         expand.setOnClickListener(v -> { this.expanded = !this.expanded; updateExpansion(); saveExpanded.accept(this.expanded); });
         controls.addView(expand,new LinearLayout.LayoutParams(0,dp(44),3));
         addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
+        addRows(new String[][] {{"UNDO","SWAP","±","÷"}}, primaryRows);
         addRows(new String[][] {{"sin","cos","tan","√","1/x"},{"ln","eˣ","xʸ","π","e"}}, scientificRows);
-        addRows(new String[][] {{"CLEAR","±","BACK","÷"},{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{"UNDO","0",".","ENTER"}}, primaryRows);
+        addRows(new String[][] {{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{".","0","BACK","ENTER"}}, primaryRows);
         setEditing(false);
         updateExpansion();
     }
@@ -108,7 +109,7 @@ public final class CalculatorKeypad extends LinearLayout {
         for (String[] entries : keys) {
             LinearLayout row = new LinearLayout(getContext());
             for (String key : entries) {
-                String label = key.equals("BACK") ? "⌫" : key.equals("CLEAR") ? "Clear" : key.equals("UNDO") ? "Undo" : key.equals("ENTER") ? "Enter" : key.equals("DUP") ? "Dup" : key;
+                String label = key.equals("BACK") ? "⌫" : key.equals("CLEAR") ? "Clear" : key.equals("UNDO") ? "Undo" : key.equals("SWAP") ? "Swap" : key.equals("ENTER") ? "Enter" : key.equals("DUP") ? "Dup" : key;
                 FrameLayout cell = new FrameLayout(getContext());
                 Button b = button(key,label);
                 if (key.equals("BACK")) deleteButton = b;
@@ -165,8 +166,10 @@ public final class CalculatorKeypad extends LinearLayout {
             fitLabel((Button)controls.getChildAt(i),width/controls.getChildCount(),lp.height);
         }
         List<LinearLayout> activeRows = new ArrayList<>();
-        if (expanded) activeRows.addAll(scientificRows);
-        activeRows.addAll(primaryRows);
+        for(int i=1;i<getChildCount();i++) {
+            View row=getChildAt(i);
+            if(row.getVisibility()!=GONE) activeRows.add((LinearLayout)row);
+        }
         int bodyHeight = Math.max(0,height-controlHeight);
         int count = Math.max(1,activeRows.size());
         for (int r=0;r<activeRows.size();r++) {
