@@ -43,8 +43,8 @@ public final class CalculatorKeypad extends LinearLayout {
         expand.setOnClickListener(v -> { this.expanded = !this.expanded; updateExpansion(); saveExpanded.accept(this.expanded); });
         controls.addView(expand,new LinearLayout.LayoutParams(0,dp(44),3));
         addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
-        addRows(new String[][] {{"UNDO","SWAP","±","÷"}}, primaryRows);
         addRows(new String[][] {{"sin","cos","tan","√","1/x"},{"ln","eˣ","xʸ","π","e"}}, scientificRows);
+        addRows(new String[][] {{"UNDO","SWAP","±","÷"}}, primaryRows);
         addRows(new String[][] {{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{".","0","BACK","ENTER"}}, primaryRows);
         setEditing(false);
         updateExpansion();
