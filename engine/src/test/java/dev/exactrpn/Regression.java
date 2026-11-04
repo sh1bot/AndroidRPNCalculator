@@ -44,6 +44,9 @@ public final class Regression {
             String expected=new java.math.BigDecimal(input).round(new java.math.MathContext(12,java.math.RoundingMode.HALF_EVEN)).stripTrailingZeros().toPlainString();
             check(ValueFormatter.format(RpnCalculator.parse(input),true,sci).equals((new java.math.BigDecimal(input).compareTo(new java.math.BigDecimal(expected))==0 ? "" : "≈ ")+expected),"large decimal rounding "+input);
         }
+        check(ValueFormatter.clipboard(RpnCalculator.parse("56565642624.456"),sci).equals("56565642624.456"),"copy preserves large exact decimal");
+        check(ValueFormatter.clipboard(RpnCalculator.parse("-0.0000000000001234567890123456"),eng).equals("-0.0000000000001234567890123456"),"copy preserves tiny exact decimal");
+        check(ValueFormatter.clipboard(RpnCalculator.parse("1").divide(RpnCalculator.parse("8")),sci).equals("0.125"),"copy exact terminating rational result");
         UnifiedReal huge = RpnCalculator.parse("123456789012345678901234567890");
         check(ValueFormatter.format(huge,true,sci).equals("123456789012345678901234567890"),"newest integer expanded");
         check(ValueFormatter.format(huge,false,sci).equals("≈ 1.23456789012e+29"),"older integer compact scientific");
@@ -171,7 +174,7 @@ public final class Regression {
         keys(pasted,"PASTE:0.1","ENTER","PASTE:0.2","+");
         check(top(pasted).definitelyEquals(RpnCalculator.parse("0.3")),"pasted arithmetic remains exact");
         check(ValueFormatter.clipboard(huge,sci).equals("123456789012345678901234567890"),"clipboard retains full exact integer");
-        check(ValueFormatter.clipboard(RpnCalculator.parse("-1e-20"),sci).equals("-1e-20"),"clipboard uses ASCII exponent minus");
+        check(ValueFormatter.clipboard(RpnCalculator.parse("-1e-20"),sci).equals("-0.00000000000000000001"),"clipboard preserves tiny exact value with ASCII minus");
         check(ValueFormatter.clipboard(third,sci).equals("0.333333333333"),"clipboard omits approximation annotation");
         check("PASTE".equals(KeyboardInput.command(50,0,true,false,false)),"Ctrl V paste shortcut");
         check("5".equals(KeyboardInput.command(0,'٥',false,false,false)),"localized hardware digits");
