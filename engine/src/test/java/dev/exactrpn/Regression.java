@@ -295,6 +295,57 @@ public final class Regression {
         check(fractions.formattedValues(sci,false).get(0).equals("≈ 0.333333333333"),"stack decimal display");
         check(top(fractions).multiply(new UnifiedReal(3)).definitelyOne(),"display mode leaves exact arithmetic unchanged");
         check(ValueFormatter.clipboard(top(fractions),sci).equals("0.333333333333"),"fraction display keeps clipboard decimal");
+        RpnCalculator durable=new RpnCalculator();
+        number(durable,"56565642624.456"); keys(durable,"ENTER","π","2","√","+","1","ENTER","3","÷");
+        durable.key("ANGLE"); durable.paste("12.345"); durable.select(2,5);
+        RpnCalculator restored=RpnCalculator.load(durable.save());
+        check(restored.values().size()==3,"restore full stack");
+        check(restored.values().get(0).definitelyEquals(RpnCalculator.parse("56565642624.456")),"restore exact large decimal");
+        check(restored.values().get(1).toStringTruncated(80).equals(UnifiedReal.PI.add(UnifiedReal.TWO.sqrt()).toStringTruncated(80)),"restore exact irrational expression");
+        check(top(restored).multiply(new UnifiedReal(3)).definitelyOne(),"restore exact recurring fraction");
+        check(restored.entry().equals("12.345") && restored.isEditing() && restored.selectionStart()==2 && restored.selectionEnd()==5,"restore editing and cursor selection");
+        check(restored.angleUnit()==RpnCalculator.AngleUnit.DEG,"restore angle mode");
+        restored.key("UNDO"); check(restored.entry().equals("") && restored.values().size()==3,"restore undo history");
+        restored.key("CLEAR");
+        RpnCalculator cleared=RpnCalculator.load(restored.save());
+        check(cleared.isEmpty() && cleared.undoCount()>0,"empty foreground state retains undo");
+        cleared.key("UNDO"); check(cleared.values().size()==3,"undo accidental Clear after restoration");
+        cleared.key("CLEAR"); cleared.clearUndo();
+        check(cleared.isEmpty() && cleared.undoCount()==0,"empty background state discards undo");
+        cleared.key("UNDO"); check(cleared.isEmpty(),"discarded undo cannot resurrect cleared values");
+        RpnCalculator rawSaved=new RpnCalculator(); rawSaved.pasteText("1,234",new NumberText.Profile('.',',',3,3)); rawSaved.select(1,2);
+        RpnCalculator rawRestored=RpnCalculator.load(rawSaved.save());
+        check(rawRestored.rawEntry() && rawRestored.entryProblem().equals("Ambiguous") && rawRestored.entry().equals("1,234"),"restore ambiguous clipboard entry");
+        check(rawRestored.selectionStart()==1 && rawRestored.selectionEnd()==2,"restore raw cursor selection");
+        RpnCalculator angleSaved=new RpnCalculator(); angleSaved.setAngleUnit(RpnCalculator.AngleUnit.GRAD);
+        number(angleSaved,"12.34"); angleSaved.key("sin"); angleSaved.setAngleUnit(RpnCalculator.AngleUnit.RAD);
+        RpnCalculator angleRestored=RpnCalculator.load(angleSaved.save());
+        check(ValueFormatter.format(top(angleRestored),true,sci).equals(ValueFormatter.format(top(angleSaved),true,sci)),"restore trig expression with original angle unit");
+        RpnCalculator bounded=new RpnCalculator();
+        for(int i=0;i<150;i++) bounded.paste(Integer.toString(i));
+        check(bounded.undoCount()==100 && RpnCalculator.load(bounded.save()).undoCount()==100,"undo count is bounded across persistence");
+        String longRaw="字".repeat(4096);
+        for(int i=0;i<110;i++) bounded.pasteText(longRaw,new NumberText.Profile('.',',',3,3));
+        byte[] boundedBytes=bounded.save();
+        check(boundedBytes.length<=1024*1024 && bounded.undoCount()<100,"saved undo history respects byte budget");
+        check(RpnCalculator.load(boundedBytes).entry().equals(longRaw),"undo eviction preserves current entry");
+        for(String operation:new String[]{"±","√","1/x","ln","eˣ","sin","cos","tan"}) {
+            RpnCalculator expression=new RpnCalculator(); keys(expression,"π",operation);
+            RpnCalculator loaded=RpnCalculator.load(expression.save());
+            check(top(loaded).toStringTruncated(60).equals(top(expression).toStringTruncated(60)),"restore unary expression "+operation);
+            loaded.key("UNDO"); check(top(loaded).definitelyEquals(UnifiedReal.PI),"restore unary undo "+operation);
+        }
+        for(String operation:new String[]{"+","−","×","÷","xʸ"}) {
+            RpnCalculator expression=new RpnCalculator(); keys(expression,"π","2","√",operation);
+            RpnCalculator loaded=RpnCalculator.load(expression.save());
+            check(top(loaded).toStringTruncated(60).equals(top(expression).toStringTruncated(60)),"restore binary expression "+operation);
+        }
+        byte[] valid=durable.save();
+        try { RpnCalculator.load(java.util.Arrays.copyOf(valid,valid.length-1)); throw new AssertionError("truncated state accepted"); }
+        catch(java.io.IOException expected) { check(true,"reject truncated state"); }
+        valid[0]=0;
+        try { RpnCalculator.load(valid); throw new AssertionError("unknown state version accepted"); }
+        catch(java.io.IOException expected) { check(true,"reject unknown saved state version"); }
         System.out.println("Passed " + checks + " regression checks");
     }
 }

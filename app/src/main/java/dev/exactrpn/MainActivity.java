@@ -60,7 +60,9 @@ public final class MainActivity extends Activity {
         volatile Display display;
         volatile String error = "";
         final Deque<String> pending = new ArrayDeque<>();
-        volatile boolean busy, cancelRequested;
+        volatile boolean busy, cancelRequested, background;
+        CalculatorStore store;
+        boolean loaded;
         volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
@@ -80,11 +82,13 @@ public final class MainActivity extends Activity {
         Locale locale=getResources().getConfiguration().getLocales().get(0);
         localNumbers=new LocaleNumbers(locale); computerNumbers=new LocaleNumbers(locale,true); ungroupedNumbers=new LocaleNumbers(locale,false,false);
         session = (Session)getLastNonConfigurationInstance();
+        boolean restoreSession=session==null;
         if (session == null) session = new Session(getPreferences(0).getBoolean("engineering", false)
             ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC,
             RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")),
             getPreferences(0).getInt("numberMode",getPreferences(0).getBoolean("computerNumbers",false) ? 1 : 0),
             getPreferences(0).getBoolean("fractions",false));
+        if(restoreSession) session.store=new CalculatorStore(getNoBackupFilesDir());
         numbers=numberFormat(session.numberMode);
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
         root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
@@ -149,6 +153,7 @@ public final class MainActivity extends Activity {
                 android.window.OnBackInvokedDispatcher.PRIORITY_DEFAULT, backCallback);
         }
         refresh();
+        if(restoreSession) execute("RESTORE");
     }
     private void styleModeButton(Button button) {
         button.setTextSize(12); button.setMinWidth(0); button.setMinimumWidth(0);
@@ -192,21 +197,28 @@ public final class MainActivity extends Activity {
                 if (session.pending.isEmpty()) {
                     session.calculatingThread = null; session.busy = false;
                     Thread.interrupted();
-                    return;
+                    key=null;
+                } else {
+                    key = session.pending.removeFirst();
+                    session.calculatingThread = Thread.currentThread();
                 }
-                key = session.pending.removeFirst();
-                session.calculatingThread = Thread.currentThread();
             }
+            if(key==null) { persistSession(true); return; }
             try {
                 checkCancelled();
                 // Private candidate includes undo; cancellation during formatting rolls back too.
-                RpnCalculator candidate = session.calculator.copy();
+                RpnCalculator candidate;
+                if(key.equals("RESTORE")) {
+                    try { candidate=session.store.load(); if(candidate==null) candidate=session.calculator.copy(); }
+                    catch(java.io.IOException ex) { throw new IllegalStateException("Could not restore saved calculator",ex); }
+                } else candidate=session.calculator.copy();
                 ValueFormatter.Notation notation = session.notation;
                 int numberMode=session.numberMode;
                 boolean fractions=session.fractions;
                 LocaleNumbers format=numberFormat(numberMode);
                 candidate.setInputProfile(format.profile());
-                if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
+                if(key.equals("RESTORE") || key.equals("CHECKPOINT")) { /* State already prepared. */ }
+                else if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
                     ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
                 else if(key.equals("NUMBER_FORMAT")) numberMode=(numberMode+1)%3;
                 else if(key.equals("FRACTION")) fractions=!fractions;
@@ -228,12 +240,23 @@ public final class MainActivity extends Activity {
                     session.calculator = candidate; session.notation = notation; session.numberMode=numberMode; session.fractions=fractions;
                     session.display = new Display(rows,Collections.unmodifiableList(copies),Collections.unmodifiableList(compactRows),candidate,notation,numberMode,fractions);
                     session.error = "";
+                    if(!key.equals("CHECKPOINT")) session.loaded=true;
                 }
+                persistSession(false);
             } catch (RuntimeException ex) {
                 session.error = session.cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
                     ? "Calculation cancelled" : "Error: " + (ex.getMessage()==null ? "Undefined result" : ex.getMessage());
                 synchronized (session) { session.pending.clear(); }
             } finally { Thread.interrupted(); }
+        }
+    }
+    private void persistSession(boolean idle) {
+        // Called only by the serial worker, after a committed operation or when its queue drains.
+        if(!session.loaded) return;
+        try { session.store.save(session.calculator,idle && session.background); }
+        catch(java.io.IOException | RuntimeException ex) {
+            android.util.Log.e("ExactRPN","Could not save calculator",ex);
+            session.error="Could not save calculator state";
         }
     }
     private void checkCancelled() {
@@ -365,13 +388,18 @@ public final class MainActivity extends Activity {
         else execute(key);
         return true;
     }
+    @Override protected void onStart() { super.onStart(); session.background=false; }
+    @Override protected void onStop() {
+        if(!isChangingConfigurations()) { session.background=true; execute("CHECKPOINT"); }
+        super.onStop();
+    }
     @Override protected void onResume() { super.onResume(); handler.post(tick); }
     @Override protected void onPause() { handler.removeCallbacks(tick); super.onPause(); }
     @Override public void onBackPressed() { handleBack(); }
     @Override protected void onDestroy() {
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
-        if (isFinishing()) { cancelCalculation(); session.worker.shutdownNow(); }
+        if (isFinishing()) session.worker.shutdown();
         super.onDestroy();
     }
 }
