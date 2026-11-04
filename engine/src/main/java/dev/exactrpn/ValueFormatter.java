@@ -45,6 +45,13 @@ public final class ValueFormatter {
         }
         return format(value,newest,notation);
     }
+    public static String clipboard(UnifiedReal value, Notation notation, boolean fractions) {
+        if(fractions) {
+            BoundedRational rational=value.boundedRationalValue();
+            if(rational!=null) return rational.toNiceString();
+        }
+        return clipboard(value,notation);
+    }
     public static String clipboard(UnifiedReal value, Notation notation) {
         BigInteger integer = value.bigIntegerValue();
         if(integer!=null) return integer.toString();

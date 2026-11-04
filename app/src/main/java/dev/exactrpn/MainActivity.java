@@ -232,7 +232,7 @@ public final class MainActivity extends Activity {
                 } else candidate.key(key);
                 List<String> rows = candidate.formattedValues(notation,fractions);
                 List<String> copies = new ArrayList<>();
-                for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation)); }
+                for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation,fractions)); }
                 List<String> compactRows = new ArrayList<>();
                 for(UnifiedReal value : candidate.values()) { checkCancelled(); compactRows.add(ValueFormatter.format(value,false,notation,fractions)); }
                 synchronized (session) {
