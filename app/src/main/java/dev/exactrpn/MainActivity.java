@@ -42,13 +42,14 @@ public final class MainActivity extends Activity {
         final List<String> rows,clipboard,compactRows;
         final String entry,problem;
         final ValueFormatter.Notation notation;
-        final boolean editing,raw,fractions;
+        final boolean editing,raw;
+        final int fractionMode;
         final int numberMode;
         final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
-        Display(ValueFormatter.Notation notation,RpnCalculator.AngleUnit angle,int numberMode,boolean fractions) {
+        Display(ValueFormatter.Notation notation,RpnCalculator.AngleUnit angle,int numberMode,int fractionMode) {
             rows=clipboard=compactRows=Collections.emptyList(); entry=problem="";
-            this.notation=notation; angleUnit=angle; this.numberMode=numberMode; this.fractions=fractions;
+            this.notation=notation; angleUnit=angle; this.numberMode=numberMode; this.fractionMode=fractionMode;
             editing=raw=false; start=end=0;
         }
         Display(Bundle result) {
@@ -58,7 +59,7 @@ public final class MainActivity extends Activity {
             entry=result.getString("entry"); problem=result.getString("problem");
             notation=ValueFormatter.Notation.valueOf(result.getString("notation"));
             angleUnit=RpnCalculator.AngleUnit.valueOf(result.getString("angle"));
-            numberMode=result.getInt("numberMode"); fractions=result.getBoolean("fractions");
+            numberMode=result.getInt("numberMode"); fractionMode=result.getInt("fractionMode");
             editing=result.getBoolean("editing"); raw=result.getBoolean("raw"); start=result.getInt("start"); end=result.getInt("end");
         }
     }
@@ -71,15 +72,15 @@ public final class MainActivity extends Activity {
         final Deque<String> pending = new ArrayDeque<>();
         volatile boolean busy, cancelRequested, background;
         CalculatorStore store;
-        boolean loaded, scientificExpanded;
+        boolean loaded, scientificExpanded, inverse;
         volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
         int numberMode;
-        boolean fractions;
-        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,int numberMode,boolean fractions) {
-            notation = n; this.numberMode=numberMode; this.fractions=fractions;
-            display = new Display(n,angle,numberMode,fractions);
+        int fractionMode;
+        Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,int numberMode,int fractionMode) {
+            notation = n; this.numberMode=numberMode; this.fractionMode=fractionMode;
+            display = new Display(n,angle,numberMode,fractionMode);
         }
     }
     private LocaleNumbers numberFormat(int mode) {
@@ -100,7 +101,7 @@ public final class MainActivity extends Activity {
             ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC,
             RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")),
             getPreferences(0).getInt("numberMode",getPreferences(0).getBoolean("computerNumbers",false) ? 1 : 0),
-            getPreferences(0).getBoolean("fractions",false));
+            getPreferences(0).getInt("fractionMode",getPreferences(0).getBoolean("fractions",false)?1:0));
         if(restoreSession) {
             session.store=new CalculatorStore(getNoBackupFilesDir());
             session.remote=new RemoteCalculator(this);
@@ -163,6 +164,7 @@ public final class MainActivity extends Activity {
         keys = new CalculatorKeypad(this, this::execute,
             session.scientificExpanded,
             expanded -> session.scientificExpanded=expanded);
+        keys.setInverse(session.inverse);
         root.addView(keys); setContentView(root);
         if (Build.VERSION.SDK_INT >= 33) {
             backCallback = this::handleBack;
@@ -180,6 +182,7 @@ public final class MainActivity extends Activity {
     private void digits(TextView t) { t.setTypeface(Typeface.create("sans-serif",Typeface.NORMAL)); t.setFontFeatureSettings("tnum"); }
     private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(Color.rgb(228,237,242)); t.setPadding(dp(4),dp(6),dp(4),dp(6)); return t; }
     private void execute(String key) {
+        if(key.equals("INVERSE")) { session.inverse=!session.inverse; keys.setInverse(session.inverse); return; }
         if (key.equals("PASTE")) { pasteClipboard(); return; }
         if (key.equals("CANCEL") || (key.equals("UNDO") && session.busy
             && SystemClock.elapsedRealtime()-session.busySince >= 250)) { cancelCalculation(); return; }
@@ -232,13 +235,13 @@ public final class MainActivity extends Activity {
                 request.putString("locale",getResources().getConfiguration().getLocales().get(0).toLanguageTag());
                 request.putString("angle",session.display.angleUnit.name());
                 request.putString("notation",session.notation.name()); request.putInt("numberMode",session.numberMode);
-                request.putBoolean("fractions",session.fractions);
+                request.putInt("fractionMode",session.fractionMode);
                 Bundle result=session.remote.evaluate(request);
                 Display display=new Display(result);
                 synchronized (session) {
                     checkCancelled();
                     session.checkpoint=result.getString("checkpoint");
-                    session.notation=display.notation; session.numberMode=display.numberMode; session.fractions=display.fractions;
+                    session.notation=display.notation; session.numberMode=display.numberMode; session.fractionMode=display.fractionMode;
                     session.display=display; session.error="";
                     if(!key.equals("CHECKPOINT")) session.loaded=true;
                 }
@@ -311,7 +314,7 @@ public final class MainActivity extends Activity {
                         value.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         value.setAutoSizeTextTypeUniformWithConfiguration(12,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);
                     }
-                    if(result && !display.fractions && display.rows.get(i).contains(".") && !display.rows.get(i).startsWith("≈")) {
+                    if(result && display.fractionMode==0 && display.rows.get(i).contains(".") && !display.rows.get(i).startsWith("≈")) {
                         final String fullNumber=display.rows.get(i), compactNumber=display.compactRows.get(i);
                         final CharSequence full=numbers.stack(withoutApproximation(fullNumber),Color.rgb(133,150,164));
                         final CharSequence compact=numbers.stack(withoutApproximation(compactNumber),Color.rgb(133,150,164));
@@ -361,11 +364,13 @@ public final class MainActivity extends Activity {
             notationButton.setText(display.notation == ValueFormatter.Notation.ENGINEERING ? "ENG" : "SCI");
             notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
             getPreferences(0).edit().putBoolean("engineering",display.notation == ValueFormatter.Notation.ENGINEERING).apply();
-            fractionButton.setText(display.fractions ? "FRAC" : "DEC");
-            fractionButton.setContentDescription(display.fractions
-                ? "Known rational results as fractions. Tap for decimals."
-                : "Decimal results. Tap for fractions.");
-            getPreferences(0).edit().putBoolean("fractions",display.fractions).apply();
+            fractionButton.setText(new String[]{"DEC","IMPR","MIX"}[display.fractionMode]);
+            fractionButton.setContentDescription(new String[]{
+                "Decimal display. Tap for improper fractions.",
+                "Improper fraction display. Tap for mixed fractions.",
+                "Mixed fraction display. Tap for decimals."
+            }[display.fractionMode]);
+            getPreferences(0).edit().putInt("fractionMode",display.fractionMode).apply();
             numberFormatButton.setText(new String[]{"LOC","DOT","NONE"}[display.numberMode]);
             numberFormatButton.setContentDescription(new String[]{
                 "Phone locale number format. Tap for decimal dot with thin space grouping.",

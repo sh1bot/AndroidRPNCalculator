@@ -44,7 +44,7 @@ public final class CalculationService extends Service {
             }
             RpnCalculator candidate=cached.copy();
             Locale locale=Locale.forLanguageTag(request.getString("locale"));
-            int numberMode=request.getInt("numberMode"); boolean fractions=request.getBoolean("fractions");
+            int numberMode=request.getInt("numberMode"), fractionMode=request.getInt("fractionMode");
             ValueFormatter.Notation notation=ValueFormatter.Notation.valueOf(request.getString("notation"));
             LocaleNumbers local=new LocaleNumbers(locale);
             LocaleNumbers format=numberMode==1 ? new LocaleNumbers(locale,true) : numberMode==2 ? new LocaleNumbers(locale,false,false) : local;
@@ -52,7 +52,7 @@ public final class CalculationService extends Service {
             if(key.equals("RESTORE") || key.equals("CHECKPOINT")) { /* No arithmetic operation. */ }
             else if(key.equals("FORMAT")) notation=notation==ValueFormatter.Notation.SCIENTIFIC ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
             else if(key.equals("NUMBER_FORMAT")) numberMode=(numberMode+1)%3;
-            else if(key.equals("FRACTION")) fractions=!fractions;
+            else if(key.equals("FRACTION")) fractionMode=(fractionMode+1)%3;
             else if(key.startsWith("PASTE_RAW:")) candidate.pasteText(key.substring(10),local.profile());
             else if(key.startsWith("SELECT:")) {
                 String[] parts=key.split(":"); candidate.select(Integer.parseInt(parts[1]),Integer.parseInt(parts[2]));
@@ -60,11 +60,11 @@ public final class CalculationService extends Service {
                 String[] parts=key.split(":",6);
                 candidate.editText(parts[5],Integer.parseInt(parts[1]),Integer.parseInt(parts[2]),Boolean.parseBoolean(parts[3]),Boolean.parseBoolean(parts[4]),format.profile());
             } else candidate.key(key);
-            ArrayList<String> rows=new ArrayList<>(candidate.formattedValues(notation,fractions));
+            ArrayList<String> rows=new ArrayList<>(candidate.formattedValues(notation,fractionMode));
             ArrayList<String> copies=new ArrayList<>(),compact=new ArrayList<>();
             for(UnifiedReal value:candidate.values()) {
-                copies.add(ValueFormatter.clipboard(value,notation,fractions));
-                compact.add(ValueFormatter.format(value,false,notation,fractions));
+                copies.add(ValueFormatter.clipboard(value,notation,fractionMode));
+                compact.add(ValueFormatter.format(value,false,notation,fractionMode));
             }
             snapshot=File.createTempFile("calculation-",".state",getNoBackupFilesDir());
             Files.write(snapshot.toPath(),candidate.save());
@@ -74,7 +74,7 @@ public final class CalculationService extends Service {
             display.putBoolean("editing",candidate.isEditing()); display.putBoolean("raw",candidate.rawEntry());
             display.putInt("start",candidate.selectionStart()); display.putInt("end",candidate.selectionEnd());
             display.putString("angle",candidate.angleUnit().name()); display.putString("notation",notation.name());
-            display.putInt("numberMode",numberMode); display.putBoolean("fractions",fractions);
+            display.putInt("numberMode",numberMode); display.putInt("fractionMode",fractionMode);
             display.putString("checkpoint",snapshot.getAbsolutePath());
             // Only paths cross Binder; large stacks must not hit Binder's transaction-size limit.
             presentation=File.createTempFile("calculation-",".display",getNoBackupFilesDir());

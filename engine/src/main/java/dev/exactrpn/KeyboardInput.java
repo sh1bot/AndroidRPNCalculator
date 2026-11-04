@@ -44,6 +44,9 @@ public final class KeyboardInput {
             case '*': case '×': return "×";
             case '/': case '÷': return "÷";
             case '^': return "xʸ";
+            case '%': return "rem";
+            case '!': return "!";
+            case 'f': return "Factor";
             case 'r': return "√";
             case 'i': return "1/x";
             case 's': return "sin";
