@@ -9,7 +9,6 @@ import android.view.*;
 import android.widget.*;
 import java.util.*;
 import java.util.concurrent.*;
-import com.android.calculator2.UnifiedReal;
 
 /** Exact values and evaluation survive rotation; views consume immutable display snapshots. */
 public final class MainActivity extends Activity {
@@ -47,15 +46,25 @@ public final class MainActivity extends Activity {
         final int numberMode;
         final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
-        Display(List<String> rows,List<String> clipboard,List<String> compactRows,RpnCalculator calculator,ValueFormatter.Notation notation,int numberMode,boolean fractions) {
-            this.rows=rows; this.clipboard=clipboard; this.compactRows=compactRows; this.notation=notation; this.numberMode=numberMode; this.fractions=fractions;
-            entry=calculator.entry(); editing=calculator.isEditing(); raw=calculator.rawEntry();
-            start=calculator.selectionStart(); end=calculator.selectionEnd(); problem=calculator.entryProblem();
-            angleUnit=calculator.angleUnit();
+        Display(ValueFormatter.Notation notation,RpnCalculator.AngleUnit angle,int numberMode,boolean fractions) {
+            rows=clipboard=compactRows=Collections.emptyList(); entry=problem="";
+            this.notation=notation; angleUnit=angle; this.numberMode=numberMode; this.fractions=fractions;
+            editing=raw=false; start=end=0;
+        }
+        Display(Bundle result) {
+            rows=Collections.unmodifiableList(result.getStringArrayList("rows"));
+            clipboard=Collections.unmodifiableList(result.getStringArrayList("clipboard"));
+            compactRows=Collections.unmodifiableList(result.getStringArrayList("compactRows"));
+            entry=result.getString("entry"); problem=result.getString("problem");
+            notation=ValueFormatter.Notation.valueOf(result.getString("notation"));
+            angleUnit=RpnCalculator.AngleUnit.valueOf(result.getString("angle"));
+            numberMode=result.getInt("numberMode"); fractions=result.getBoolean("fractions");
+            editing=result.getBoolean("editing"); raw=result.getBoolean("raw"); start=result.getInt("start"); end=result.getInt("end");
         }
     }
     static final class Session {
-        RpnCalculator calculator = new RpnCalculator();
+        String checkpoint;
+        RemoteCalculator remote;
         final ExecutorService worker = Executors.newSingleThreadExecutor();
         volatile Display display;
         volatile String error = "";
@@ -69,8 +78,8 @@ public final class MainActivity extends Activity {
         int numberMode;
         boolean fractions;
         Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,int numberMode,boolean fractions) {
-            notation = n; this.numberMode=numberMode; this.fractions=fractions; calculator.setAngleUnit(angle);
-            display = new Display(Collections.emptyList(),Collections.emptyList(),Collections.emptyList(),calculator,n,numberMode,fractions);
+            notation = n; this.numberMode=numberMode; this.fractions=fractions;
+            display = new Display(n,angle,numberMode,fractions);
         }
     }
     private LocaleNumbers numberFormat(int mode) {
@@ -88,7 +97,10 @@ public final class MainActivity extends Activity {
             RpnCalculator.AngleUnit.valueOf(getPreferences(0).getString("angleUnit","RAD")),
             getPreferences(0).getInt("numberMode",getPreferences(0).getBoolean("computerNumbers",false) ? 1 : 0),
             getPreferences(0).getBoolean("fractions",false));
-        if(restoreSession) session.store=new CalculatorStore(getNoBackupFilesDir());
+        if(restoreSession) {
+            session.store=new CalculatorStore(getNoBackupFilesDir());
+            session.remote=new RemoteCalculator(this);
+        }
         numbers=numberFormat(session.numberMode);
         LinearLayout root = new LinearLayout(this); root.setOrientation(1);
         root.setPadding(dp(16),dp(16),dp(16),dp(12)); root.setBackgroundColor(Color.rgb(16,23,31));
@@ -206,40 +218,23 @@ public final class MainActivity extends Activity {
             if(key==null) { persistSession(true); return; }
             try {
                 checkCancelled();
-                // Private candidate includes undo; cancellation during formatting rolls back too.
-                RpnCalculator candidate;
                 if(key.equals("RESTORE")) {
-                    try { candidate=session.store.load(); if(candidate==null) candidate=session.calculator.copy(); }
+                    try { session.checkpoint=session.store.checkpoint(); session.store.cleanWorkFiles(session.checkpoint); }
                     catch(java.io.IOException ex) { throw new IllegalStateException("Could not restore saved calculator",ex); }
-                } else candidate=session.calculator.copy();
-                ValueFormatter.Notation notation = session.notation;
-                int numberMode=session.numberMode;
-                boolean fractions=session.fractions;
-                LocaleNumbers format=numberFormat(numberMode);
-                candidate.setInputProfile(format.profile());
-                if(key.equals("RESTORE") || key.equals("CHECKPOINT")) { /* State already prepared. */ }
-                else if (key.equals("FORMAT")) notation = notation == ValueFormatter.Notation.SCIENTIFIC
-                    ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
-                else if(key.equals("NUMBER_FORMAT")) numberMode=(numberMode+1)%3;
-                else if(key.equals("FRACTION")) fractions=!fractions;
-                else if(key.startsWith("PASTE_RAW:")) candidate.pasteText(key.substring(10),localNumbers.profile());
-                else if(key.startsWith("SELECT:")) {
-                    String[] parts=key.split(":"); candidate.select(Integer.parseInt(parts[1]),Integer.parseInt(parts[2]));
-                } else if(key.startsWith("EDIT:")) {
-                    String[] parts=key.split(":",6);
-                    candidate.editText(parts[5],Integer.parseInt(parts[1]),Integer.parseInt(parts[2]),
-                        Boolean.parseBoolean(parts[3]),Boolean.parseBoolean(parts[4]),format.profile());
-                } else candidate.key(key);
-                List<String> rows = candidate.formattedValues(notation,fractions);
-                List<String> copies = new ArrayList<>();
-                for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation,fractions)); }
-                List<String> compactRows = new ArrayList<>();
-                for(UnifiedReal value : candidate.values()) { checkCancelled(); compactRows.add(ValueFormatter.format(value,false,notation,fractions)); }
+                }
+                Bundle request=new Bundle();
+                request.putString("key",key); request.putString("input",session.checkpoint);
+                request.putString("locale",getResources().getConfiguration().getLocales().get(0).toLanguageTag());
+                request.putString("angle",session.display.angleUnit.name());
+                request.putString("notation",session.notation.name()); request.putInt("numberMode",session.numberMode);
+                request.putBoolean("fractions",session.fractions);
+                Bundle result=session.remote.evaluate(request);
+                Display display=new Display(result);
                 synchronized (session) {
                     checkCancelled();
-                    session.calculator = candidate; session.notation = notation; session.numberMode=numberMode; session.fractions=fractions;
-                    session.display = new Display(rows,Collections.unmodifiableList(copies),Collections.unmodifiableList(compactRows),candidate,notation,numberMode,fractions);
-                    session.error = "";
+                    session.checkpoint=result.getString("checkpoint");
+                    session.notation=display.notation; session.numberMode=display.numberMode; session.fractions=display.fractions;
+                    session.display=display; session.error="";
                     if(!key.equals("CHECKPOINT")) session.loaded=true;
                 }
                 persistSession(false);
@@ -252,8 +247,13 @@ public final class MainActivity extends Activity {
     }
     private void persistSession(boolean idle) {
         // Called only by the serial worker, after a committed operation or when its queue drains.
-        if(!session.loaded) return;
-        try { session.store.save(session.calculator,idle && session.background); }
+        if(!session.loaded) { session.store.cleanWorkFiles(session.checkpoint); return; }
+        try {
+            if(idle && session.background && session.display.rows.isEmpty() && session.display.entry.isEmpty()) {
+                session.checkpoint=null; session.store.clear();
+            } else if(session.checkpoint!=null) session.store.save(session.checkpoint);
+            session.store.cleanWorkFiles(session.checkpoint);
+        }
         catch(java.io.IOException | RuntimeException ex) {
             android.util.Log.e("ExactRPN","Could not save calculator",ex);
             session.error="Could not save calculator state";
@@ -266,6 +266,8 @@ public final class MainActivity extends Activity {
         synchronized (session) {
             if (!session.busy) return;
             session.cancelRequested = true;
+            session.pending.clear();
+            session.remote.cancel();
             if (session.calculatingThread != null) session.calculatingThread.interrupt();
         }
         refresh();
@@ -412,7 +414,7 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy() {
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
-        if (isFinishing()) session.worker.shutdown();
+        if (isFinishing()) { session.remote.close(); session.worker.shutdown(); }
         super.onDestroy();
     }
 }
