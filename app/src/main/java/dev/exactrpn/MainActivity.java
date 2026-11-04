@@ -77,21 +77,9 @@ public final class MainActivity extends Activity {
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
         entryView = text(32); entryView.setGravity(Gravity.END); digits(entryView); entryView.setTextIsSelectable(true);
         root.addView(entryView);
-        LinearLayout keys = new LinearLayout(this); keys.setOrientation(1);
-        String[][] rows = {{"UNDO","SWAP","DROP","CLEAR"},{"sin","cos","tan","π"},{"√","ln","eˣ","e"},{"7","8","9","÷"},{"4","5","6","×"},{"1","2","3","−"},{"0",".","±","+"},{"BACK","1/x","xʸ","ENTER"}};
-        for (String[] row : rows) {
-            LinearLayout line = new LinearLayout(this);
-            for (String key : row) {
-                Button button = new Button(this); button.setAllCaps(false); button.setText(key);
-                button.setTextSize(key.equals("e") || key.equals("π") ? 23 : key.equals("1/x") || key.equals("eˣ") ? 18 : 15);
-                button.setMinHeight(0); button.setMinimumHeight(0); button.setPadding(0,0,0,0);
-                button.setContentDescription(key.equals("BACK") ? "Backspace" : key.equals("eˣ") ? "e to the power of X"
-                    : key.equals("e") ? "Euler’s number" : key.equals("π") ? "Pi" : key.equals("1/x") ? "Reciprocal of X" : key);
-                button.setOnClickListener(v -> execute(key));
-                line.addView(button,new LinearLayout.LayoutParams(0,dp(44),1));
-            }
-            keys.addView(line);
-        }
+        CalculatorKeypad keys = new CalculatorKeypad(this, this::execute,
+            getPreferences(0).getBoolean("scientificExpanded",false),
+            expanded -> getPreferences(0).edit().putBoolean("scientificExpanded",expanded).apply());
         root.addView(keys); setContentView(root);
         if (Build.VERSION.SDK_INT >= 33) {
             backCallback = this::handleBack;
@@ -194,8 +182,7 @@ public final class MainActivity extends Activity {
             // scroll on polling ticks: the user must still be able to inspect older entries.
             scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));
         }
-        // Reserve the button's space even when idle. Brief entry evaluations should not
-        // flash progress UI; Back/Escape can still cancel immediately.
+        // Keep layout fixed and avoid flashing progress during brief entry evaluations.
         boolean showProgress = session.busy && (session.cancelRequested
             || SystemClock.elapsedRealtime() - session.busySince >= 250);
         status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Calculating… Back to cancel") : session.error);

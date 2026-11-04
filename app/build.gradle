@@ -1,8 +1,33 @@
 plugins { id 'com.android.application' }
+def signingFile = System.getenv('ANDROID_KEYSTORE_PATH')
 android {
     namespace 'dev.exactrpn'
     compileSdk 35
-    defaultConfig { applicationId 'dev.exactrpn'; minSdk 26; targetSdk 35; versionCode 1; versionName '0.1' }
+    defaultConfig {
+        applicationId 'dev.exactrpn'
+        minSdk 26
+        targetSdk 35
+        versionCode (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+        versionName '0.1'
+    }
+    signingConfigs {
+        if (signingFile) {
+            permanent {
+                storeFile file(signingFile)
+                storeType 'PKCS12'
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        if (signingFile) {
+            debug { signingConfig signingConfigs.permanent }
+            release { signingConfig signingConfigs.permanent }
+        }
+    }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 dependencies { implementation project(':engine') }
+

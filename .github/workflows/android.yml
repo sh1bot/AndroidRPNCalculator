@@ -41,11 +41,53 @@ jobs:
         with:
           gradle-version: '8.11.1'
 
+      - name: Check phone-install script syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/install-latest.ps1", [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors) { $parseErrors | ForEach-Object { Write-Error $_ }; exit 1 }
+
       - name: Check upstream source integrity
         run: sha256sum -c licenses/SHA256SUMS
 
-      - name: Run regression checks and build debug APK
+      - name: Build trusted main branch (permanent signing when configured)
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$ANDROID_KEYSTORE_BASE64" ]]; then
+            : "${ANDROID_KEYSTORE_PASSWORD:?Missing keystore password}"
+            : "${ANDROID_KEY_ALIAS:?Missing key alias}"
+            : "${ANDROID_KEY_PASSWORD:?Missing key password}"
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/androidrpn-signing.p12"
+            trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
+            umask 077
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+            echo "Signing with the permanent key configured in repository secrets."
+          else
+            if [[ -n "$ANDROID_KEYSTORE_PASSWORD$ANDROID_KEY_ALIAS$ANDROID_KEY_PASSWORD" ]]; then
+              echo "::error::Signing secrets are incomplete: ANDROID_KEYSTORE_BASE64 is missing."
+              exit 1
+            fi
+            echo "::warning::No permanent signing key configured. This build uses a temporary debug key; in-place updates across builds will fail."
+          fi
+          gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
+
+      - name: Build other branches and pull requests without signing secrets
+        if: github.ref != 'refs/heads/main' || github.event_name == 'pull_request'
         run: gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
+
+      - name: Verify APK signature and record checksum
+        run: |
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
+          sha256sum app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -54,3 +96,4 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
