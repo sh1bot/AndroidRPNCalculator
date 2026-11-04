@@ -82,7 +82,7 @@ public final class MainActivity extends Activity {
         stackRows = new LinearLayout(this); stackRows.setOrientation(1); stackRows.setGravity(Gravity.BOTTOM);
         scroll.addView(stackRows,new ScrollView.LayoutParams(-1,-2));
         root.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
-        entryView = text(32); entryView.setGravity(Gravity.END); digits(entryView); entryView.setTextIsSelectable(true);
+        entryView = text(32); entryView.setGravity(Gravity.START); digits(entryView); entryView.setTextIsSelectable(true);
         root.addView(entryView);
         keys = new CalculatorKeypad(this, this::execute,
             getPreferences(0).getBoolean("scientificExpanded",false),
