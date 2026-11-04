@@ -312,6 +312,11 @@ public final class MainActivity extends Activity {
         if (unicode==numbers.decimalSeparator()) unicode = '.';
         String key = KeyboardInput.command(keyCode,unicode,event.isCtrlPressed(),event.isAltPressed(),event.isMetaPressed());
         if (key == null) return super.dispatchKeyEvent(event);
+        boolean navigation=key.equals("LEFT") || key.equals("RIGHT") || key.equals("HOME") || key.equals("END");
+        if(navigation) {
+            if(!session.display.editing) return super.dispatchKeyEvent(event);
+            if(event.isShiftPressed()) key="SELECT_"+key;
+        }
         if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
         if (key.equals("ESCAPE")) { if (session.busy) cancelCalculation(); else execute("CE"); }
         else execute(key);
@@ -327,5 +332,6 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 }
+
 
 

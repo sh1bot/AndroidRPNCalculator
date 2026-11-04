@@ -8,6 +8,8 @@ public final class KeyboardInput {
         if (alt || meta) return null;
         if (ctrl) {
             switch(code) { // Android KEYCODE_Z / D / S / L.
+                case 122: return "HOME";
+                case 123: return "END";
                 case 50: return "PASTE";
                 case 54: return "UNDO";
                 case 32: return "DUP";
@@ -17,6 +19,10 @@ public final class KeyboardInput {
             }
         }
         switch(code) {
+            case 21: return "LEFT";
+            case 22: return "RIGHT";
+            case 122: return "HOME";
+            case 123: return "END";
             case 66: case 160: case 62: return "ENTER"; // Enter, numpad Enter, Space.
             case 67: return "BACK";
             case 112: return "DELETE"; // Forward Delete while editing; Drop in stack mode.
@@ -50,5 +56,6 @@ public final class KeyboardInput {
         }
     }
 }
+
 
 
