@@ -36,7 +36,8 @@ and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 
 **LOC/DOT/NONE** cycles between phone-locale numbers, decimal dot with thin-space
 display grouping, and the locale decimal with no grouping. Copied numbers follow this choice but never
-include grouping. Copy preserves exact terminating decimals and remains decimal even in fraction display. Tap a stack value
+include grouping. Copy follows **FRAC/DEC**: known rationals copy as reduced `numerator/denominator`
+fractions in FRAC mode; DEC mode preserves exact terminating decimals. Tap a stack value
 to copy it; long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
 a selected separator explicitly. Backspace/Delete edit at the cursor.

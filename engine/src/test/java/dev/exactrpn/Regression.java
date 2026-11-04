@@ -294,7 +294,12 @@ public final class Regression {
         check(fractions.formattedValues(sci,true).get(0).equals("1/3"),"stack fraction display");
         check(fractions.formattedValues(sci,false).get(0).equals("≈ 0.333333333333"),"stack decimal display");
         check(top(fractions).multiply(new UnifiedReal(3)).definitelyOne(),"display mode leaves exact arithmetic unchanged");
-        check(ValueFormatter.clipboard(top(fractions),sci).equals("0.333333333333"),"fraction display keeps clipboard decimal");
+        check(ValueFormatter.clipboard(top(fractions),sci,true).equals("1/3"),"fraction display copies exact fraction");
+        check(ValueFormatter.clipboard(RpnCalculator.parse("0.125"),sci,true).equals("1/8"),"terminating decimal copies as fraction");
+        check(ValueFormatter.clipboard(new UnifiedReal(new com.android.calculator2.BoundedRational(6,-8)),sci,true).equals("-3/4"),"copied fraction is reduced with positive denominator");
+        check(ValueFormatter.clipboard(UnifiedReal.TWO,sci,true).equals("2"),"fraction mode copies integer without denominator");
+        check(ValueFormatter.clipboard(UnifiedReal.PI,sci,true).equals(ValueFormatter.clipboard(UnifiedReal.PI,sci,false)),"fraction mode copies irrational decimal fallback");
+        check(ValueFormatter.clipboard(top(fractions),sci,false).equals("0.333333333333"),"decimal mode retains decimal copy");
         RpnCalculator durable=new RpnCalculator();
         number(durable,"56565642624.456"); keys(durable,"ENTER","π","2","√","+","1","ENTER","3","÷");
         durable.key("ANGLE"); durable.paste("12.345"); durable.select(2,5);
