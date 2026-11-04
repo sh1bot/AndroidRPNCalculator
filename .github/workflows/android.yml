@@ -17,6 +17,8 @@ jobs:
     name: Test engine and build APK
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      permanent_signing: ${{ steps.trusted_build.outputs.permanent_signing }}
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -53,6 +55,7 @@ jobs:
         run: sha256sum -c licenses/SHA256SUMS
 
       - name: Build trusted main branch (permanent signing when configured)
+        id: trusted_build
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -71,6 +74,7 @@ jobs:
             umask 077
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
             echo "Signing with the permanent key configured in repository secrets."
+            echo "permanent_signing=true" >> "$GITHUB_OUTPUT"
           else
             if [[ -n "$ANDROID_KEYSTORE_PASSWORD$ANDROID_KEY_ALIAS$ANDROID_KEY_PASSWORD" ]]; then
               echo "::error::Signing secrets are incomplete: ANDROID_KEYSTORE_BASE64 is missing."
@@ -97,3 +101,42 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+
+  publish:
+    name: Publish latest development release
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.build.outputs.permanent_signing == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified APK
+        uses: actions/download-artifact@v4
+        with:
+          name: ExactRPN-debug-${{ github.run_number }}
+          path: dist
+
+      - name: Publish versioned development release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_SHA: ${{ github.sha }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v0.1-dev.$BUILD_NUMBER"
+          mv dist/app-debug.apk dist/ExactRPN.apk
+          (cd dist && sha256sum ExactRPN.apk > SHA256SUMS.txt)
+          cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          Development build $BUILD_NUMBER from main.
+          Commit: $BUILD_SHA
+
+          Download **ExactRPN.apk** to install or update. Signed with the project's permanent key.
+          EOF
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$BUILD_SHA" --title "Development build $BUILD_NUMBER" --draft --notes-file "$RUNNER_TEMP/release-notes.md"
+          fi
+          gh release upload "$tag" dist/ExactRPN.apk dist/SHA256SUMS.txt --clobber
+          gh release edit "$tag" --draft=false --latest
