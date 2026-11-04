@@ -22,11 +22,13 @@ public final class ValueFormatter {
             return (rounded.compareTo(new BigDecimal(integer)) == 0 ? "" : "≈ ") + decimal(rounded, notation);
         }
         // Bounded zero detection avoids an undecidable comparison with exact zero.
-        StringFloatRep rep = value.crValue().toStringFloatRep(DIGITS, 10, -1000);
+        StringFloatRep rep = value.crValue().toStringFloatRep(DIGITS + 8, 10, -1000);
         if (rep.sign == 0) return "≈ 0 (|x| < 1e−1000)";
         BigDecimal approximation = new BigDecimal(new BigInteger(rep.mantissa))
             .scaleByPowerOfTen(rep.exponent - rep.mantissa.length());
         if (rep.sign < 0) approximation = approximation.negate();
+        // CR guarantees an approximation, not correct rounding of its final digit.
+        approximation = approximation.round(new MathContext(DIGITS, RoundingMode.HALF_EVEN));
         boolean exact = Math.abs((long)approximation.scale()) <= 1000
             && RpnCalculator.parse(approximation.toString()).definitelyEquals(value);
         return (exact ? "" : "≈ ") + decimal(approximation, notation);
