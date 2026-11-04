@@ -148,7 +148,9 @@ public final class Regression {
         check(NumberText.normalize("−1,25e−3",',','.',3,3).equals("-1.25e-3"),"local scientific notation and minus");
         check(NumberText.normalize("\u061c-١٬٢٣٤٫٥",'٫','٬',3,3).equals("-1234.5"),"Arabic digits and bidi mark");
         check(NumberText.normalize("  +12.50E+2  ",',','.',3,3).equals("+12.50E+2"),"C scientific paste preserves exact text");
-        for (String invalid : new String[]{"1,23.4","1,,234","1,234,","1 234.5","1\n2","$12","1/2","NaN","Infinity","", "1e10000"}) {
+        check(NumberText.normalize("1\u2009234.5",'.',',',3,3).equals("1234.5"),"thin space computer grouping");
+        check(NumberText.normalize("1 234.5",'.',',',3,3).equals("1234.5"),"space computer grouping");
+        for (String invalid : new String[]{"1,23.4","1,,234","1,234,","1\n2","$12","1/2","NaN","Infinity","", "1e10000"}) {
             try { NumberText.normalize(invalid,'.',',',3,3); throw new AssertionError("accepted invalid paste: "+invalid); }
             catch (IllegalArgumentException expected) { check(true,"reject invalid clipboard number"); }
         }

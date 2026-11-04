@@ -15,7 +15,7 @@ public final class NumberText {
             this.decimal=decimal; this.grouping=grouping; this.primary=primary; this.secondary=secondary;
         }
     }
-    public static final Profile COMPUTER = new Profile('.', '’', 3, 3);
+    public static final Profile COMPUTER = new Profile('.', '\u2009', 3, 3);
     public static final class Analysis {
         public final List<String> candidates;
         private Analysis(List<String> values) { candidates=Collections.unmodifiableList(values); }
@@ -31,7 +31,7 @@ public final class NumberText {
     private NumberText() {}
     public static Analysis analyze(String text, Profile local) {
         LinkedHashMap<String,String> values=new LinkedHashMap<>();
-        Profile[] profiles={new Profile('.',(char)0,0,0),local,COMPUTER,
+        Profile[] profiles={new Profile('.',(char)0,0,0),local,COMPUTER,new Profile('.', '’', 3, 3),
             new Profile('.',',',3,3),new Profile(',','.',3,3),new Profile(',','\u202f',3,3)};
         for (Profile p:profiles) {
             try {
