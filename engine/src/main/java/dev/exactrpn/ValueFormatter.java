@@ -30,6 +30,12 @@ public final class ValueFormatter {
             && RpnCalculator.parse(approximation.toString()).definitelyEquals(value);
         return (exact ? "" : "≈ ") + decimal(approximation, notation);
     }
+    public static String clipboard(UnifiedReal value, Notation notation) {
+        String text = format(value,true,notation);
+        if (text.startsWith("≈ ")) text = text.substring(2);
+        if (text.startsWith("0 (")) return "0";
+        return text.replace('−','-');
+    }
     private static String decimal(BigDecimal number, Notation notation) {
         BigDecimal d = number.stripTrailingZeros();
         int exponent = d.precision() - d.scale() - 1;
@@ -38,3 +44,4 @@ public final class ValueFormatter {
         return d.scaleByPowerOfTen(-power).toPlainString() + "e" + (power >= 0 ? "+" : "−") + Math.abs(power);
     }
 }
+

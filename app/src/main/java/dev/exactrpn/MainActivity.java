@@ -17,6 +17,7 @@ public final class MainActivity extends Activity {
     private TextView entryView, status;
     private Button notationButton, angleButton;
     private CalculatorKeypad keys;
+    private LocaleNumbers numbers;
     private String shownError = "";
     private android.window.OnBackInvokedCallback backCallback;
     private LinearLayout stackRows;
@@ -24,13 +25,13 @@ public final class MainActivity extends Activity {
     private Display rendered;
     private final Handler handler = new Handler(Looper.getMainLooper());
     static final class Display {
-        final List<String> rows;
+        final List<String> rows, clipboard;
         final String entry;
         final ValueFormatter.Notation notation;
         final boolean editing;
         final RpnCalculator.AngleUnit angleUnit;
-        Display(List<String> r, String e, ValueFormatter.Notation n, boolean edit, RpnCalculator.AngleUnit angle) {
-            rows = r; entry = e; notation = n; editing = edit; angleUnit = angle;
+        Display(List<String> r, List<String> c, String e, ValueFormatter.Notation n, boolean edit, RpnCalculator.AngleUnit angle) {
+            rows = r; clipboard = c; entry = e; notation = n; editing = edit; angleUnit = angle;
         }
     }
     static final class Session {
@@ -45,12 +46,13 @@ public final class MainActivity extends Activity {
         ValueFormatter.Notation notation;
         Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle) {
             notation = n; calculator.setAngleUnit(angle);
-            display = new Display(Collections.emptyList(), "", n, false, angle);
+            display = new Display(Collections.emptyList(), Collections.emptyList(), "", n, false, angle);
         }
     }
     @Override public Object onRetainNonConfigurationInstance() { return session; }
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        numbers = new LocaleNumbers(getResources().getConfiguration().getLocales().get(0));
         session = (Session)getLastNonConfigurationInstance();
         if (session == null) session = new Session(getPreferences(0).getBoolean("engineering", false)
             ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC,
@@ -95,6 +97,7 @@ public final class MainActivity extends Activity {
     private void digits(TextView t) { t.setTypeface(Typeface.MONOSPACE); t.setFontFeatureSettings("tnum"); }
     private TextView text(int size) { TextView t = new TextView(this); t.setTextSize(size); t.setTextColor(Color.rgb(228,237,242)); t.setPadding(dp(4),dp(6),dp(4),dp(6)); return t; }
     private void execute(String key) {
+        if (key.equals("PASTE")) { pasteClipboard(); return; }
         if (key.equals("CANCEL") || (key.equals("UNDO") && session.busy
             && SystemClock.elapsedRealtime()-session.busySince >= 250)) { cancelCalculation(); return; }
         boolean start;
@@ -105,6 +108,20 @@ public final class MainActivity extends Activity {
         }
         refresh();
         if (start) session.worker.submit(this::drainKeys);
+    }
+    private void pasteClipboard() {
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        android.content.ClipData clip = clipboard.getPrimaryClip();
+        if (clip==null || clip.getItemCount()==0 || clip.getItemAt(0).getText()==null) {
+            Toast.makeText(this,"Clipboard does not contain a number",Toast.LENGTH_SHORT).show(); return;
+        }
+        try { execute("PASTE:"+numbers.paste(clip.getItemAt(0).getText().toString())); }
+        catch (IllegalArgumentException ex) { Toast.makeText(this,ex.getMessage(),Toast.LENGTH_LONG).show(); }
+    }
+    private void copyValue(String text) {
+        android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Calculator value",text));
+        if (Build.VERSION.SDK_INT<=32) Toast.makeText(this,"Copied",Toast.LENGTH_SHORT).show();
     }
     private void drainKeys() {
         while (true) {
@@ -128,10 +145,12 @@ public final class MainActivity extends Activity {
                     ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
                 else candidate.key(key);
                 List<String> rows = candidate.formattedValues(notation);
+                List<String> copies = new ArrayList<>();
+                for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation)); }
                 synchronized (session) {
                     checkCancelled();
                     session.calculator = candidate; session.notation = notation;
-                    session.display = new Display(rows,candidate.entry(),notation,candidate.isEditing(),candidate.angleUnit());
+                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate.entry(),notation,candidate.isEditing(),candidate.angleUnit());
                     session.error = "";
                 }
             } catch (RuntimeException ex) {
@@ -157,7 +176,7 @@ public final class MainActivity extends Activity {
     private void refresh() {
         Display display = session.display;
         if (rendered != display) {
-            boolean stackChanged = rendered == null || rendered.editing != display.editing || !rendered.rows.equals(display.rows);
+            boolean stackChanged = rendered == null || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
             if (stackChanged) {
                 stackRows.removeAllViews();
                 if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(Color.rgb(133,150,164)); stackRows.addView(empty); }
@@ -169,17 +188,20 @@ public final class MainActivity extends Activity {
                     label.setContentDescription("Stack level " + depth);
                     row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
                     boolean result = !display.editing && depth == 1;
-                    TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(display.rows.get(i));
+                    TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(display.rows.get(i),Color.rgb(133,150,164)));
                     if (!result) {
                         value.setSingleLine(true);
                         value.setAutoSizeTextTypeUniformWithConfiguration(12,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);
                     }
-                    value.setTextIsSelectable(true); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
+                    value.setTextIsSelectable(false); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
+                    final String copy = display.clipboard.get(i);
+                    row.setOnClickListener(v -> copyValue(copy));
+                    row.setContentDescription("Copy stack level " + depth + ": " + value.getText());
                     stackRows.addView(row);
                 }
             }
             entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
-            entryView.setText(display.entry.isEmpty() ? "▸" : display.entry);
+            entryView.setText(display.entry.isEmpty() ? "▸" : numbers.entry(display.entry));
             keys.setEditing(display.editing);
             angleButton.setText(display.angleUnit.name());
             angleButton.setContentDescription("Angle unit: " + display.angleUnit.name() + ". Tap to switch.");
@@ -206,7 +228,9 @@ public final class MainActivity extends Activity {
     }
     @Override public boolean dispatchKeyEvent(KeyEvent event) {
         int keyCode = event.getKeyCode();
-        String key = KeyboardInput.command(keyCode,event.getUnicodeChar(),event.isCtrlPressed(),event.isAltPressed(),event.isMetaPressed());
+        int unicode = event.getUnicodeChar();
+        if (unicode==numbers.decimalSeparator()) unicode = '.';
+        String key = KeyboardInput.command(keyCode,unicode,event.isCtrlPressed(),event.isAltPressed(),event.isMetaPressed());
         if (key == null) return super.dispatchKeyEvent(event);
         if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
         if (key.equals("ESCAPE")) { if (session.busy) cancelCalculation(); else execute("CE"); }
@@ -223,3 +247,4 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 }
+

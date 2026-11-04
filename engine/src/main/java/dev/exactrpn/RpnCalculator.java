@@ -41,6 +41,7 @@ public final class RpnCalculator {
     }
     public List<UnifiedReal> values() { return Collections.unmodifiableList(new ArrayList<>(stack)); }
     public void key(String key) {
+        if (key.startsWith("PASTE:")) { paste(key.substring(6)); return; }
         if (key.equals("ANGLE")) { angleUnit = AngleUnit.values()[(angleUnit.ordinal()+1)%AngleUnit.values().length]; return; }
         if (key.equals("UNDO")) {
             if (!undo.isEmpty()) { State s = undo.pop(); stack = new ArrayList<>(s.stack); entry = s.entry; editing = s.editing; }
@@ -51,7 +52,7 @@ public final class RpnCalculator {
             if (key.matches("[0-9.]")) {
                 editing = true;
                 if (entry.length() >= 256) throw new IllegalArgumentException("Entry too long");
-                if (key.equals(".") && entry.contains(".")) return;
+                if (key.equals(".") && (entry.contains(".") || entry.contains("e") || entry.contains("E"))) return;
                 if (key.equals(".") && (entry.isEmpty() || entry.equals("-"))) entry += "0";
                 entry += key;
             } else if (key.equals("BACK") || key.equals("DROP")) {
@@ -103,6 +104,13 @@ public final class RpnCalculator {
             undo.push(before); if (undo.size() > 100) undo.removeLast();
         } catch (RuntimeException ex) { stack = before.stack; entry = before.entry; editing = before.editing; throw ex; }
     }
+    /** Replace pending input atomically; retain the exact decimal text and all stack values. */
+    public void paste(String canonical) {
+        parse(canonical);
+        State before = new State(stack,entry,editing);
+        entry = canonical; editing = true;
+        undo.push(before); if (undo.size()>100) undo.removeLast();
+    }
     private UnifiedReal top() { return stack.get(stack.size()-1); }
     private void need(int count) { if (stack.size() < count) throw new IllegalArgumentException("Need " + count + " stack values"); }
     private void commit() {
@@ -126,3 +134,4 @@ public final class RpnCalculator {
         return "≈ " + value.toStringTruncated(24);
     }
 }
+

@@ -8,6 +8,7 @@ public final class KeyboardInput {
         if (alt || meta) return null;
         if (ctrl) {
             switch(code) { // Android KEYCODE_Z / D / S / L.
+                case 50: return "PASTE";
                 case 54: return "UNDO";
                 case 32: return "DUP";
                 case 47: return "SWAP";
@@ -28,7 +29,7 @@ public final class KeyboardInput {
             case 158: return ".";
         }
         if (code >= 144 && code <= 153) return Integer.toString(code - 144);
-        if (unicode >= '0' && unicode <= '9') return Character.toString((char)unicode);
+        if (Character.digit(unicode,10)>=0) return Integer.toString(Character.digit(unicode,10));
         switch(unicode) {
             case '.': return ".";
             case '+': return "+";
@@ -49,3 +50,4 @@ public final class KeyboardInput {
         }
     }
 }
+

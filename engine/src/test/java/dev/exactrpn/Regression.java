@@ -132,6 +132,44 @@ public final class Regression {
         check(hp.angleUnit()==RpnCalculator.AngleUnit.DEG && hp.isEditing() && hp.entry().equals("7"), "angle toggle preserves entry and stack");
         hp.key("ANGLE"); check(hp.angleUnit()==RpnCalculator.AngleUnit.GRAD, "cycle to gradians");
         hp.key("ANGLE"); check(hp.angleUnit()==RpnCalculator.AngleUnit.RAD, "cycle to radians");
+        check(NumberText.normalize("1234.56",',','.',3,3).equals("1234.56"),"C decimal in comma locale");
+        check(NumberText.normalize("1.234",',','.',3,3).equals("1.234"),"dot-only ambiguity favors C");
+        check(NumberText.normalize("1.234,56",',','.',3,3).equals("1234.56"),"German grouped decimal");
+        check(NumberText.normalize("-0,125",',','.',3,3).equals("-0.125"),"negative local subunit");
+        check(NumberText.normalize(",5",',','.',3,3).equals("0.5"),"local leading decimal");
+        check(NumberText.normalize("1,234.56",'.',',',3,3).equals("1234.56"),"US grouped decimal");
+        check(NumberText.normalize("1,234",'.',',',3,3).equals("1234"),"US grouped integer");
+        check(NumberText.normalize("1,234",',','.',3,3).equals("1.234"),"local decimal takes comma");
+        check(NumberText.normalize("12,34,567.89",'.',',',3,2).equals("1234567.89"),"Indian grouping");
+        check(NumberText.normalize("1 234,5",',','\u202f',3,3).equals("1234.5"),"French space grouping");
+        check(NumberText.normalize("1\u00a0234,5",',','\u202f',3,3).equals("1234.5"),"French nonbreaking space grouping");
+        check(NumberText.normalize("1’234.5",'.','’',3,3).equals("1234.5"),"Swiss grouping");
+        check(NumberText.normalize("1'234.5",'.','’',3,3).equals("1234.5"),"Swiss ASCII apostrophe");
+        check(NumberText.normalize("−1,25e−3",',','.',3,3).equals("-1.25e-3"),"local scientific notation and minus");
+        check(NumberText.normalize("\u061c-١٬٢٣٤٫٥",'٫','٬',3,3).equals("-1234.5"),"Arabic digits and bidi mark");
+        check(NumberText.normalize("  +12.50E+2  ",',','.',3,3).equals("+12.50E+2"),"C scientific paste preserves exact text");
+        for (String invalid : new String[]{"1,23.4","1,,234","1,234,","1 234.5","1\n2","$12","1/2","NaN","Infinity","", "1e10000"}) {
+            try { NumberText.normalize(invalid,'.',',',3,3); throw new AssertionError("accepted invalid paste: "+invalid); }
+            catch (IllegalArgumentException expected) { check(true,"reject invalid clipboard number"); }
+        }
+        try { NumberText.normalize("123,456",'.',',',3,2); throw new AssertionError("bad Indian grouping accepted"); }
+        catch (IllegalArgumentException expected) { check(true,"Indian secondary width enforced"); }
+        RpnCalculator pasted = new RpnCalculator(); keys(pasted,"7","ENTER","8");
+        pasted.paste(NumberText.normalize("1.234,56",',','.',3,3));
+        check(pasted.isEditing() && pasted.entry().equals("1234.56") && top(pasted).definitelyEquals(new UnifiedReal(7)), "paste replaces entry without changing stack");
+        pasted.key("UNDO"); check(pasted.entry().equals("8") && pasted.isEditing(),"paste is one undo transaction");
+        try { pasted.paste("oops"); throw new AssertionError("invalid direct paste accepted"); }
+        catch (IllegalArgumentException expected) { check(pasted.entry().equals("8"),"invalid paste preserves state"); }
+        keys(pasted,"PASTE:0.1","ENTER","PASTE:0.2","+");
+        check(top(pasted).definitelyEquals(RpnCalculator.parse("0.3")),"pasted arithmetic remains exact");
+        check(ValueFormatter.clipboard(huge,sci).equals("123456789012345678901234567890"),"clipboard retains full exact integer");
+        check(ValueFormatter.clipboard(RpnCalculator.parse("-1e-20"),sci).equals("-1e-20"),"clipboard uses ASCII exponent minus");
+        check(ValueFormatter.clipboard(third,sci).equals("0.333333333333"),"clipboard omits approximation annotation");
+        check("PASTE".equals(KeyboardInput.command(50,0,true,false,false)),"Ctrl V paste shortcut");
+        check("5".equals(KeyboardInput.command(0,'٥',false,false,false)),"localized hardware digits");
+        pasted.paste("1e-3"); pasted.key(".");
+        check(pasted.entry().equals("1e-3"),"decimal key does not corrupt pasted exponent");
         System.out.println("Passed " + checks + " regression checks");
     }
 }
+
