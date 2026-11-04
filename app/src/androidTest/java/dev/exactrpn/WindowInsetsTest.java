@@ -16,7 +16,7 @@ import static org.junit.Assert.*;
 
 @RunWith(AndroidJUnit4.class)
 public final class WindowInsetsTest {
-    @Test public void cameraAndStatusBarClearanceIsAppliedOnlyOnce() {
+    @Test public void cameraAndStatusBarClearanceIsAppliedOnlyOnce() throws Exception {
         Instrumentation instrumentation=InstrumentationRegistry.getInstrumentation();
         Context context=instrumentation.getTargetContext();
         MainActivity activity=(MainActivity)instrumentation.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
@@ -39,6 +39,6 @@ public final class WindowInsetsTest {
                 root.dispatchApplyWindowInsets(insets);
                 assertEquals("Repeated inset dispatch must not accumulate padding",cutout+Math.round(4*density),root.getPaddingTop());
             });
-        } finally { instrumentation.runOnMainSync(activity::finish); instrumentation.waitForIdleSync(); }
+        } finally { StackSelectionTest.finish(activity); }
     }
 }
