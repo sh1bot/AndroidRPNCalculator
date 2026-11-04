@@ -241,6 +241,18 @@ public final class RpnCalculator {
         for(int i=0;i<a.size();i++) if(a.get(i)!=b.get(i)) return false;
         return true;
     }
+    /** Remove arbitrary rows as one undoable action, leaving unfinished entry untouched. */
+    public void dropRows(int... indices) {
+        TreeSet<Integer> rows=new TreeSet<>();
+        for(int index:indices) {
+            if(index<0 || index>=stack.size()) throw new IllegalArgumentException("Stack row no longer exists");
+            rows.add(index);
+        }
+        if(rows.isEmpty()) return;
+        State before=new State(this);
+        for(int index:rows.descendingSet()) stack.remove(index);
+        remember(before);
+    }
     public boolean isEmpty() { return stack.isEmpty() && entry.isEmpty(); }
     public int undoCount() { return undo.size(); }
     public int redoCount() { return redo.size(); }

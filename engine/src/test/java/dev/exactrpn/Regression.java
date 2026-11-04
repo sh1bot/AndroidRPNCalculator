@@ -473,6 +473,19 @@ public final class Regression {
         check("rem".equals(KeyboardInput.command(0,'%',false,false,false)),"remainder keyboard shortcut");
         check("!".equals(KeyboardInput.command(0,'!',false,false,false)),"factorial keyboard shortcut");
         check("Factor".equals(KeyboardInput.command(0,'f',false,false,false)),"factorise keyboard shortcut");
+        RpnCalculator rowDrop=new RpnCalculator(); keys(rowDrop,"1","ENTER","2","ENTER","3","ENTER","4","ENTER");
+        rowDrop.pasteText("1,234",new NumberText.Profile('.',',',3,3)); rowDrop.select(1,2);
+        int beforeDropHistory=rowDrop.undoCount(); rowDrop.dropRows(2,0,2);
+        check(rowDrop.values().size()==2 && rowDrop.values().get(0).definitelyEquals(UnifiedReal.TWO) && top(rowDrop).definitelyEquals(new UnifiedReal(4)),"drop nonadjacent rows once, preserving order");
+        check(rowDrop.rawEntry() && rowDrop.entry().equals("1,234") && rowDrop.selectionStart()==1 && rowDrop.selectionEnd()==2,"row drop preserves ambiguous entry and caret");
+        check(rowDrop.undoCount()==beforeDropHistory+1,"multi-row drop is one undo action");
+        RpnCalculator rowDropRestored=RpnCalculator.load(rowDrop.save());
+        rowDropRestored.key("UNDO"); check(rowDropRestored.values().size()==4 && rowDropRestored.entry().equals("1,234"),"undo multi-row drop after restart");
+        rowDropRestored.key("REDO"); check(rowDropRestored.values().size()==2 && top(rowDropRestored).definitelyEquals(new UnifiedReal(4)),"redo multi-row drop");
+        try { rowDrop.dropRows(0,99); throw new AssertionError("invalid row accepted"); } catch(IllegalArgumentException expected) {}
+        check(rowDrop.values().size()==2 && rowDrop.values().get(0).definitelyEquals(UnifiedReal.TWO),"invalid row drop is atomic");
+        int noOpUndo=rowDrop.undoCount(); rowDrop.dropRows(); check(rowDrop.undoCount()==noOpUndo,"empty row drop does not add undo");
+        rowDrop.dropRows(1,0); check(rowDrop.values().isEmpty() && rowDrop.rawEntry(),"drop entire stack without discarding entry");
         byte[] valid=durable.save();
         try { RpnCalculator.load(java.util.Arrays.copyOf(valid,valid.length-1)); throw new AssertionError("truncated state accepted"); }
         catch(java.io.IOException expected) { check(true,"reject truncated state"); }

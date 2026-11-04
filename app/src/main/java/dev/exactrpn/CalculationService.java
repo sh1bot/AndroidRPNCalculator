@@ -15,7 +15,7 @@ public final class CalculationService extends Service {
     static final int HELLO=1, EVALUATE=2;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private RpnCalculator cached;
-    private String cachedPath;
+    private String cachedPath, cachedStackId;
     private final Messenger messenger=new Messenger(new Handler(Looper.getMainLooper(),message -> {
         if(message.what==HELLO) {
             Message reply=Message.obtain(null,HELLO); reply.arg1=android.os.Process.myPid(); reply.arg2=message.arg2;
@@ -32,6 +32,12 @@ public final class CalculationService extends Service {
         android.os.Process.killProcess(android.os.Process.myPid()); return false;
     }
     @Override public void onDestroy() { worker.shutdownNow(); super.onDestroy(); }
+    private boolean sameStack(RpnCalculator a,RpnCalculator b) {
+        List<UnifiedReal> left=a.values(),right=b.values();
+        if(left.size()!=right.size()) return false;
+        for(int i=0;i<left.size();i++) if(left.get(i)!=right.get(i)) return false;
+        return true;
+    }
     private void evaluate(Bundle request,Messenger client) {
         Bundle response=new Bundle();
         File snapshot=null, presentation=null;
@@ -40,7 +46,7 @@ public final class CalculationService extends Service {
             if(cached==null || !Objects.equals(input,cachedPath)) {
                 cached=input==null ? new RpnCalculator() : RpnCalculator.load(Files.readAllBytes(new File(input).toPath()));
                 if(input==null) cached.setAngleUnit(RpnCalculator.AngleUnit.valueOf(request.getString("angle")));
-                cachedPath=input;
+                cachedPath=input; cachedStackId=UUID.randomUUID().toString();
             }
             RpnCalculator candidate=cached.copy();
             Locale locale=Locale.forLanguageTag(request.getString("locale"));
@@ -53,6 +59,11 @@ public final class CalculationService extends Service {
             else if(key.equals("FORMAT")) notation=notation==ValueFormatter.Notation.SCIENTIFIC ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
             else if(key.equals("NUMBER_FORMAT")) numberMode=(numberMode+1)%3;
             else if(key.equals("FRACTION")) fractionMode=(fractionMode+1)%3;
+            else if(key.startsWith("DROP_ROWS:")) {
+                String[] parts=key.substring(10).split(","); int[] rows=new int[parts.length];
+                for(int i=0;i<parts.length;i++) rows[i]=Integer.parseInt(parts[i]);
+                candidate.dropRows(rows);
+            }
             else if(key.startsWith("PASTE_RAW:")) candidate.pasteText(key.substring(10),local.profile());
             else if(key.startsWith("SELECT:")) {
                 String[] parts=key.split(":"); candidate.select(Integer.parseInt(parts[1]),Integer.parseInt(parts[2]));
@@ -60,6 +71,7 @@ public final class CalculationService extends Service {
                 String[] parts=key.split(":",6);
                 candidate.editText(parts[5],Integer.parseInt(parts[1]),Integer.parseInt(parts[2]),Boolean.parseBoolean(parts[3]),Boolean.parseBoolean(parts[4]),format.profile());
             } else candidate.key(key);
+            String stackId=sameStack(cached,candidate) ? cachedStackId : UUID.randomUUID().toString();
             ArrayList<String> rows=new ArrayList<>(candidate.formattedValues(notation,fractionMode));
             ArrayList<String> copies=new ArrayList<>(),compact=new ArrayList<>();
             for(UnifiedReal value:candidate.values()) {
@@ -69,6 +81,7 @@ public final class CalculationService extends Service {
             snapshot=File.createTempFile("calculation-",".state",getNoBackupFilesDir());
             Files.write(snapshot.toPath(),candidate.save());
             Bundle display=new Bundle();
+            display.putString("stackId",stackId);
             display.putStringArrayList("rows",rows); display.putStringArrayList("clipboard",copies); display.putStringArrayList("compactRows",compact);
             display.putString("entry",candidate.entry()); display.putString("problem",candidate.entryProblem());
             display.putBoolean("editing",candidate.isEditing()); display.putBoolean("raw",candidate.rawEntry());
@@ -82,7 +95,7 @@ public final class CalculationService extends Service {
             try { parcel.writeBundle(display); Files.write(presentation.toPath(),parcel.marshall()); }
             finally { parcel.recycle(); }
             response.putString("presentation",presentation.getAbsolutePath());
-            cached=candidate; cachedPath=snapshot.getAbsolutePath();
+            cached=candidate; cachedPath=snapshot.getAbsolutePath(); cachedStackId=stackId;
         } catch(OutOfMemoryError ex) {
             android.os.Process.killProcess(android.os.Process.myPid()); return;
         } catch(IOException | RuntimeException | StackOverflowError ex) {

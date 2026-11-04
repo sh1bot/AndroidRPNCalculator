@@ -44,7 +44,10 @@ and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 display grouping, and the locale decimal with no grouping. Copied numbers follow this choice but never
 include grouping. Copy follows **DEC/IMPR/FRAC**, using plain text such as `7/3` or `2 1/3`;
 DEC preserves exact terminating decimals. Tap a stack value
-to copy it; long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
+to copy it. Long-press a stack label to select it, then use the checkboxes to select
+more rows. Long-press a value for **Drop** and **Copy**; these act on the whole
+selection, or on that row if nothing is selected. Multiple values copy one per
+line in display order. Back/Escape exits selection. Long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
 a selected separator explicitly. Backspace/Delete edit at the cursor.
 

@@ -25,6 +25,7 @@ public final class MainActivity extends Activity {
     private LinearLayout stackRows;
     private ScrollView scroll;
     private Display rendered;
+    private boolean selectionDirty;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable hideNotice=() -> { if(noticeView!=null) noticeView.setVisibility(View.GONE); };
     static final class EntryField extends EditText {
@@ -42,7 +43,7 @@ public final class MainActivity extends Activity {
     }
     static final class Display {
         final List<String> rows,clipboard,compactRows;
-        final String entry,problem;
+        final String entry,problem,stackId;
         final ValueFormatter.Notation notation;
         final boolean editing,raw;
         final int fractionMode;
@@ -50,7 +51,7 @@ public final class MainActivity extends Activity {
         final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
         Display(ValueFormatter.Notation notation,RpnCalculator.AngleUnit angle,int numberMode,int fractionMode) {
-            rows=clipboard=compactRows=Collections.emptyList(); entry=problem="";
+            rows=clipboard=compactRows=Collections.emptyList(); entry=problem=""; stackId="initial";
             this.notation=notation; angleUnit=angle; this.numberMode=numberMode; this.fractionMode=fractionMode;
             editing=raw=false; start=end=0;
         }
@@ -58,6 +59,7 @@ public final class MainActivity extends Activity {
             rows=Collections.unmodifiableList(result.getStringArrayList("rows"));
             clipboard=Collections.unmodifiableList(result.getStringArrayList("clipboard"));
             compactRows=Collections.unmodifiableList(result.getStringArrayList("compactRows"));
+            stackId=result.getString("stackId");
             entry=result.getString("entry"); problem=result.getString("problem");
             notation=ValueFormatter.Notation.valueOf(result.getString("notation"));
             angleUnit=RpnCalculator.AngleUnit.valueOf(result.getString("angle"));
@@ -72,6 +74,7 @@ public final class MainActivity extends Activity {
         volatile Display display;
         volatile String error = "";
         final Deque<String> pending = new ArrayDeque<>();
+        final SortedSet<Integer> selectedRows=new TreeSet<>();
         volatile boolean busy, cancelRequested, background;
         CalculatorStore store;
         boolean loaded, scientificExpanded, inverse;
@@ -233,6 +236,8 @@ public final class MainActivity extends Activity {
         if (key.equals("PASTE")) { pasteClipboard(); return; }
         if (key.equals("CANCEL") || (key.equals("UNDO") && session.busy
             && SystemClock.elapsedRealtime()-session.busySince >= 250)) { cancelCalculation(); return; }
+        if(!key.equals("FORMAT") && !key.equals("NUMBER_FORMAT") && !key.equals("FRACTION")
+            && !key.equals("ANGLE") && !key.equals("CHECKPOINT") && !key.startsWith("SELECT:")) clearStackSelection(false);
         boolean start;
         synchronized (session) {
             session.pending.addLast(key);
@@ -253,7 +258,7 @@ public final class MainActivity extends Activity {
     }
     private void copyValue(String text) {
         android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
-        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Calculator value",numbers.copy(text)));
+        clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Calculator value",numberFormat(session.display.numberMode).copy(text)));
         if (Build.VERSION.SDK_INT<=32) showNotice("Copied",false);
     }
     private void drainKeys() {
@@ -327,8 +332,48 @@ public final class MainActivity extends Activity {
         }
         refresh();
     }
-    private void handleBack() { if (session.busy) cancelCalculation(); else if (session.display.editing) execute("CE"); else finish(); }
+    private void handleBack() { if (session.busy) cancelCalculation(); else if(!session.selectedRows.isEmpty()) clearStackSelection(true); else if (session.display.editing) execute("CE"); else finish(); }
     private final Runnable tick = new Runnable() { public void run() { refresh(); handler.postDelayed(this,100); } };
+    private void clearStackSelection(boolean redraw) {
+        if(session.selectedRows.isEmpty()) return;
+        session.selectedRows.clear(); selectionDirty=true;
+        if(redraw) refresh();
+    }
+    private boolean stackActionAllowed(Display snapshot) {
+        if(session.busy) { showNotice("Wait for the calculation to finish",true); return false; }
+        if(!Objects.equals(session.display.stackId,snapshot.stackId)) { showNotice("Stack changed; try again",true); refresh(); return false; }
+        return true;
+    }
+    private boolean toggleStackRow(int index,Display snapshot) {
+        if(!stackActionAllowed(snapshot)) return false;
+        int scrollY=scroll.getScrollY();
+        if(!session.selectedRows.remove(index)) session.selectedRows.add(index);
+        selectionDirty=true; refresh(); scroll.post(() -> scroll.scrollTo(0,scrollY));
+        return true;
+    }
+    private void stackRowTapped(int index,Display snapshot) {
+        if(!session.selectedRows.isEmpty()) toggleStackRow(index,snapshot);
+        else copyValue(snapshot.clipboard.get(index));
+    }
+    private void showStackMenu(View anchor,int index,Display snapshot) {
+        if(!stackActionAllowed(snapshot)) return;
+        PopupMenu menu=new PopupMenu(this,anchor);
+        menu.getMenu().add(0,1,0,"Drop"); menu.getMenu().add(0,2,1,"Copy");
+        menu.setOnMenuItemClickListener(item -> {
+            if(!stackActionAllowed(snapshot)) return true;
+            SortedSet<Integer> rows=new TreeSet<>(session.selectedRows);
+            if(rows.isEmpty()) rows.add(index);
+            if(item.getItemId()==1) {
+                List<String> indices=new ArrayList<>(); for(int row:rows) indices.add(Integer.toString(row));
+                execute("DROP_ROWS:"+String.join(",",indices));
+            } else {
+                List<String> copies=new ArrayList<>(); for(int row:rows) copies.add(session.display.clipboard.get(row));
+                copyValue(String.join("\n",copies));
+            }
+            return true;
+        });
+        menu.show();
+    }
     private static String withoutApproximation(String number) {
         return number.startsWith("≈ ") ? number.substring(2) : number;
     }
@@ -336,22 +381,42 @@ public final class MainActivity extends Activity {
         boolean approximate=number.startsWith("≈ ");
         String name=depth==1 ? "x" : depth==2 ? "y" : Integer.toString(depth);
         label.setText(name+(approximate ? "≈" : ":"));
-        label.setContentDescription("Stack " + name + (approximate ? ", approximate value" : ""));
+        label.setContentDescription("Stack " + name + (approximate ? ", approximate value" : "") + "; long press to select");
     }
     private void refresh() {
         Display display = session.display;
-        if (rendered != display) {
+        if (rendered != display || selectionDirty) {
             numbers=numberFormat(display.numberMode);
             keys.setNumberFormat(numbers);
-            boolean stackChanged = rendered == null || rendered.numberMode!=display.numberMode || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
+            boolean stackChanged = selectionDirty || rendered == null || !Objects.equals(rendered.stackId,display.stackId) || rendered.numberMode!=display.numberMode || rendered.editing != display.editing || !rendered.rows.equals(display.rows) || !rendered.clipboard.equals(display.clipboard);
+            selectionDirty=false;
             if (stackChanged) {
+                session.selectedRows.removeIf(index -> index>=display.rows.size());
                 stackRows.removeAllViews();
                 if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(colors.muted); stackRows.addView(empty); }
                 for (int i=0;i<display.rows.size();i++) {
+                    final int index=i;
                     int depth = display.rows.size()-i;
                     LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
+                    row.setTag("stack-row:"+i);
+                    if(!session.selectedRows.isEmpty()) {
+                        CheckBox selected=new CheckBox(this); selected.setTag("stack-checkbox:"+i);
+                        selected.setMinWidth(0); selected.setMinimumWidth(0); selected.setPadding(0,0,0,0);
+                        selected.setButtonTintList(new android.content.res.ColorStateList(
+                            new int[][]{new int[]{android.R.attr.state_checked},new int[]{}},new int[]{colors.accent,colors.muted}));
+                        selected.setChecked(session.selectedRows.contains(i)); selected.setContentDescription("Select stack level "+depth);
+                        selected.setOnClickListener(v -> { if(!toggleStackRow(index,display)) selected.setChecked(session.selectedRows.contains(index)); });
+                        row.addView(selected,new LinearLayout.LayoutParams(dp(40),dp(40)));
+                        if(session.selectedRows.contains(i)) {
+                            android.graphics.drawable.GradientDrawable highlight=new android.graphics.drawable.GradientDrawable();
+                            highlight.setColor(colors.numberKey); highlight.setCornerRadius(dp(8)); row.setBackground(highlight);
+                        }
+                    }
                     TextView label = text(12); digits(label); label.setSingleLine(true);
                     updateStackLabel(label,depth,display.rows.get(i));
+                    label.setTag("stack-label:"+i);
+                    label.setOnLongClickListener(v -> { toggleStackRow(index,display); return true; });
+                    label.setOnClickListener(v -> stackRowTapped(index,display));
                     label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL); label.setTextColor(colors.muted);
                     row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
                     boolean result = !display.editing && depth == 1;
@@ -377,15 +442,18 @@ public final class MainActivity extends Activity {
                             boolean fits=android.text.Layout.getDesiredWidth(full,measure)<=available;
                             CharSequence chosen=fits ? full : compact;
                             updateStackLabel(label,depth,fits ? fullNumber : compactNumber);
-                            row.setContentDescription("Copy stack level " + depth + (fits || !compactNumber.startsWith("≈ ") ? ": " : ", approximately: ") + chosen);
+                            row.setContentDescription((session.selectedRows.isEmpty() ? "Copy" : "Select") + " stack level " + depth + (fits || !compactNumber.startsWith("≈ ") ? ": " : ", approximately: ") + chosen);
                             if(!value.getText().toString().equals(chosen.toString())) value.setText(chosen);
                             if(value.getTextSize()!=size*scale) value.setTextSize(size);
                         });
                     }
                     value.setTextIsSelectable(false); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
-                    final String copy = display.clipboard.get(i);
-                    row.setOnClickListener(v -> copyValue(copy));
-                    row.setContentDescription("Copy stack level " + depth + (display.rows.get(i).startsWith("≈ ") ? ", approximately: " : ": ") + value.getText());
+                    value.setTag("stack-value:"+i);
+                    value.setOnLongClickListener(v -> { showStackMenu(value,index,display); return true; });
+                    value.setOnClickListener(v -> stackRowTapped(index,display));
+                    row.setOnLongClickListener(v -> { showStackMenu(value,index,display); return true; });
+                    row.setOnClickListener(v -> stackRowTapped(index,display));
+                    row.setContentDescription((session.selectedRows.isEmpty() ? "Copy" : "Select") + " stack level " + depth + (display.rows.get(i).startsWith("≈ ") ? ", approximately: " : ": ") + value.getText());
                     stackRows.addView(row);
                 }
             }
@@ -457,7 +525,7 @@ public final class MainActivity extends Activity {
             if(event.isShiftPressed()) key="SELECT_"+key;
         }
         if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
-        if (key.equals("ESCAPE")) { if (session.busy) cancelCalculation(); else execute("CE"); }
+        if (key.equals("ESCAPE")) { if (session.busy) cancelCalculation(); else if(!session.selectedRows.isEmpty()) clearStackSelection(true); else execute("CE"); }
         else execute(key);
         return true;
     }
