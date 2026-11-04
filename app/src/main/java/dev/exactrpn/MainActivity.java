@@ -62,7 +62,7 @@ public final class MainActivity extends Activity {
         final Deque<String> pending = new ArrayDeque<>();
         volatile boolean busy, cancelRequested, background;
         CalculatorStore store;
-        boolean loaded;
+        boolean loaded, scientificExpanded;
         volatile long busySince;
         volatile Thread calculatingThread;
         ValueFormatter.Notation notation;
@@ -144,8 +144,8 @@ public final class MainActivity extends Activity {
         });
         root.addView(entryView);
         keys = new CalculatorKeypad(this, this::execute,
-            getPreferences(0).getBoolean("scientificExpanded",false),
-            expanded -> getPreferences(0).edit().putBoolean("scientificExpanded",expanded).apply());
+            session.scientificExpanded,
+            expanded -> session.scientificExpanded=expanded);
         root.addView(keys); setContentView(root);
         if (Build.VERSION.SDK_INT >= 33) {
             backCallback = this::handleBack;
