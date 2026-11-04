@@ -14,7 +14,7 @@ import java.util.concurrent.*;
 public final class MainActivity extends Activity {
     private Session session;
     private EntryField entryView;
-    private TextView status;
+    private TextView status, noticeView;
     private Button notationButton, angleButton, numberFormatButton, fractionButton;
     private CalculatorKeypad keys;
     private LocaleNumbers numbers, localNumbers, computerNumbers, ungroupedNumbers;
@@ -25,6 +25,7 @@ public final class MainActivity extends Activity {
     private ScrollView scroll;
     private Display rendered;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable hideNotice=() -> { if(noticeView!=null) noticeView.setVisibility(View.GONE); };
     static final class EntryField extends EditText {
         java.util.function.BiConsumer<Integer,Integer> selectionChanged;
         Runnable paste;
@@ -114,6 +115,7 @@ public final class MainActivity extends Activity {
                 android.graphics.Insets bars = insets.getInsets(WindowInsets.Type.systemBars());
                 root.setPadding(dp(16)+bars.left,dp(16)+bars.top,dp(16)+bars.right,dp(12)+bars.bottom);
             } else root.setPadding(dp(16),dp(16)+insets.getSystemWindowInsetTop(),dp(16),dp(12)+insets.getSystemWindowInsetBottom());
+            positionNotice(root);
             return insets;
         });
         LinearLayout header = new LinearLayout(this); header.setGravity(Gravity.CENTER_VERTICAL);
@@ -165,7 +167,17 @@ public final class MainActivity extends Activity {
             session.scientificExpanded,
             expanded -> session.scientificExpanded=expanded);
         keys.setInverse(session.inverse);
-        root.addView(keys); setContentView(root);
+        root.addView(keys);
+        FrameLayout screen=new FrameLayout(this);
+        screen.addView(root,new FrameLayout.LayoutParams(-1,-1));
+        noticeView=text(14); noticeView.setPadding(dp(12),dp(10),dp(12),dp(10));
+        noticeView.setMaxLines(3); noticeView.setEllipsize(android.text.TextUtils.TruncateAt.END);
+        noticeView.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
+        android.graphics.drawable.GradientDrawable noticeBackground=new android.graphics.drawable.GradientDrawable();
+        noticeBackground.setColor(Color.rgb(35,46,59)); noticeBackground.setCornerRadius(dp(12));
+        noticeView.setBackground(noticeBackground); noticeView.setElevation(dp(8)); noticeView.setVisibility(View.GONE);
+        screen.addView(noticeView,new FrameLayout.LayoutParams(-1,-2,Gravity.TOP));
+        positionNotice(root); setContentView(screen);
         if (Build.VERSION.SDK_INT >= 33) {
             backCallback = this::handleBack;
             getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
@@ -173,6 +185,17 @@ public final class MainActivity extends Activity {
         }
         refresh();
         if(restoreSession) execute("RESTORE");
+    }
+    private void positionNotice(LinearLayout content) {
+        if(noticeView==null) return;
+        FrameLayout.LayoutParams layout=(FrameLayout.LayoutParams)noticeView.getLayoutParams();
+        layout.leftMargin=content.getPaddingLeft(); layout.rightMargin=content.getPaddingRight();
+        layout.topMargin=content.getPaddingTop()+dp(52); noticeView.setLayoutParams(layout);
+    }
+    private void showNotice(String message,boolean error) {
+        noticeView.setText(message); noticeView.setTextColor(error ? Color.rgb(255,125,125) : Color.rgb(228,237,242));
+        noticeView.setVisibility(View.VISIBLE); noticeView.bringToFront();
+        handler.removeCallbacks(hideNotice); handler.postDelayed(hideNotice,error ? 5000 : 2000);
     }
     private void styleModeButton(Button button) {
         button.setTextSize(12); button.setMinWidth(0); button.setMinimumWidth(0);
@@ -199,15 +222,15 @@ public final class MainActivity extends Activity {
         android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
         android.content.ClipData clip = clipboard.getPrimaryClip();
         if (clip==null || clip.getItemCount()==0 || clip.getItemAt(0).getText()==null) {
-            Toast.makeText(this,"Clipboard does not contain a number",Toast.LENGTH_SHORT).show(); return;
+            showNotice("Clipboard does not contain a number",true); return;
         }
         try { execute("PASTE_RAW:"+clip.getItemAt(0).getText().toString()); }
-        catch (IllegalArgumentException ex) { Toast.makeText(this,ex.getMessage(),Toast.LENGTH_LONG).show(); }
+        catch (IllegalArgumentException ex) { showNotice(ex.getMessage(),true); }
     }
     private void copyValue(String text) {
         android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
         clipboard.setPrimaryClip(android.content.ClipData.newPlainText("Calculator value",numbers.copy(text)));
-        if (Build.VERSION.SDK_INT<=32) Toast.makeText(this,"Copied",Toast.LENGTH_SHORT).show();
+        if (Build.VERSION.SDK_INT<=32) showNotice("Copied",false);
     }
     private void drainKeys() {
         while (true) {
@@ -390,7 +413,7 @@ public final class MainActivity extends Activity {
         status.setText(showProgress ? (session.cancelRequested ? "Cancelling…" : "Working…")
             : !display.problem.isEmpty() ? display.problem.toUpperCase(Locale.ROOT) : display.editing ? "ENTRY" : "STACK");
         status.setContentDescription(status.getText());
-        if (!session.error.isEmpty() && !session.error.equals(shownError)) Toast.makeText(this,session.error,Toast.LENGTH_LONG).show();
+        if (!session.error.isEmpty() && !session.error.equals(shownError)) showNotice(session.error,true);
         shownError = session.error;
         keys.setCalculating(showProgress);
         notationButton.setEnabled(!session.busy);
@@ -420,7 +443,7 @@ public final class MainActivity extends Activity {
         super.onStop();
     }
     @Override protected void onResume() { super.onResume(); handler.post(tick); }
-    @Override protected void onPause() { handler.removeCallbacks(tick); super.onPause(); }
+    @Override protected void onPause() { handler.removeCallbacks(tick); handler.removeCallbacks(hideNotice); hideNotice.run(); super.onPause(); }
     @Override public void onBackPressed() { handleBack(); }
     @Override protected void onDestroy() {
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null)
