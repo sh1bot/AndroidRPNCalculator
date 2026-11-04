@@ -349,10 +349,10 @@ public final class MainActivity extends Activity {
                 if (display.rows.isEmpty()) { TextView empty = text(16); empty.setText("Stack is empty"); empty.setTextColor(colors.muted); stackRows.addView(empty); }
                 for (int i=0;i<display.rows.size();i++) {
                     int depth = display.rows.size()-i;
-                    LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.BOTTOM);
+                    LinearLayout row = new LinearLayout(this); row.setGravity(Gravity.CENTER_VERTICAL);
                     TextView label = text(12); digits(label); label.setSingleLine(true);
                     updateStackLabel(label,depth,display.rows.get(i));
-                    label.setGravity(Gravity.START | Gravity.BOTTOM); label.setTextColor(colors.muted);
+                    label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL); label.setTextColor(colors.muted);
                     row.addView(label,new LinearLayout.LayoutParams(dp(46),-2));
                     boolean result = !display.editing && depth == 1;
                     TextView value = text(result ? 32 : 21); digits(value); value.setGravity(Gravity.END); value.setText(numbers.stack(withoutApproximation(display.rows.get(i)),colors.muted));
