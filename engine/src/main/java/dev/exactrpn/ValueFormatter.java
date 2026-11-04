@@ -21,6 +21,11 @@ public final class ValueFormatter {
             BigDecimal rounded = new BigDecimal(integer).round(new MathContext(DIGITS, RoundingMode.HALF_EVEN));
             return (rounded.compareTo(new BigDecimal(integer)) == 0 ? "" : "≈ ") + decimal(rounded, notation);
         }
+        if(newest) {
+            BoundedRational rational=value.boundedRationalValue();
+            int places=BoundedRational.digitsRequired(rational);
+            if(places<=1000) return new BigDecimal(rational.toStringTruncated(places)).stripTrailingZeros().toPlainString();
+        }
         // Bounded zero detection avoids an undecidable comparison with exact zero.
         StringFloatRep rep = value.crValue().toStringFloatRep(DIGITS + 8, 10, -1000);
         if (rep.sign == 0) return "≈ 0 (|x| < 1e−1000)";

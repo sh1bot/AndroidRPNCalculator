@@ -40,15 +40,15 @@ public final class MainActivity extends Activity {
         }
     }
     static final class Display {
-        final List<String> rows,clipboard;
+        final List<String> rows,clipboard,compactRows;
         final String entry,problem;
         final ValueFormatter.Notation notation;
         final boolean editing,raw,fractions;
         final int numberMode;
         final int start,end;
         final RpnCalculator.AngleUnit angleUnit;
-        Display(List<String> rows,List<String> clipboard,RpnCalculator calculator,ValueFormatter.Notation notation,int numberMode,boolean fractions) {
-            this.rows=rows; this.clipboard=clipboard; this.notation=notation; this.numberMode=numberMode; this.fractions=fractions;
+        Display(List<String> rows,List<String> clipboard,List<String> compactRows,RpnCalculator calculator,ValueFormatter.Notation notation,int numberMode,boolean fractions) {
+            this.rows=rows; this.clipboard=clipboard; this.compactRows=compactRows; this.notation=notation; this.numberMode=numberMode; this.fractions=fractions;
             entry=calculator.entry(); editing=calculator.isEditing(); raw=calculator.rawEntry();
             start=calculator.selectionStart(); end=calculator.selectionEnd(); problem=calculator.entryProblem();
             angleUnit=calculator.angleUnit();
@@ -68,7 +68,7 @@ public final class MainActivity extends Activity {
         boolean fractions;
         Session(ValueFormatter.Notation n, RpnCalculator.AngleUnit angle,int numberMode,boolean fractions) {
             notation = n; this.numberMode=numberMode; this.fractions=fractions; calculator.setAngleUnit(angle);
-            display = new Display(Collections.emptyList(),Collections.emptyList(),calculator,n,numberMode,fractions);
+            display = new Display(Collections.emptyList(),Collections.emptyList(),Collections.emptyList(),calculator,n,numberMode,fractions);
         }
     }
     private LocaleNumbers numberFormat(int mode) {
@@ -221,10 +221,12 @@ public final class MainActivity extends Activity {
                 List<String> rows = candidate.formattedValues(notation,fractions);
                 List<String> copies = new ArrayList<>();
                 for (UnifiedReal value : candidate.values()) { checkCancelled(); copies.add(ValueFormatter.clipboard(value,notation)); }
+                List<String> compactRows = new ArrayList<>();
+                for(UnifiedReal value : candidate.values()) { checkCancelled(); compactRows.add(ValueFormatter.format(value,false,notation,fractions)); }
                 synchronized (session) {
                     checkCancelled();
                     session.calculator = candidate; session.notation = notation; session.numberMode=numberMode; session.fractions=fractions;
-                    session.display = new Display(rows,Collections.unmodifiableList(copies),candidate,notation,numberMode,fractions);
+                    session.display = new Display(rows,Collections.unmodifiableList(copies),Collections.unmodifiableList(compactRows),candidate,notation,numberMode,fractions);
                     session.error = "";
                 }
             } catch (RuntimeException ex) {
@@ -269,6 +271,23 @@ public final class MainActivity extends Activity {
                         value.setSingleLine(true); value.setHorizontallyScrolling(false);
                         value.setEllipsize(android.text.TextUtils.TruncateAt.END);
                         value.setAutoSizeTextTypeUniformWithConfiguration(12,21,1,android.util.TypedValue.COMPLEX_UNIT_SP);
+                    }
+                    if(result && !display.fractions && display.rows.get(i).contains(".") && !display.rows.get(i).startsWith("≈")) {
+                        final CharSequence full=numbers.stack(display.rows.get(i),Color.rgb(133,150,164));
+                        final CharSequence compact=numbers.stack(display.compactRows.get(i),Color.rgb(133,150,164));
+                        value.setSingleLine(true); value.setHorizontallyScrolling(false);
+                        value.addOnLayoutChangeListener((v,l,t,r,b,ol,ot,or,ob) -> {
+                            int available=r-l-value.getPaddingLeft()-value.getPaddingRight();
+                            if(available<=0) return;
+                            android.text.TextPaint measure=new android.text.TextPaint(value.getPaint());
+                            float scale=getResources().getDisplayMetrics().scaledDensity;
+                            int size=32;
+                            for(;size>21;size--) { measure.setTextSize(size*scale); if(measure.measureText(full.toString())<=available) break; }
+                            measure.setTextSize(size*scale);
+                            CharSequence chosen=measure.measureText(full.toString())<=available ? full : compact;
+                            if(!value.getText().toString().equals(chosen.toString())) value.setText(chosen);
+                            if(value.getTextSize()!=size*scale) value.setTextSize(size);
+                        });
                     }
                     value.setTextIsSelectable(false); row.addView(value,new LinearLayout.LayoutParams(0,-2,1));
                     final String copy = display.clipboard.get(i);
