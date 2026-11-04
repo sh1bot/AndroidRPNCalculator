@@ -59,6 +59,7 @@ public final class LocaleNumbers {
             } else if(numerator.startsWith("-")) {
                 text.append(((DecimalFormat)integers).getNegativePrefix()); numerator=numerator.substring(1);
             }
+            int fractionStart=text.length();
             int start=text.length(); appendInteger(text,numerator,groupingColor);
             text.setSpan(new RelativeSizeSpan(.72f),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             text.setSpan(new SuperscriptSpan(),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -67,6 +68,8 @@ public final class LocaleNumbers {
             start=text.length(); appendInteger(text,number.substring(slash+1),groupingColor);
             text.setSpan(new RelativeSizeSpan(.72f),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             text.setSpan(new SubscriptSpan(),start,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            // Apply before digit scaling, so numerator, slash and denominator all rise equally.
+            text.setSpan(new FractionRaiseSpan(),fractionStart,text.length(),Spanned.SPAN_EXCLUSIVE_EXCLUSIVE | (1 << Spanned.SPAN_PRIORITY_SHIFT));
             return text;
         }
         int e = number.indexOf('e');
