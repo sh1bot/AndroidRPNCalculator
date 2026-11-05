@@ -99,11 +99,8 @@ public final class CalculatorKeypad extends LinearLayout {
         if(Arrays.asList("INVERSE","sin","cos","tan","ln","√","xʸ","rem").contains(key)) inverseButtons.put(key,b);
         if (key.equals("xʸ") || key.equals("INVERSE") || key.equals("!")) label=functionLabel(key);
         if (key.equals("1/x")) {
-            // Keep the smaller x on the normal baseline, rather than below the slash.
             SpannableString fraction = new SpannableString("1/x");
-            fraction.setSpan(new SuperscriptSpan(),0,1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            fraction.setSpan(new RelativeSizeSpan(.7f),0,1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            fraction.setSpan(new RelativeSizeSpan(.7f),2,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            fraction.setSpan(new ReciprocalSpan(),0,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.setText(fraction);
         } else b.setText(key.matches("[0-9.]") ? numbers.entry(label) : label);
         if(key.matches("[0-9.]")) { b.setFontFeatureSettings("tnum"); numberButtons.put(key,b); }

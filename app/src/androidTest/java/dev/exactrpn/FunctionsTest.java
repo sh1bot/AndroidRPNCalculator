@@ -34,7 +34,7 @@ public final class FunctionsTest {
             Files.write(seed.toPath(),calculator.save());
             Bundle improper=worker.submit(() -> remote.evaluate(request("RESTORE",seed.getAbsolutePath(),1))).get(15,TimeUnit.SECONDS);
             assertEquals("7/3",improper.getStringArrayList("rows").get(0));
-            Bundle mixed=worker.submit(() -> remote.evaluate(request("FRACTION",improper.getString("checkpoint"),1))).get(15,TimeUnit.SECONDS);
+            Bundle mixed=worker.submit(() -> remote.evaluate(request("FRACTION",improper.getString("checkpoint"),0))).get(15,TimeUnit.SECONDS);
             assertEquals(2,mixed.getInt("fractionMode"));
             assertEquals("2 1/3",mixed.getStringArrayList("rows").get(0));
             assertEquals("2 1/3",mixed.getStringArrayList("clipboard").get(0));
@@ -63,9 +63,17 @@ public final class FunctionsTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             CalculatorKeypad keypad=new CalculatorKeypad(context,command::set,true,expanded -> {});
             keypad.setInverse(true);
-            for(String[] example:new String[][]{{"asin","asin"},{"acos","acos"},{"atan","atan"},{"eˣ","eˣ"},{"x²","x²"},{"ˣ√y","root"},{"mod","mod"},{"Roll ↑","ROLL_UP"},{"Roll ↓","ROLL_DOWN"}}) {
+            for(String[] example:new String[][]{{"asin","asin"},{"acos","acos"},{"atan","atan"},{"eˣ","eˣ"},{"x²","x²"},{"ˣ√y","root"},{"mod","mod"}}) {
                 Button button=find(keypad,example[0]); assertNotNull(example[0],button); button.performClick(); assertEquals(example[1],command.get());
             }
+            Button drop=find(keypad,"Drop");
+            drop.performLongClick(); assertEquals("ROLL_DOWN",command.get());
+            drop.performClick(); assertEquals("BACK",command.get());
+            Button swap=find(keypad,"Swap");
+            swap.performLongClick(); assertEquals("ROLL_UP",command.get());
+            swap.performClick(); assertEquals("SWAP",command.get());
+            keypad.setEditing(true);
+            find(keypad,"⌫").performLongClick(); assertEquals("ROLL_DOWN",command.get());
             keypad.setInverse(false); Button sine=find(keypad,"sin"); assertNotNull(sine); sine.performClick(); assertEquals("sin",command.get());
         });
     }

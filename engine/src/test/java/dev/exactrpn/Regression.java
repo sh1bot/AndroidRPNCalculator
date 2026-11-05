@@ -9,6 +9,9 @@ public final class Regression {
     static UnifiedReal top(RpnCalculator c) { return c.values().get(c.values().size()-1); }
     static void number(RpnCalculator c, String n) { for(char ch:n.toCharArray()) c.key(String.valueOf(ch)); }
     public static void main(String[] args) throws Exception {
+        check(FractionMode.next(FractionMode.DECIMAL) == FractionMode.MIXED, "decimal cycles to mixed");
+        check(FractionMode.next(FractionMode.MIXED) == FractionMode.IMPROPER, "mixed cycles to improper");
+        check(FractionMode.next(FractionMode.IMPROPER) == FractionMode.DECIMAL, "improper cycles to decimal");
         RpnCalculator c = new RpnCalculator();
         number(c,"0.1"); c.key("ENTER"); number(c,"0.2"); c.key("+");
         check(top(c).definitelyEquals(RpnCalculator.parse("0.3")), "exact decimal addition");
