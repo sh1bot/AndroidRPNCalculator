@@ -237,7 +237,7 @@ public final class MainActivity extends Activity {
         if (key.equals("CANCEL") || (key.equals("UNDO") && session.busy
             && SystemClock.elapsedRealtime()-session.busySince >= 250)) { cancelCalculation(); return; }
         if(!key.equals("FORMAT") && !key.equals("NUMBER_FORMAT") && !key.equals("FRACTION")
-            && !key.equals("ANGLE") && !key.equals("CHECKPOINT") && !key.startsWith("SELECT:") && !key.startsWith("DROP_ROWS:")) clearStackSelection(false);
+            && !key.equals("ANGLE") && !key.equals("CHECKPOINT") && !key.startsWith("SELECT:") && !key.startsWith("DROP_ROWS:") && !key.startsWith("PICK_ROWS:")) clearStackSelection(false);
         boolean start;
         synchronized (session) {
             session.pending.addLast(key);
@@ -394,15 +394,15 @@ public final class MainActivity extends Activity {
     private void showStackMenu(View anchor,int index,Display snapshot) {
         if(!stackActionAllowed(snapshot)) return;
         PopupMenu menu=new PopupMenu(this,anchor);
-        menu.getMenu().add(0,1,0,"Drop"); menu.getMenu().add(0,2,1,"Copy");
+        menu.getMenu().add(0,1,0,"Drop"); menu.getMenu().add(0,2,1,"Copy"); menu.getMenu().add(0,3,2,"Pick");
         menu.setOnMenuItemClickListener(item -> {
             if(!stackActionAllowed(snapshot)) return true;
             SortedSet<Integer> rows=new TreeSet<>();
             if(session.selectedRows.contains(index)) rows.addAll(session.selectedRows);
             else rows.add(index);
-            if(item.getItemId()==1) {
+            if(item.getItemId()==1 || item.getItemId()==3) {
                 List<String> indices=new ArrayList<>(); for(int row:rows) indices.add(Integer.toString(row));
-                execute("DROP_ROWS:"+String.join(",",indices));
+                execute((item.getItemId()==1 ? "DROP_ROWS:" : "PICK_ROWS:")+String.join(",",indices));
             } else {
                 List<String> copies=new ArrayList<>(); for(int row:rows) copies.add(session.display.clipboard.get(row));
                 copyValue(String.join("\n",copies));

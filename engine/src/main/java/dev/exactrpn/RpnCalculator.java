@@ -261,6 +261,18 @@ public final class RpnCalculator {
         for(int index:rows.descendingSet()) stack.remove(index);
         remember(before);
     }
+    /** Copy rows onto the stack in display order, preserving their exact values and entry. */
+    public void pickRows(int... indices) {
+        TreeSet<Integer> rows=new TreeSet<>();
+        for(int index:indices) {
+            if(index<0 || index>=stack.size()) throw new IllegalArgumentException("Stack row no longer exists");
+            rows.add(index);
+        }
+        if(rows.isEmpty()) return;
+        State before=new State(this);
+        List<UnifiedReal> picked=new ArrayList<>(); for(int index:rows) picked.add(stack.get(index));
+        stack.addAll(picked); remember(before);
+    }
     public boolean isEmpty() { return stack.isEmpty() && entry.isEmpty(); }
     public int undoCount() { return undo.size(); }
     public int redoCount() { return redo.size(); }
