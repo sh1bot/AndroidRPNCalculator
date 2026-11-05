@@ -63,7 +63,7 @@ public final class FunctionsTest {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             CalculatorKeypad keypad=new CalculatorKeypad(context,command::set,true,expanded -> {});
             keypad.setInverse(true);
-            for(String[] example:new String[][]{{"asin","asin"},{"acos","acos"},{"atan","atan"},{"eˣ","eˣ"},{"x²","x²"},{"ˣ√y","root"},{"mod","mod"}}) {
+            for(String[] example:new String[][]{{"asin","asin"},{"acos","acos"},{"atan","atan"},{"eˣ","eˣ"},{"x²","x²"},{"ˣ√y","root"},{"mod","mod"},{"Roll ↑","ROLL_UP"},{"Roll ↓","ROLL_DOWN"}}) {
                 Button button=find(keypad,example[0]); assertNotNull(example[0],button); button.performClick(); assertEquals(example[1],command.get());
             }
             keypad.setInverse(false); Button sine=find(keypad,"sin"); assertNotNull(sine); sine.performClick(); assertEquals("sin",command.get());

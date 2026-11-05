@@ -196,6 +196,8 @@ public final class RpnCalculator {
                         break;
                     case "DUP": need(1); stack.add(top()); break;
                     case "SWAP": need(2); Collections.swap(stack,stack.size()-1,stack.size()-2); break;
+                    case "ROLL_UP": if(stack.size()>1) Collections.rotate(stack,-1); break;
+                    case "ROLL_DOWN": if(stack.size()>1) Collections.rotate(stack,1); break;
                     case "+": case "−": case "×": case "÷": case "xʸ": case "root": case "rem": case "mod":
                         need(2);
                         UnifiedReal x=top(),y=stack.get(stack.size()-2),result;

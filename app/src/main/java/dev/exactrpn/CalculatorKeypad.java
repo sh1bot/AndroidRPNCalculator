@@ -45,7 +45,7 @@ public final class CalculatorKeypad extends LinearLayout {
         expand.setOnClickListener(v -> { this.expanded = !this.expanded; updateExpansion(); saveExpanded.accept(this.expanded); });
         controls.addView(expand,new LinearLayout.LayoutParams(0,dp(44),3));
         addView(controls,new LinearLayout.LayoutParams(-1,dp(48)));
-        addRows(new String[][] {{"INVERSE","sin","cos","tan","1/x"},{"ln","√","xʸ","π","e"},{"rem","!","Factor"}}, scientificRows);
+        addRows(new String[][] {{"INVERSE","sin","cos","tan","1/x"},{"ln","√","xʸ","π","e"},{"rem","!","Factor","ROLL_UP","ROLL_DOWN"}}, scientificRows);
         addRows(new String[][] {{"UNDO","SWAP","±","÷"}}, primaryRows);
         addRows(new String[][] {{"7","8","9","×"},{"4","5","6","−"},{"1","2","3","+"},{".","0","BACK","ENTER"}}, primaryRows);
         setEditing(false);
@@ -60,7 +60,7 @@ public final class CalculatorKeypad extends LinearLayout {
         }
     }
     private String functionLabel(String key) {
-        switch(key) { case "INVERSE": return "INV"; case "xʸ": return "yˣ"; case "root": return "ˣ√y"; case "!": return "x!"; default: return key; }
+        switch(key) { case "INVERSE": return "INV"; case "xʸ": return "yˣ"; case "root": return "ˣ√y"; case "!": return "x!"; case "ROLL_UP": return "Roll ↑"; case "ROLL_DOWN": return "Roll ↓"; default: return key; }
     }
     public void setInverse(boolean active) {
         inverse=active;
@@ -97,7 +97,7 @@ public final class CalculatorKeypad extends LinearLayout {
         Button b = new Button(getContext());
         if(key.equals("CLEAR")) clearButton=b; b.setAllCaps(false); b.setTag(key);
         if(Arrays.asList("INVERSE","sin","cos","tan","ln","√","xʸ","rem").contains(key)) inverseButtons.put(key,b);
-        if (key.equals("xʸ") || key.equals("INVERSE") || key.equals("!")) label=functionLabel(key);
+        if (key.equals("xʸ") || key.equals("INVERSE") || key.equals("!") || key.equals("ROLL_UP") || key.equals("ROLL_DOWN")) label=functionLabel(key);
         if (key.equals("1/x")) {
             // Keep the smaller x on the normal baseline, rather than below the slash.
             SpannableString fraction = new SpannableString("1/x");
@@ -119,6 +119,8 @@ public final class CalculatorKeypad extends LinearLayout {
         b.setBackground(new RippleDrawable(ColorStateList.valueOf(colors.ripple),shape,null));
         String description;
         switch (key) {
+            case "ROLL_UP": description="Roll stack up; top displayed value becomes X"; break;
+            case "ROLL_DOWN": description="Roll stack down; X moves to the top displayed row"; break;
             case "INVERSE": description="Inverse functions off"; break;
             case "!": description="Factorial of X"; break;
             case "Factor": description="Replace X with prime factors, smallest first"; break;
