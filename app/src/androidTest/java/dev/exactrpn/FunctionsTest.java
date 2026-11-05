@@ -169,7 +169,9 @@ public final class FunctionsTest {
                                         {"eˣ", "eˣ"},
                                         {"x²", "x²"},
                                         {"ˣ√y", "root"},
-                                        {"mod", "mod"}
+                                        {"rem", "rem"},
+                                        {"10ˣ", "10ˣ"},
+                                        {"⌊x⌋", "floor"}
                                     }) {
                                 Button button = find(keypad, example[0]);
                                 assertNotNull(example[0], button);
