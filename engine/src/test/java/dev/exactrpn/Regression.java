@@ -531,6 +531,23 @@ public final class Regression {
         int noPickHistory=pickedRows.undoCount(); pickedRows.pickRows(); check(pickedRows.undoCount()==noPickHistory,"empty pick does not add history");
         RpnCalculator exactPick=new RpnCalculator(); keys(exactPick,"π","1","ENTER","3","÷"); exactPick.pickRows(0,1);
         check(exactPick.values().size()==4 && exactPick.values().get(2).definitelyEquals(UnifiedReal.PI) && top(exactPick).multiply(new UnifiedReal(3)).definitelyOne(),"pick preserves irrational and recurring values exactly");
+        RpnCalculator rolled=new RpnCalculator(); keys(rolled,"1","ENTER","2","ENTER","3","ENTER"); int rollHistory=rolled.undoCount(); rolled.key("ROLL_UP");
+        check(rolled.values().get(0).definitelyEquals(UnifiedReal.TWO) && rolled.values().get(1).definitelyEquals(new UnifiedReal(3)) && top(rolled).definitelyOne(),"roll up moves displayed values upward, wrapping top to X");
+        check(rolled.undoCount()==rollHistory+1,"roll is one undoable action");
+        RpnCalculator rollRestored=RpnCalculator.load(rolled.save()); rollRestored.key("UNDO");
+        check(rollRestored.values().get(0).definitelyOne() && top(rollRestored).definitelyEquals(new UnifiedReal(3)),"undo roll after restore");
+        rollRestored.key("REDO"); check(top(rollRestored).definitelyOne(),"redo roll after restore");
+        rolled.key("ROLL_DOWN"); check(rolled.values().get(0).definitelyOne() && top(rolled).definitelyEquals(new UnifiedReal(3)),"roll down reverses roll up");
+        keys(rolled,"ROLL_UP","ROLL_UP","ROLL_UP"); check(rolled.values().get(0).definitelyOne() && top(rolled).definitelyEquals(new UnifiedReal(3)),"full roll cycle restores original order");
+        RpnCalculator emptyRoll=new RpnCalculator(); keys(emptyRoll,"ROLL_UP","ROLL_DOWN"); check(emptyRoll.isEmpty() && emptyRoll.undoCount()==0,"empty roll is a no-op");
+        keys(emptyRoll,"7","ENTER"); int singleRollHistory=emptyRoll.undoCount(); keys(emptyRoll,"ROLL_UP","ROLL_DOWN");
+        check(top(emptyRoll).definitelyEquals(new UnifiedReal(7)) && emptyRoll.undoCount()==singleRollHistory,"single-item roll is a no-op");
+        RpnCalculator editRoll=new RpnCalculator(); keys(editRoll,"1","ENTER","2","ROLL_UP");
+        check(!editRoll.isEditing() && editRoll.values().size()==2 && top(editRoll).definitelyOne(),"roll commits entry before cycling");
+        editRoll.key("UNDO"); check(editRoll.isEditing() && editRoll.entry().equals("2") && editRoll.values().size()==1,"undo roll restores entry");
+        editRoll.pasteText("1,234",new NumberText.Profile('.',',',3,3));
+        try { editRoll.key("ROLL_DOWN"); throw new AssertionError("ambiguous entry was rolled"); } catch(IllegalArgumentException expected) {}
+        check(editRoll.rawEntry() && editRoll.entry().equals("1,234") && editRoll.values().size()==1,"roll refuses ambiguous entry without changing the stack");
         byte[] valid=durable.save();
         try { RpnCalculator.load(java.util.Arrays.copyOf(valid,valid.length-1)); throw new AssertionError("truncated state accepted"); }
         catch(java.io.IOException expected) { check(true,"reject truncated state"); }
