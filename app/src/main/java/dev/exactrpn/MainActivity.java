@@ -526,9 +526,9 @@ public final class MainActivity extends Activity {
             notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
             fractionButton.setText(new String[]{"DEC","IMPR","FRAC"}[display.fractionMode]);
             fractionButton.setContentDescription(new String[]{
-                "Decimal display. Tap for improper fractions.",
-                "Improper fraction display. Tap for mixed fractions.",
-                "Mixed fraction display. Tap for decimals."
+                "Decimal display. Tap for mixed fractions.",
+                "Improper fraction display. Tap for decimals.",
+                "Mixed fraction display. Tap for improper fractions."
             }[display.fractionMode]);
             numberFormatButton.setText(new String[]{"LOC","DOT","NONE"}[display.numberMode]);
             numberFormatButton.setContentDescription(new String[]{

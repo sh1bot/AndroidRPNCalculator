@@ -23,8 +23,8 @@ or Back/Escape returns to stack mode. **Undo** reverses the last change; long-pr
 Undo to redo. During a long calculation, Undo becomes
 **Cancel**. **Functions**
 expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
-**SCI/ENG** for display notation. **DEC/IMPR/FRAC** cycles between decimals,
-improper fractions (`7/3`) and mixed fractions (`2 1/3`). Fraction digits are smaller, raised and lowered
+**SCI/ENG** for display notation. **DEC/FRAC/IMPR** cycles between decimals,
+mixed fractions (`2 1/3`) and improper fractions (`7/3`). Fraction digits are smaller, raised and lowered
 around the slash; the whole-number part stays full size. Irrational results remain decimal.
 
 **INV** switches sin/cos/tan to asin/acos/atan, ln to eˣ, square root to square,
@@ -47,7 +47,7 @@ and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 
 **LOC/DOT/NONE** cycles between phone-locale numbers, decimal dot with thin-space
 display grouping, and the locale decimal with no grouping. Copied numbers follow this choice but never
-include grouping. Copy follows **DEC/IMPR/FRAC**, using plain text such as `7/3` or `2 1/3`;
+include grouping. Copy follows **DEC/FRAC/IMPR**, using plain text such as `7/3` or `2 1/3`;
 DEC preserves exact terminating decimals and copies recurring/irrational values
 to 40 significant digits. Tap a stack value
 to copy it. Long-press a stack label to select it, then use the checkboxes to select
