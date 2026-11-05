@@ -2,6 +2,7 @@
 package dev.exactrpn;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Set;
 
 /** Parsed at the application boundary; punctuation inside entry text remains literal. */
@@ -24,7 +25,8 @@ public final class Command {
             INVERSE = "INVERSE",
             PASTE = "PASTE";
     private static final Set<String> PRESENTATION =
-            Set.of("FORMAT", "NUMBER_FORMAT", "FRACTION", "ANGLE", CHECKPOINT);
+            new HashSet<>(
+                    Arrays.asList("FORMAT", "NUMBER_FORMAT", "FRACTION", "ANGLE", CHECKPOINT));
     public final Kind kind;
     public final String wire;
     public final String text;
