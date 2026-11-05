@@ -29,26 +29,73 @@ final class ExactFunctions {
         String[] parts=value.boundedRationalValue().toNiceString().split("/");
         return new BigInteger[]{new BigInteger(parts[0]),parts.length==1 ? BigInteger.ONE : new BigInteger(parts[1])};
     }
-    static List<BigInteger> factors(BigInteger n) {
+    static UnifiedReal root(UnifiedReal base,UnifiedReal index) {
+        BigInteger degree=index.bigIntegerValue();
+        if(degree==null) return base.pow(index.inverse());
+        if(degree.signum()==0) throw new ArithmeticException("Root degree cannot be zero");
+        boolean inverse=degree.signum()<0; degree=degree.abs();
+        if(degree.equals(BigInteger.ONE)) return inverse ? base.inverse() : base;
+        if(base.boundedRationalValue()!=null) {
+            BigInteger[] ratio=parts(base); boolean negative=ratio[0].signum()<0;
+            if(negative && !degree.testBit(0)) throw new ArithmeticException("Even root of a negative number");
+            BigInteger numerator=exactRoot(ratio[0].abs(),degree), denominator=exactRoot(ratio[1],degree);
+            if(numerator!=null && denominator!=null) {
+                if(negative) numerator=numerator.negate();
+                UnifiedReal result=new UnifiedReal(new BoundedRational(numerator,denominator));
+                return inverse ? result.inverse() : result;
+            }
+        }
+        boolean negative=base.signum()<0;
+        if(negative && !degree.testBit(0)) throw new ArithmeticException("Even root of a negative number");
+        UnifiedReal result=(negative ? base.negate() : base).pow(new UnifiedReal(degree).inverse());
+        if(negative) result=result.negate();
+        return inverse ? result.inverse() : result;
+    }
+    private static BigInteger exactRoot(BigInteger n,BigInteger degree) {
+        if(n.compareTo(BigInteger.ONE)<=0 || degree.equals(BigInteger.ONE)) return n;
+        if(degree.compareTo(BigInteger.valueOf(n.bitLength()))>0) return null;
+        int k=degree.intValue(); BigInteger divisor=BigInteger.valueOf(k), previous=BigInteger.valueOf(k-1);
+        BigInteger x=BigInteger.ONE.shiftLeft((n.bitLength()+k-1)/k);
+        while(true) {
+            check(); BigInteger next=x.multiply(previous).add(n.divide(x.pow(k-1))).divide(divisor);
+            if(next.compareTo(x)>=0) return x.pow(k).equals(n) ? x : null;
+            x=next;
+        }
+    }
+    static List<BigInteger> factors(BigInteger n) { return factors(n,new HashMap<>()); }
+    private static List<BigInteger> factors(BigInteger n,Map<BigInteger,Boolean> proofs) {
         if(n.compareTo(TWO)<0) throw new IllegalArgumentException("Factorisation requires an integer greater than 1");
         List<BigInteger> factors=new ArrayList<>();
-        for(BigInteger p:new BigInteger[]{TWO,THREE}) {
+        for(int small:new int[]{2,3,5,7,11,13,17,19,23,29,31,37}) {
+            BigInteger p=BigInteger.valueOf(small);
             while(n.mod(p).signum()==0) { check(); factors.add(p); n=n.divide(p); }
-        }
-        // Above 64 bits, exact trial division avoids treating a probable prime as proven prime.
-        BigInteger divisor=BigInteger.valueOf(5); int step=2;
-        while(n.bitLength()>64 && divisor.multiply(divisor).compareTo(n)<=0) {
-            check();
-            while(n.mod(divisor).signum()==0) { check(); factors.add(divisor); n=n.divide(divisor); }
-            divisor=divisor.add(BigInteger.valueOf(step)); step=6-step;
         }
         Deque<BigInteger> pending=new ArrayDeque<>(); if(!n.equals(BigInteger.ONE)) pending.push(n);
         while(!pending.isEmpty()) {
             check(); n=pending.pop();
-            if(n.bitLength()>64 || prime64(n)) { factors.add(n); continue; }
+            if(provenPrime(n,proofs)) { factors.add(n); continue; }
             BigInteger p=rho(n); pending.push(p); pending.push(n.divide(p));
         }
         Collections.sort(factors); return factors;
+    }
+    private static boolean provenPrime(BigInteger n,Map<BigInteger,Boolean> proofs) {
+        if(n.bitLength()<=64) return prime64(n);
+        Boolean cached=proofs.get(n); if(cached!=null) return cached;
+        // A failed probable-prime test proves compositeness. Passing is only a filter:
+        // certify candidates by Pocklington using the fully proven factorisation of n-1.
+        if(!n.isProbablePrime(80)) { proofs.put(n,false); return false; }
+        BigInteger minusOne=n.subtract(BigInteger.ONE);
+        Set<BigInteger> primeDivisors=new HashSet<>(factors(minusOne,proofs));
+        for(BigInteger q:primeDivisors) {
+            for(BigInteger a=TWO;;a=a.add(BigInteger.ONE)) {
+                check();
+                if(!a.modPow(minusOne,n).equals(BigInteger.ONE)) { proofs.put(n,false); return false; }
+                BigInteger gcd=a.modPow(minusOne.divide(q),n).subtract(BigInteger.ONE).gcd(n);
+                if(gcd.equals(BigInteger.ONE)) break;
+                if(!gcd.equals(n)) { proofs.put(n,false); return false; }
+            }
+        }
+        proofs.put(n,true); return true;
     }
     private static boolean prime64(BigInteger n) {
         if(n.equals(TWO) || n.equals(THREE)) return true;

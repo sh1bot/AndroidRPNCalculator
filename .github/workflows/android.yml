@@ -21,16 +21,16 @@ jobs:
       permanent_signing: ${{ steps.trusted_build.outputs.permanent_signing }}
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
           packages: 'platform-tools'
           log-accepted-android-sdk-licenses: false
@@ -39,7 +39,7 @@ jobs:
         run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.11.1'
 
@@ -50,6 +50,7 @@ jobs:
           $parseErrors = $null
           [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/install-latest.ps1", [ref]$tokens, [ref]$parseErrors) | Out-Null
           if ($parseErrors) { $parseErrors | ForEach-Object { Write-Error $_ }; exit 1 }
+          ./scripts/test-install-latest.ps1
 
       - name: Check upstream source integrity
         run: sha256sum -c licenses/SHA256SUMS
@@ -65,6 +66,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p dist
           if [[ -n "$ANDROID_KEYSTORE_BASE64" ]]; then
             : "${ANDROID_KEYSTORE_PASSWORD:?Missing keystore password}"
             : "${ANDROID_KEY_ALIAS:?Missing key alias}"
@@ -75,29 +77,44 @@ jobs:
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
             echo "Signing with the permanent key configured in repository secrets."
             echo "permanent_signing=true" >> "$GITHUB_OUTPUT"
+            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease
+            cp app/build/outputs/apk/release/app-release.apk dist/ExactRPN.apk
           else
             if [[ -n "$ANDROID_KEYSTORE_PASSWORD$ANDROID_KEY_ALIAS$ANDROID_KEY_PASSWORD" ]]; then
               echo "::error::Signing secrets are incomplete: ANDROID_KEYSTORE_BASE64 is missing."
               exit 1
             fi
+            gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
+            cp app/build/outputs/apk/debug/app-debug.apk dist/ExactRPN.apk
             echo "::warning::No permanent signing key configured. This build uses a temporary debug key; in-place updates across builds will fail."
           fi
-          gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
 
       - name: Build other branches and pull requests without signing secrets
         if: github.ref != 'refs/heads/main' || github.event_name == 'pull_request'
-        run: gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
+        run: |
+          gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
+          mkdir -p dist
+          cp app/build/outputs/apk/debug/app-debug.apk dist/ExactRPN.apk
 
       - name: Verify APK signature and record checksum
+        env:
+          PERMANENT_SIGNING: ${{ steps.trusted_build.outputs.permanent_signing }}
         run: |
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/debug/app-debug.apk
-          sha256sum app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose --print-certs dist/ExactRPN.apk
+          sha256sum dist/ExactRPN.apk
+          if [[ "$PERMANENT_SIGNING" == "true" ]]; then
+            badging=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging dist/ExactRPN.apk)
+            if [[ "$badging" == *application-debuggable* ]]; then
+              echo "::error::Published APK must not be debuggable."
+              exit 1
+            fi
+          fi
 
-      - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+      - name: Upload APK
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ExactRPN-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: ExactRPN
+          path: dist/ExactRPN.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -112,9 +129,9 @@ jobs:
       contents: write
     steps:
       - name: Download verified APK
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: ExactRPN-debug
+          name: ExactRPN
           path: dist
 
       - name: Update rolling development release
@@ -127,7 +144,6 @@ jobs:
         run: |
           set -euo pipefail
           tag="v0.1-dev.$BUILD_NUMBER"
-          mv dist/app-debug.apk dist/ExactRPN.apk
           (cd dist && sha256sum ExactRPN.apk > SHA256SUMS.txt)
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Latest development build from main.

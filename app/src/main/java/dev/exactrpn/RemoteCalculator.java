@@ -4,11 +4,13 @@ package dev.exactrpn;
 import android.content.*;
 import android.os.*;
 import java.io.*;
-import java.nio.file.Files;
 import java.util.concurrent.*;
 
 /** One request at a time. Cancelling destroys the remote process, never the UI process. */
 final class RemoteCalculator {
+    static final class InvalidCheckpoint extends IllegalStateException {
+        InvalidCheckpoint(String message) { super(message); }
+    }
     private final Context context;
     private final Handler main=new Handler(Looper.getMainLooper());
     private Messenger remote;
@@ -39,13 +41,11 @@ final class RemoteCalculator {
         }
         try {
             Bundle response=future.get();
+            if(response.getBoolean("invalidCheckpoint")) throw new InvalidCheckpoint(response.getString("error"));
             if(response.containsKey("error")) throw new IllegalStateException(response.getString("error"));
             File file=new File(response.getString("presentation"));
-            Parcel parcel=Parcel.obtain();
-            try {
-                byte[] bytes=Files.readAllBytes(file.toPath()); parcel.unmarshall(bytes,0,bytes.length); parcel.setDataPosition(0);
-                return parcel.readBundle(RemoteCalculator.class.getClassLoader());
-            } finally { parcel.recycle(); file.delete(); }
+            try { return DisplayResult.read(file); }
+            finally { file.delete(); }
         } catch(InterruptedException ex) { Thread.currentThread().interrupt(); throw new com.hp.creals.CR.AbortedException(); }
         catch(ExecutionException ex) { throw new IllegalStateException("Calculation process stopped; previous state preserved",ex); }
         catch(IOException ex) { throw new IllegalStateException("Could not read calculation result",ex); }

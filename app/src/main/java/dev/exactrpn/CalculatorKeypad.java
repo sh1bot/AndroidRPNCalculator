@@ -27,7 +27,7 @@ public final class CalculatorKeypad extends LinearLayout {
     private LocaleNumbers numbers;
     private final Map<String,Button> numberButtons=new HashMap<>();
     private final LinearLayout controls;
-    private Button deleteButton, undoButton;
+    private Button deleteButton, undoButton, clearButton;
     private boolean calculating;
     private boolean expanded, inverse;
     private final Map<String,Button> inverseButtons=new HashMap<>();
@@ -81,6 +81,8 @@ public final class CalculatorKeypad extends LinearLayout {
         for(Map.Entry<String,Button> item:numberButtons.entrySet()) item.getValue().setText(numbers.entry(item.getKey()));
     }
     public void setEditing(boolean editing) {
+        clearButton.setText(editing ? "CE" : "Clear");
+        clearButton.setContentDescription(editing ? "Clear entry" : "Clear stack");
         deleteButton.setText(editing ? "⌫" : "Drop");
         deleteButton.setContentDescription(editing ? "Backspace" : "Drop X");
     }
@@ -92,15 +94,15 @@ public final class CalculatorKeypad extends LinearLayout {
     }
     private int dp(int n) { return Math.round(n * getResources().getDisplayMetrics().density); }
     private Button button(String key, String label) {
-        Button b = new Button(getContext()); b.setAllCaps(false); b.setTag(key);
+        Button b = new Button(getContext());
+        if(key.equals("CLEAR")) clearButton=b; b.setAllCaps(false); b.setTag(key);
         if(Arrays.asList("INVERSE","sin","cos","tan","ln","√","xʸ","rem").contains(key)) inverseButtons.put(key,b);
         if (key.equals("xʸ") || key.equals("INVERSE") || key.equals("!")) label=functionLabel(key);
         if (key.equals("1/x")) {
-            // A diagonal (solidus) fraction, with raised numerator and lowered denominator.
-            SpannableString fraction = new SpannableString("1⁄x");
+            // Keep the smaller x on the normal baseline, rather than below the slash.
+            SpannableString fraction = new SpannableString("1/x");
             fraction.setSpan(new SuperscriptSpan(),0,1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             fraction.setSpan(new RelativeSizeSpan(.7f),0,1,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            fraction.setSpan(new SubscriptSpan(),2,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             fraction.setSpan(new RelativeSizeSpan(.7f),2,3,Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.setText(fraction);
         } else b.setText(key.matches("[0-9.]") ? numbers.entry(label) : label);
@@ -135,7 +137,7 @@ public final class CalculatorKeypad extends LinearLayout {
             default: description=key;
         }
         b.setContentDescription(description);
-        b.setOnClickListener(v -> command.accept(key.equals("UNDO") && calculating ? "CANCEL" : effectiveKey(key)));
+        b.setOnClickListener(v -> command.accept(key.equals("UNDO") && calculating ? "CANCEL" : key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
         if (key.equals("UNDO")) b.setOnLongClickListener(v -> { command.accept(calculating ? "CANCEL" : "REDO"); return true; });
         if (key.equals("ENTER")) b.setOnLongClickListener(v -> { command.accept("PASTE"); return true; });
         return b;

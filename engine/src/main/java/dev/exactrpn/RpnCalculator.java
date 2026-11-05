@@ -10,6 +10,7 @@ import java.io.*;
 
 /** Exact stack values plus a cursor-editable, transactional number entry. */
 public final class RpnCalculator {
+    public static final int MAX_ENTRY_LENGTH=4096;
     private List<UnifiedReal> stack=new ArrayList<>();
     private String entry="";
     private boolean editing, raw;
@@ -38,7 +39,13 @@ public final class RpnCalculator {
         stack=new ArrayList<>(s.stack); entry=s.entry; editing=s.editing; raw=s.raw;
         selectionStart=s.start; selectionEnd=s.end; rawProfile=s.profile;
     }
-    private void remember(State s) { redo.clear(); undo.push(s); if(undo.size()>100) undo.removeLast(); pruneSavedValues(); }
+    private void remember(State s) {
+        if(sameStack(s.stack,stack) && s.entry.equals(entry) && s.editing==editing && s.raw==raw
+            && s.start==selectionStart && s.end==selectionEnd && (!raw || sameProfile(s.profile,rawProfile))) return;
+        redo.clear(); undo.push(s); if(undo.size()>100) undo.removeLast(); pruneSavedValues(); }
+    private static boolean sameProfile(NumberText.Profile a,NumberText.Profile b) {
+        return a.decimal==b.decimal && a.grouping==b.grouping && a.primary==b.primary && a.secondary==b.secondary;
+    }
     public RpnCalculator copy() {
         RpnCalculator c=new RpnCalculator(); c.restore(new State(this));
         c.angleUnit=angleUnit; c.inputProfile=inputProfile; c.undo.addAll(undo); c.redo.addAll(redo); c.savedValues.putAll(savedValues); return c;
@@ -91,7 +98,7 @@ public final class RpnCalculator {
         resolveRaw(); remember(before);
     }
     private void checkLength(String text) {
-        if(text==null || text.length()>4096) throw new IllegalArgumentException("Entry too long");
+        if(text==null || text.length()>MAX_ENTRY_LENGTH) throw new IllegalArgumentException("Entry too long");
     }
     private void resolveRaw() {
         if(entry.isEmpty()) { raw=false; return; }
@@ -125,6 +132,7 @@ public final class RpnCalculator {
         select(extend ? selectionStart : target,target);
     }
     public void key(String key) {
+        if(key.equals("SMART_CLEAR")) key=editing ? "CE" : "CLEAR";
         String direction=key.startsWith("SELECT_") ? key.substring(7) : key;
         if(direction.equals("LEFT") || direction.equals("RIGHT") || direction.equals("HOME") || direction.equals("END")) {
             moveCursor(direction,key.startsWith("SELECT_")); return;
@@ -167,9 +175,9 @@ public final class RpnCalculator {
                 boolean negative=entry.startsWith("-") || entry.startsWith("−");
                 entry=negative ? entry.substring(1) : "-"+entry;
                 select(selectionStart+(negative?-1:1),selectionEnd+(negative?-1:1)); resolveRaw();
-            } else if(key.equals("CE") || key.equals("CLEAR")) {
+            } else if(key.equals("CE") || key.equals("CLEAR") || key.equals("CANCEL_ENTRY")) {
                 if(key.equals("CLEAR")) stack.clear();
-                entry=""; editing=false; raw=false; select(0,0);
+                entry=""; if(!key.equals("CE")) editing=false; raw=false; select(0,0);
             } else if(key.equals("ENTER")) {
                 if(editing) commit(); else { need(1); stack.add(top()); }
             } else {
@@ -197,7 +205,7 @@ public final class RpnCalculator {
                             case "×": result=y.multiply(x); break;
                             case "÷": result=y.divide(x); break;
                             case "rem": case "mod": result=ExactFunctions.remainder(y,x,key.equals("mod")); break;
-                            case "root": result=y.pow(x.inverse()); break;
+                            case "root": result=ExactFunctions.root(y,x); break;
                             default: result=y.pow(x);
                         }
                         savedValues.put(result,SavedValue.of(result,key,savedValues.get(y),savedValues.get(x)));
@@ -229,7 +237,7 @@ public final class RpnCalculator {
                 }
                 if(!stack.isEmpty()) ValueFormatter.format(top(),true,ValueFormatter.Notation.SCIENTIFIC);
             }
-            if(before.editing && !editing && !key.equals("CE") && !key.equals("CLEAR")) {
+            if(before.editing && !editing && !key.equals("CE") && !key.equals("CLEAR") && !key.equals("CANCEL_ENTRY")) {
                 // Keep the complete entry for undoing the commit, but discard its intermediate edits.
                 while(!undo.isEmpty() && undo.peek().editing && sameStack(undo.peek().stack,before.stack)) undo.pop();
             }

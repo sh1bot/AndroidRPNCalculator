@@ -20,6 +20,10 @@ final class CalculatorStore {
         try { out.write(bytes); file.finishWrite(out); }
         catch(IOException | RuntimeException ex) { file.failWrite(out); throw ex; }
     }
+    void quarantine() throws IOException {
+        if(file.getBaseFile().exists()) Files.move(file.getBaseFile().toPath(),new File(directory,"calculator-state.corrupt").toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        file.delete();
+    }
     void clear() { file.delete(); }
     void cleanWorkFiles(String keep) {
         File[] files=directory.listFiles((dir,name) -> name.startsWith("calculation-"));
