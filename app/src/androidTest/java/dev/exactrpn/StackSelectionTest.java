@@ -55,6 +55,40 @@ public final class StackSelectionTest {
     private void choose(String text) {
         onView(withText(text)).inRoot(isPlatformPopup()).perform(click());
     }
+    @Test public void pickCopiesOnlyTheTargetRowsAndKeepsOriginalSelection() throws Exception {
+        Context context=instrumentation.getTargetContext(); CalculatorStore store=new CalculatorStore(context.getNoBackupFilesDir());
+        File seed=File.createTempFile("pick-test-",".state",context.getNoBackupFilesDir());
+        RpnCalculator calculator=new RpnCalculator(); for(String key:new String[]{"1","ENTER","2","ENTER","3","ENTER"}) calculator.key(key);
+        Files.write(seed.toPath(),calculator.save()); store.save(seed.getAbsolutePath());
+        MainActivity activity=(MainActivity)instrumentation.startActivitySync(new Intent(context,MainActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        MainActivity.Session session=session(activity);
+        try {
+            await(() -> !session.busy && tagged(activity,"stack-label:2")!=null);
+            instrumentation.runOnMainSync(() -> tagged(activity,"stack-label:0").performLongClick());
+            instrumentation.runOnMainSync(() -> tagged(activity,"stack-checkbox:2").performClick());
+            instrumentation.runOnMainSync(() -> tagged(activity,"stack-value:1").performLongClick()); choose("Pick");
+            await(() -> !session.busy && tagged(activity,"stack-value:3")!=null);
+            instrumentation.runOnMainSync(() -> {
+                assertEquals(java.util.Arrays.asList("1","2","3","2"),session.display.rows);
+                assertEquals(new java.util.TreeSet<>(java.util.Arrays.asList(0,2)),session.selectedRows);
+                assertFalse(((CheckBox)tagged(activity,"stack-checkbox:3")).isChecked());
+                tagged(activity,"stack-value:2").performLongClick();
+            }); choose("Pick");
+            await(() -> !session.busy && tagged(activity,"stack-value:5")!=null && button(activity.getWindow().getDecorView(),"Undo")!=null);
+            instrumentation.runOnMainSync(() -> {
+                assertEquals(java.util.Arrays.asList("1","2","3","2","1","3"),session.display.rows);
+                assertEquals(new java.util.TreeSet<>(java.util.Arrays.asList(0,2)),session.selectedRows);
+                assertFalse(((CheckBox)tagged(activity,"stack-checkbox:4")).isChecked());
+                assertFalse(((CheckBox)tagged(activity,"stack-checkbox:5")).isChecked());
+                button(activity.getWindow().getDecorView(),"Undo").performClick();
+            });
+            await(() -> !session.busy && tagged(activity,"stack-value:5")==null && tagged(activity,"stack-value:3")!=null);
+            instrumentation.runOnMainSync(() -> {
+                assertEquals(java.util.Arrays.asList("1","2","3","2"),session.display.rows);
+                assertNull(tagged(activity,"stack-checkbox:0"));
+            });
+        } finally { finish(activity); store.clear(); store.cleanWorkFiles(null); seed.delete(); }
+    }
     @Test public void selectionCopyDropAndUndoOperateOnWholeSelection() throws Exception {
         Context context=instrumentation.getTargetContext(); CalculatorStore store=new CalculatorStore(context.getNoBackupFilesDir());
         File seed=File.createTempFile("selection-test-",".state",context.getNoBackupFilesDir());

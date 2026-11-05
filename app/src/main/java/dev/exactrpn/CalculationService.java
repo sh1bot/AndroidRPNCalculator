@@ -63,10 +63,10 @@ public final class CalculationService extends Service {
             else if(key.equals("FORMAT")) notation=notation==ValueFormatter.Notation.SCIENTIFIC ? ValueFormatter.Notation.ENGINEERING : ValueFormatter.Notation.SCIENTIFIC;
             else if(key.equals("NUMBER_FORMAT")) numberMode=(numberMode+1)%3;
             else if(key.equals("FRACTION")) fractionMode=(fractionMode+1)%3;
-            else if(key.startsWith("DROP_ROWS:")) {
+            else if(key.startsWith("DROP_ROWS:") || key.startsWith("PICK_ROWS:")) {
                 String[] parts=key.substring(10).split(","); int[] rows=new int[parts.length];
                 for(int i=0;i<parts.length;i++) rows[i]=Integer.parseInt(parts[i]);
-                candidate.dropRows(rows);
+                if(key.startsWith("DROP_ROWS:")) candidate.dropRows(rows); else candidate.pickRows(rows);
             }
             else if(key.startsWith("PASTE_RAW:")) candidate.pasteText(key.substring(10),local.profile());
             else if(key.startsWith("SELECT:")) {

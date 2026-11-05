@@ -517,6 +517,20 @@ public final class Regression {
         BigInteger mersenne89=BigInteger.ONE.shiftLeft(89).subtract(BigInteger.ONE);
         check(ExactFunctions.factors(mersenne89).equals(java.util.Arrays.asList(mersenne89)),"large prime has a proof, not only probable-prime acceptance");
         check("SMART_CLEAR".equals(KeyboardInput.command(40,0,true,false,false)),"Ctrl L uses safe contextual clear");
+        RpnCalculator pickedRows=new RpnCalculator(); keys(pickedRows,"1","ENTER","2","ENTER","3","ENTER","4","ENTER");
+        pickedRows.pasteText("1,234",new NumberText.Profile('.',',',3,3)); pickedRows.select(1,2);
+        int pickHistory=pickedRows.undoCount(); pickedRows.pickRows(3,1,3);
+        check(pickedRows.values().size()==6 && pickedRows.values().get(4).definitelyEquals(UnifiedReal.TWO) && top(pickedRows).definitelyEquals(new UnifiedReal(4)),"multi-pick appends in display order with originals retained");
+        check(pickedRows.rawEntry() && pickedRows.entry().equals("1,234") && pickedRows.selectionStart()==1 && pickedRows.selectionEnd()==2,"pick leaves unfinished entry and cursor intact");
+        check(pickedRows.undoCount()==pickHistory+1,"multi-pick is one undo action");
+        RpnCalculator pickedRestored=RpnCalculator.load(pickedRows.save()); pickedRestored.key("UNDO");
+        check(pickedRestored.values().size()==4,"undo pick after restore"); pickedRestored.key("REDO");
+        check(pickedRestored.values().size()==6 && top(pickedRestored).definitelyEquals(new UnifiedReal(4)),"redo restores picked rows");
+        try { pickedRows.pickRows(0,99); throw new AssertionError("invalid pick accepted"); } catch(IllegalArgumentException expected) {}
+        check(pickedRows.values().size()==6,"invalid multi-pick is atomic");
+        int noPickHistory=pickedRows.undoCount(); pickedRows.pickRows(); check(pickedRows.undoCount()==noPickHistory,"empty pick does not add history");
+        RpnCalculator exactPick=new RpnCalculator(); keys(exactPick,"π","1","ENTER","3","÷"); exactPick.pickRows(0,1);
+        check(exactPick.values().size()==4 && exactPick.values().get(2).definitelyEquals(UnifiedReal.PI) && top(exactPick).multiply(new UnifiedReal(3)).definitelyOne(),"pick preserves irrational and recurring values exactly");
         byte[] valid=durable.save();
         try { RpnCalculator.load(java.util.Arrays.copyOf(valid,valid.length-1)); throw new AssertionError("truncated state accepted"); }
         catch(java.io.IOException expected) { check(true,"reject truncated state"); }
