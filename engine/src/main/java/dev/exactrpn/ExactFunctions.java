@@ -29,6 +29,27 @@ final class ExactFunctions {
         return n;
     }
 
+    /** Rational floor is exact; real floor refines an enclosure until one integer is certain. */
+    static UnifiedReal floor(UnifiedReal value) {
+        BigInteger integer = value.bigIntegerValue();
+        if (integer != null) return new UnifiedReal(integer);
+        if (value.boundedRationalValue() != null) {
+            BigInteger[] fraction = parts(value);
+            BigInteger[] qr = fraction[0].divideAndRemainder(fraction[1]);
+            return new UnifiedReal(qr[1].signum() < 0 ? qr[0].subtract(BigInteger.ONE) : qr[0]);
+        }
+        // get_appr(-bits) has error strictly less than one unit. Never round through a double.
+        // Equality to an integer can be undecidable for general constructive reals; Cancel
+        // remains available while refining such a value.
+        for (int bits = 32; ; bits = Math.multiplyExact(bits, 2)) {
+            check();
+            BigInteger approximation = value.crValue().get_appr(-bits);
+            BigInteger lower = approximation.subtract(BigInteger.ONE).shiftRight(bits);
+            BigInteger upper = approximation.add(BigInteger.ONE).shiftRight(bits);
+            if (lower.equals(upper)) return new UnifiedReal(lower);
+        }
+    }
+
     static UnifiedReal remainder(UnifiedReal y, UnifiedReal x, boolean modulo) {
         BigInteger[] a = parts(y), b = parts(x);
         if (b[0].signum() == 0)

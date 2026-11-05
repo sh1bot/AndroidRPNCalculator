@@ -27,10 +27,12 @@ expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
 mixed fractions (`2 1/3`) and improper fractions (`7/3`). Fraction digits are smaller, raised and lowered
 around the slash; the whole-number part stays full size. Irrational results remain decimal.
 
-**INV** switches sin/cos/tan to asin/acos/atan, ln to eˣ, square root to square,
-power to the Xth root of Y, and remainder to modulo. Inverse trig results use the
+**INV** switches sin/cos/tan to asin/acos/atan, ln to eˣ, log₁₀ to 10ˣ, square root to square,
+power to the Xth root of Y, and modulo to remainder. Inverse trig results use the
 selected angle unit. **rem** calculates Y remainder X, with the sign of Y;
-**mod** uses the sign of X. Both accept exact rational operands. **x!** computes
+**mod** uses the sign of X and is the default key; INV reveals rem.
+**⌊x⌋** rounds down toward negative infinity; INV leaves it unchanged.
+**φ** pushes the exact golden ratio `(1 + √5) / 2`. Both accept exact rational operands. **x!** computes
 factorial for nonnegative integers. **Factor** replaces a positive integer greater
 than 1 with its prime factors, pushed smallest first: `84 Factor` gives `2, 2, 3, 7`
 (with 7 at X). Large factorisations may take time; Cancel stops them.

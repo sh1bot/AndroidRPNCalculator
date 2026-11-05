@@ -98,4 +98,9 @@
     <string name="error_invalid_number">Enter one valid number</string>
     <string name="error_undefined_result">Operation is undefined for these values</string>
     <string name="error_internal">Calculation failed</string>
+    <string name="floor_description">Floor of X: greatest integer no larger than X</string>
+    <string name="log10_description">Base ten logarithm of X</string>
+    <string name="ten_power_description">Ten to the power of X</string>
+    <string name="phi_description">Golden ratio</string>
+    <string name="modulo_description">Y modulo X, with the sign of X</string>
 </resources>

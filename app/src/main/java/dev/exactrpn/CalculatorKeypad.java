@@ -65,9 +65,9 @@ public final class CalculatorKeypad extends LinearLayout {
         addView(controls, new LinearLayout.LayoutParams(-1, dp(48)));
         addRows(
                 new String[][] {
-                    {Command.INVERSE, "sin", "cos", "tan", "1/x"},
-                    {"ln", "√", "xʸ", "π", "e"},
-                    {"rem", "!", "Factor"}
+                    {Command.INVERSE, "sin", "cos", "tan", "1/x", "xʸ"},
+                    {"ln", "log10", "√", "floor", "!"},
+                    {"π", "e", "φ", "mod", "Factor"}
                 },
                 scientificRows);
         addRows(new String[][] {{Command.UNDO, "SWAP", "BACK", "÷"}}, primaryRows);
@@ -98,8 +98,10 @@ public final class CalculatorKeypad extends LinearLayout {
                 return "x²";
             case "xʸ":
                 return "root";
-            case "rem":
-                return "mod";
+            case "mod":
+                return "rem";
+            case "log10":
+                return "10ˣ";
             default:
                 return key;
         }
@@ -115,6 +117,25 @@ public final class CalculatorKeypad extends LinearLayout {
                 return "ˣ√y";
             case "!":
                 return "x!";
+            case "log10":
+                return "log₁₀";
+            case "floor":
+                return "⌊x⌋";
+            default:
+                return key;
+        }
+    }
+
+    private String functionDescription(String key) {
+        switch (key) {
+            case "log10":
+                return getContext().getString(R.string.log10_description);
+            case "10ˣ":
+                return getContext().getString(R.string.ten_power_description);
+            case "mod":
+                return getContext().getString(R.string.modulo_description);
+            case "rem":
+                return getContext().getString(R.string.remainder_description);
             default:
                 return key;
         }
@@ -133,7 +154,7 @@ public final class CalculatorKeypad extends LinearLayout {
                                     .getString(active ? R.string.inverse_on : R.string.inverse_off)
                             : effective.equals("root")
                                     ? getContext().getString(R.string.root_description)
-                                    : effective);
+                                    : functionDescription(effective));
             if (key.equals(Command.INVERSE)) {
                 button.setTextColor(active ? colors.accent : colors.text);
                 if (Build.VERSION.SDK_INT >= 30)
@@ -190,10 +211,13 @@ public final class CalculatorKeypad extends LinearLayout {
         if (key.equals("CLEAR")) clearButton = b;
         b.setAllCaps(false);
         b.setTag(key);
-        if (Arrays.asList(Command.INVERSE, "sin", "cos", "tan", "ln", "√", "xʸ", "rem")
+        if (Arrays.asList(Command.INVERSE, "sin", "cos", "tan", "ln", "√", "xʸ", "log10", "mod")
                 .contains(key)) inverseButtons.put(key, b);
-        if (key.equals("xʸ") || key.equals(Command.INVERSE) || key.equals("!"))
-            label = functionLabel(key);
+        if (key.equals("xʸ")
+                || key.equals(Command.INVERSE)
+                || key.equals("!")
+                || key.equals("log10")
+                || key.equals("floor")) label = functionLabel(key);
         if (key.equals("Factor")) label = getContext().getString(R.string.factor);
         if (key.equals("1/x")) {
             SpannableString fraction = new SpannableString("1/x");
@@ -239,6 +263,18 @@ public final class CalculatorKeypad extends LinearLayout {
                 break;
             case "Factor":
                 description = getContext().getString(R.string.factor_description);
+                break;
+            case "floor":
+                description = getContext().getString(R.string.floor_description);
+                break;
+            case "log10":
+                description = getContext().getString(R.string.log10_description);
+                break;
+            case "φ":
+                description = getContext().getString(R.string.phi_description);
+                break;
+            case "mod":
+                description = getContext().getString(R.string.modulo_description);
                 break;
             case "rem":
                 description = getContext().getString(R.string.remainder_description);
@@ -373,17 +409,21 @@ public final class CalculatorKeypad extends LinearLayout {
         if (key.matches("[0-9.]")) preferred = 26;
         else if (key.matches("[+−×÷±]")) preferred = 26;
         else if (key.equals("BACK") && button.getText().toString().equals("⌫")) preferred = 24;
-        else if (key.equals("π") || key.equals("e") || key.equals("√")) preferred = 24;
+        else if (key.equals("π") || key.equals("e") || key.equals("φ") || key.equals("√"))
+            preferred = 24;
         else if (key.equals("1/x")
                 || key.equals("eˣ")
                 || key.equals("xʸ")
                 || key.equals("root")
                 || key.equals("x²")
-                || key.equals("!")) preferred = 22;
+                || key.equals("!")
+                || key.equals("floor")
+                || key.equals("10ˣ")) preferred = 22;
         else if (key.equals("sin")
                 || key.equals("cos")
                 || key.equals("tan")
                 || key.equals("ln")
+                || key.equals("log10")
                 || key.equals("asin")
                 || key.equals("acos")
                 || key.equals("atan")

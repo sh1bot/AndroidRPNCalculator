@@ -9,6 +9,7 @@ import java.util.Arrays;
 public enum Operation {
     PI("π", 0),
     E("e", 0),
+    PHI("φ", 0),
     ADD("+", 2),
     SUBTRACT("−", 2),
     MULTIPLY("×", 2),
@@ -22,6 +23,9 @@ public enum Operation {
     SQUARE("x²", 1),
     FACTORIAL("!", 1),
     RECIPROCAL("1/x", 1),
+    FLOOR("floor", 1),
+    LOG10("log10", 1),
+    TEN_POWER("10ˣ", 1),
     LN("ln", 1),
     EXP("eˣ", 1),
     SIN("sin", 1),
@@ -84,6 +88,14 @@ public enum Operation {
                 return UnifiedReal.PI;
             case E:
                 return UnifiedReal.E;
+            case PHI:
+                return UnifiedReal.ONE.add(new UnifiedReal(5).sqrt()).divide(UnifiedReal.TWO);
+            case FLOOR:
+                return ExactFunctions.floor(a);
+            case LOG10:
+                return a.ln().divide(new UnifiedReal(10).ln());
+            case TEN_POWER:
+                return new UnifiedReal(10).pow(a);
             case ADD:
                 return a.add(b);
             case SUBTRACT:
