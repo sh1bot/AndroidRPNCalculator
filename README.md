@@ -17,8 +17,10 @@ full there, while values above an entry use compact notation.
 
 Your stack and entry are restored when you reopen the app.
 
-**Swap** exchanges X and Y. **Clear** clears the stack and entry. **Undo** reverses
-the last change; long-press Undo to redo. During a long calculation, Undo becomes
+**Swap** exchanges X and Y. **Clear** clears the stack. During entry it becomes
+**CE**, which clears only the line and stays in edit mode. Enter on an empty line
+or Back/Escape returns to stack mode. **Undo** reverses the last change; long-press
+Undo to redo. During a long calculation, Undo becomes
 **Cancel**. **Functions**
 expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
 **SCI/ENG** for display notation. **DEC/IMPR/FRAC** cycles between decimals,
@@ -43,7 +45,8 @@ and F9 changes sign. Scientific shortcuts: `r` square root, `i` reciprocal,
 **LOC/DOT/NONE** cycles between phone-locale numbers, decimal dot with thin-space
 display grouping, and the locale decimal with no grouping. Copied numbers follow this choice but never
 include grouping. Copy follows **DEC/IMPR/FRAC**, using plain text such as `7/3` or `2 1/3`;
-DEC preserves exact terminating decimals. Tap a stack value
+DEC preserves exact terminating decimals and copies recurring/irrational values
+to 40 significant digits. Tap a stack value
 to copy it. Long-press a stack label to select it, then use the checkboxes to select
 more rows. Long-press a value for **Drop** and **Copy**: pressing a selected row
 acts on the whole selection; pressing an unselected row acts only on that row.

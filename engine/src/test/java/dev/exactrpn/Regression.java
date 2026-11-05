@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 import com.android.calculator2.UnifiedReal;
+import java.math.BigInteger;
 public final class Regression {
     static int checks;
     static void check(boolean b, String label) { checks++; if (!b) throw new AssertionError(label); }
@@ -122,7 +123,7 @@ public final class Regression {
         check(hp.values().size()==1 && !hp.isEditing(), "context key drops result");
         hp.key("UNDO");
         check(hp.values().size()==2 && !hp.isEditing(), "undo drop restores stack mode");
-        keys(hp,"5","BACK","CE","UNDO");
+        keys(hp,"5","BACK","CANCEL_ENTRY","UNDO");
         check(hp.isEditing() && hp.entry().isEmpty(), "undo restores explicitly empty editing mode");
         RpnCalculator editCopy = hp.copy(); editCopy.key("6");
         check(hp.isEditing() && hp.entry().isEmpty() && editCopy.entry().equals("6"), "copy preserves independent empty edit");
@@ -180,7 +181,7 @@ public final class Regression {
         check(top(pasted).definitelyEquals(RpnCalculator.parse("0.3")),"pasted arithmetic remains exact");
         check(ValueFormatter.clipboard(huge,sci).equals("123456789012345678901234567890"),"clipboard retains full exact integer");
         check(ValueFormatter.clipboard(RpnCalculator.parse("-1e-20"),sci).equals("-0.00000000000000000001"),"clipboard preserves tiny exact value with ASCII minus");
-        check(ValueFormatter.clipboard(third,sci).equals("0.333333333333"),"clipboard omits approximation annotation");
+        check(ValueFormatter.clipboard(third,sci).equals("0.3333333333333333333333333333333333333333"),"clipboard omits approximation annotation");
         check("PASTE".equals(KeyboardInput.command(50,0,true,false,false)),"Ctrl V paste shortcut");
         check("5".equals(KeyboardInput.command(0,'٥',false,false,false)),"localized hardware digits");
         pasted.paste("1e-3"); pasted.key(".");
@@ -299,7 +300,7 @@ public final class Regression {
         check(ValueFormatter.clipboard(new UnifiedReal(new com.android.calculator2.BoundedRational(6,-8)),sci,true).equals("-3/4"),"copied fraction is reduced with positive denominator");
         check(ValueFormatter.clipboard(UnifiedReal.TWO,sci,true).equals("2"),"fraction mode copies integer without denominator");
         check(ValueFormatter.clipboard(UnifiedReal.PI,sci,true).equals(ValueFormatter.clipboard(UnifiedReal.PI,sci,false)),"fraction mode copies irrational decimal fallback");
-        check(ValueFormatter.clipboard(top(fractions),sci,false).equals("0.333333333333"),"decimal mode retains decimal copy");
+        check(ValueFormatter.clipboard(top(fractions),sci,false).equals("0.3333333333333333333333333333333333333333"),"decimal mode retains decimal copy");
         RpnCalculator durable=new RpnCalculator();
         number(durable,"56565642624.456"); keys(durable,"ENTER","π","2","√","+","1","ENTER","3","÷");
         durable.key("ANGLE"); durable.paste("12.345"); durable.select(2,5);
@@ -329,11 +330,11 @@ public final class Regression {
         RpnCalculator bounded=new RpnCalculator();
         for(int i=0;i<150;i++) bounded.paste(Integer.toString(i));
         check(bounded.undoCount()==100 && RpnCalculator.load(bounded.save()).undoCount()==100,"undo count is bounded across persistence");
-        String longRaw="字".repeat(4096);
-        for(int i=0;i<110;i++) bounded.pasteText(longRaw,new NumberText.Profile('.',',',3,3));
+        String longRaw="字".repeat(4095);
+        for(int i=0;i<110;i++) bounded.pasteText(longRaw+(i%10),new NumberText.Profile('.',',',3,3));
         byte[] boundedBytes=bounded.save();
         check(boundedBytes.length<=1024*1024 && bounded.undoCount()<100,"saved undo history respects byte budget");
-        check(RpnCalculator.load(boundedBytes).entry().equals(longRaw),"undo eviction preserves current entry");
+        check(RpnCalculator.load(boundedBytes).entry().equals(longRaw+"9"),"undo eviction preserves current entry");
         for(String operation:new String[]{"±","√","1/x","ln","eˣ","sin","cos","tan"}) {
             RpnCalculator expression=new RpnCalculator(); keys(expression,"π",operation);
             RpnCalculator loaded=RpnCalculator.load(expression.save());
@@ -486,6 +487,36 @@ public final class Regression {
         check(rowDrop.values().size()==2 && rowDrop.values().get(0).definitelyEquals(UnifiedReal.TWO),"invalid row drop is atomic");
         int noOpUndo=rowDrop.undoCount(); rowDrop.dropRows(); check(rowDrop.undoCount()==noOpUndo,"empty row drop does not add undo");
         rowDrop.dropRows(1,0); check(rowDrop.values().isEmpty() && rowDrop.rawEntry(),"drop entire stack without discarding entry");
+        RpnCalculator safeClear=new RpnCalculator(); keys(safeClear,"9","ENTER","7","SMART_CLEAR","SMART_CLEAR");
+        check(safeClear.isEditing() && safeClear.entry().isEmpty() && top(safeClear).definitelyEquals(new UnifiedReal(9)),"repeated contextual clear cannot clear the stack");
+        int emptyEdits=safeClear.undoCount(); keys(safeClear,"CE","CE","BACK","DELETE");
+        check(safeClear.undoCount()==emptyEdits,"unchanged entry commands do not consume undo");
+        safeClear.key("ENTER"); safeClear.key("SMART_CLEAR"); check(safeClear.isEmpty() && !safeClear.isEditing(),"contextual Clear clears stack only after leaving entry");
+        safeClear.key("UNDO"); int remainingUndo=safeClear.undoCount(), remainingRedo=safeClear.redoCount();
+        safeClear.key("CE"); check(safeClear.undoCount()==remainingUndo && safeClear.redoCount()==remainingRedo,"no-op clear preserves undo and redo");
+        RpnCalculator noOps=new RpnCalculator(); keys(noOps,"1","ENTER","CLEAR"); int realHistory=noOps.undoCount();
+        for(int i=0;i<150;i++) keys(noOps,"CLEAR","CE","BACK","DELETE");
+        check(noOps.undoCount()==realHistory,"no-op commands cannot evict real history"); noOps.key("UNDO"); check(top(noOps).definitelyOne(),"undo skips no-op commands");
+        for(String[] example:new String[][]{{"9","1","9"},{"27","3","3"},{"-8","3","-2"},{"-32","5","-2"},{"81","4","3"},{"16","-2","0.25"},{"-8","-3","-0.5"},{"0","3","0"},{"1","999","1"}}) {
+            RpnCalculator rooted=new RpnCalculator(); rooted.paste(example[0]); rooted.key("ENTER"); rooted.paste(example[1]); rooted.key("root");
+            check(top(rooted).definitelyEquals(RpnCalculator.parse(example[2])),"exact root "+example[0]+" degree "+example[1]);
+            check(top(RpnCalculator.load(rooted.save())).definitelyEquals(top(rooted)),"root exactness survives restart");
+        }
+        RpnCalculator rationalRoot=new RpnCalculator(); keys(rationalRoot,"8","ENTER","2","7","÷","3","root");
+        check(top(rationalRoot).multiply(new UnifiedReal(3)).definitelyEquals(UnifiedReal.TWO),"perfect rational cube root stays exact");
+        RpnCalculator cubeZero=new RpnCalculator(); keys(cubeZero,"2","7","ENTER","3","root","3","−"); check(top(cubeZero).definitelyZero(),"cube root subtraction gives exact zero");
+        for(String[] invalid:new String[][]{{"-8","2"},{"9","0"},{"0","-3"}}) {
+            RpnCalculator rejected=new RpnCalculator(); rejected.paste(invalid[0]); rejected.key("ENTER"); rejected.paste(invalid[1]);
+            try { rejected.key("root"); throw new AssertionError("invalid root accepted"); } catch(ArithmeticException expected) {}
+            check(top(rejected).definitelyEquals(RpnCalculator.parse(invalid[0])) && rejected.entry().equals(invalid[1]),"invalid root preserves state");
+        }
+        check(ValueFormatter.clipboard(UnifiedReal.PI,sci).equals("3.141592653589793238462643383279502884197"),"copy pi to forty significant digits");
+        check(ValueFormatter.clipboard(UnifiedReal.TWO.sqrt(),sci).equals("1.41421356237309504880168872420969807857"),"copy sqrt2 to forty significant digits");
+        BigInteger largeSemi=new BigInteger("1000000007").multiply(new BigInteger("34359738337"));
+        check(ExactFunctions.factors(largeSemi).equals(java.util.Arrays.asList(new BigInteger("1000000007"),new BigInteger("34359738337"))),"rho splits semiprime above 64 bits");
+        BigInteger mersenne89=BigInteger.ONE.shiftLeft(89).subtract(BigInteger.ONE);
+        check(ExactFunctions.factors(mersenne89).equals(java.util.Arrays.asList(mersenne89)),"large prime has a proof, not only probable-prime acceptance");
+        check("SMART_CLEAR".equals(KeyboardInput.command(40,0,true,false,false)),"Ctrl L uses safe contextual clear");
         byte[] valid=durable.save();
         try { RpnCalculator.load(java.util.Arrays.copyOf(valid,valid.length-1)); throw new AssertionError("truncated state accepted"); }
         catch(java.io.IOException expected) { check(true,"reject truncated state"); }

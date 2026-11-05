@@ -48,10 +48,10 @@ do {
             New-Item -ItemType Directory -Path $downloadDir | Out-Null
             try {
                 Write-Host "Downloading build $($run.number), commit $($run.headSha)..."
-                & gh run download ([string]$run.databaseId) --repo $Repository --name "ExactRPN-debug-$($run.number)" --dir $downloadDir
+                & gh run download ([string]$run.databaseId) --repo $Repository --name "ExactRPN" --dir $downloadDir
                 if ($LASTEXITCODE -ne 0) { throw 'Artifact download failed. It may have expired; start a new GitHub build.' }
-                $apk = Join-Path $downloadDir 'app-debug.apk'
-                if (-not (Test-Path -LiteralPath $apk)) { throw 'Expected app-debug.apk was not present in the artifact.' }
+                $apk = Join-Path $downloadDir 'ExactRPN.apk'
+                if (-not (Test-Path -LiteralPath $apk)) { throw 'Expected ExactRPN.apk was not present in the artifact.' }
                 & $AdbPath @deviceArgs install -r $apk
                 if ($LASTEXITCODE -ne 0) {
                     throw 'Installation failed. If ADB reports UPDATE_INCOMPATIBLE, the signing key changed. Configure the permanent signing secrets, then uninstall the old app ONCE (this clears its data). This script never uninstalls automatically.'

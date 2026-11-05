@@ -253,8 +253,9 @@ public final class MainActivity extends Activity {
         if (clip==null || clip.getItemCount()==0 || clip.getItemAt(0).getText()==null) {
             showNotice("Clipboard does not contain a number",true); return;
         }
-        try { execute("PASTE_RAW:"+clip.getItemAt(0).getText().toString()); }
-        catch (IllegalArgumentException ex) { showNotice(ex.getMessage(),true); }
+        CharSequence text=clip.getItemAt(0).getText();
+        if(text.length()>RpnCalculator.MAX_ENTRY_LENGTH) { showNotice("Pasted number is too long (maximum 4096 characters)",true); return; }
+        execute("PASTE_RAW:"+text.toString());
     }
     private void copyValue(String text) {
         android.content.ClipboardManager clipboard = (android.content.ClipboardManager)getSystemService(CLIPBOARD_SERVICE);
@@ -293,8 +294,15 @@ public final class MainActivity extends Activity {
                 publishResult(result,display,key);
                 persistSession(false);
             } catch (RuntimeException ex) {
+                if(key.equals("RESTORE")) {
+                    session.checkpoint=null; session.remote.cancel();
+                    if(ex instanceof RemoteCalculator.InvalidCheckpoint) {
+                        try { session.store.quarantine(); }
+                        catch(java.io.IOException backupError) { android.util.Log.e("ExactRPN","Could not quarantine checkpoint",backupError); }
+                    }
+                }
                 session.error = session.cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
-                    ? "Calculation cancelled" : "Error: " + (ex.getMessage()==null ? "Undefined result" : ex.getMessage());
+                    ? "Calculation cancelled" : key.equals("RESTORE") ? "Could not restore saved calculation. Started empty." : "Error: " + (ex.getMessage()==null ? "Undefined result" : ex.getMessage());
                 synchronized (session) { session.pending.clear(); }
             } finally { Thread.interrupted(); }
         }
@@ -354,7 +362,7 @@ public final class MainActivity extends Activity {
         }
         refresh();
     }
-    private void handleBack() { if (session.busy) cancelCalculation(); else if(!session.selectedRows.isEmpty()) clearStackSelection(true); else if (session.display.editing) execute("CE"); else finish(); }
+    private void handleBack() { if (session.busy) cancelCalculation(); else if(!session.selectedRows.isEmpty()) clearStackSelection(true); else if (session.display.editing) execute("CANCEL_ENTRY"); else finish(); }
     private final Runnable tick = new Runnable() { public void run() { refresh(); handler.postDelayed(this,100); } };
     private void clearStackSelection(boolean redraw) {
         if(session.selectedRows.isEmpty()) return;
@@ -411,6 +419,16 @@ public final class MainActivity extends Activity {
         String name=depth==1 ? "x" : depth==2 ? "y" : Integer.toString(depth);
         label.setText(name+(approximate ? "≈" : ":"));
         label.setContentDescription("Stack " + name + (approximate ? ", approximate value" : "") + "; long press to select");
+    }
+    private void saveDisplayPreferences(Display display) {
+        android.content.SharedPreferences preferences=getPreferences(0);
+        android.content.SharedPreferences.Editor editor=preferences.edit(); boolean changed=false;
+        if(!display.angleUnit.name().equals(preferences.getString("angleUnit",""))) { editor.putString("angleUnit",display.angleUnit.name()); changed=true; }
+        boolean engineering=display.notation==ValueFormatter.Notation.ENGINEERING;
+        if(preferences.getBoolean("engineering",false)!=engineering) { editor.putBoolean("engineering",engineering); changed=true; }
+        if(preferences.getInt("fractionMode",-1)!=display.fractionMode) { editor.putInt("fractionMode",display.fractionMode); changed=true; }
+        if(preferences.getInt("numberMode",-1)!=display.numberMode) { editor.putInt("numberMode",display.numberMode); changed=true; }
+        if(changed) editor.apply();
     }
     private void refresh() {
         Display display = session.display;
@@ -504,24 +522,21 @@ public final class MainActivity extends Activity {
             keys.setEditing(display.editing);
             angleButton.setText(display.angleUnit.name());
             angleButton.setContentDescription("Angle unit: " + display.angleUnit.name() + ". Tap to switch.");
-            getPreferences(0).edit().putString("angleUnit",display.angleUnit.name()).apply();
             notationButton.setText(display.notation == ValueFormatter.Notation.ENGINEERING ? "ENG" : "SCI");
             notationButton.setContentDescription("Display notation: " + (display.notation == ValueFormatter.Notation.ENGINEERING ? "engineering" : "scientific") + ". Tap to switch.");
-            getPreferences(0).edit().putBoolean("engineering",display.notation == ValueFormatter.Notation.ENGINEERING).apply();
             fractionButton.setText(new String[]{"DEC","IMPR","FRAC"}[display.fractionMode]);
             fractionButton.setContentDescription(new String[]{
                 "Decimal display. Tap for improper fractions.",
                 "Improper fraction display. Tap for mixed fractions.",
                 "Mixed fraction display. Tap for decimals."
             }[display.fractionMode]);
-            getPreferences(0).edit().putInt("fractionMode",display.fractionMode).apply();
             numberFormatButton.setText(new String[]{"LOC","DOT","NONE"}[display.numberMode]);
             numberFormatButton.setContentDescription(new String[]{
                 "Phone locale number format. Tap for decimal dot with thin space grouping.",
                 "Decimal dot with thin space grouping. Tap for locale decimal without grouping.",
                 "Locale decimal without grouping. Tap for phone locale grouping."
             }[display.numberMode]);
-            getPreferences(0).edit().putInt("numberMode",display.numberMode).apply();
+            saveDisplayPreferences(display);
             boolean follow = rendered==null || rendered.editing!=display.editing || !rendered.rows.equals(display.rows);
             rendered = display;
             // A second post runs after the updated rows have been measured. Do not repeatedly
@@ -554,7 +569,7 @@ public final class MainActivity extends Activity {
             if(event.isShiftPressed()) key="SELECT_"+key;
         }
         if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
-        if (key.equals("ESCAPE")) { if (session.busy) cancelCalculation(); else if(!session.selectedRows.isEmpty()) clearStackSelection(true); else execute("CE"); }
+        if (key.equals("ESCAPE")) { if (session.busy) cancelCalculation(); else if(!session.selectedRows.isEmpty()) clearStackSelection(true); else execute("CANCEL_ENTRY"); }
         else execute(key);
         return true;
     }

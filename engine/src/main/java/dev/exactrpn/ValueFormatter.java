@@ -13,6 +13,7 @@ import java.math.RoundingMode;
 public final class ValueFormatter {
     public enum Notation { SCIENTIFIC, ENGINEERING }
     private static final int DIGITS = 12;
+    private static final int COPY_DIGITS = 40;
     private ValueFormatter() {}
     public static String format(UnifiedReal value, boolean newest, Notation notation) {
         BigInteger integer = value.bigIntegerValue();
@@ -68,15 +69,18 @@ public final class ValueFormatter {
         BoundedRational rational = value.boundedRationalValue();
         int places = BoundedRational.digitsRequired(rational);
         if(places<=1000) return new BigDecimal(rational.toStringTruncated(places)).stripTrailingZeros().toPlainString();
-        String text = format(value,true,notation);
-        if (text.startsWith("≈ ")) text = text.substring(2);
-        if (text.startsWith("0 (")) return "0";
-        return text.replace('−','-');
+        StringFloatRep rep=value.crValue().toStringFloatRep(COPY_DIGITS+10,10,-1000);
+        if(rep.sign==0) return "0";
+        BigDecimal number=new BigDecimal(new BigInteger(rep.mantissa)).scaleByPowerOfTen(rep.exponent-rep.mantissa.length());
+        if(rep.sign<0) number=number.negate();
+        return decimal(number.round(new MathContext(COPY_DIGITS,RoundingMode.HALF_EVEN)),notation,COPY_DIGITS).replace('−','-');
     }
-    private static String decimal(BigDecimal number, Notation notation) {
+
+    private static String decimal(BigDecimal number, Notation notation) { return decimal(number,notation,DIGITS); }
+    private static String decimal(BigDecimal number, Notation notation,int digits) {
         BigDecimal d = number.stripTrailingZeros();
         int exponent = d.precision() - d.scale() - 1;
-        if (d.signum() == 0 || (exponent >= -6 && exponent < DIGITS)) return d.toPlainString();
+        if (d.signum() == 0 || (exponent >= -6 && exponent < digits)) return d.toPlainString();
         int power = notation == Notation.ENGINEERING ? Math.floorDiv(exponent, 3) * 3 : exponent;
         return d.scaleByPowerOfTen(-power).toPlainString() + "e" + (power >= 0 ? "+" : "−") + Math.abs(power);
     }

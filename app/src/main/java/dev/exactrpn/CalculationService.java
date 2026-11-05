@@ -44,7 +44,11 @@ public final class CalculationService extends Service {
         try {
             String input=request.getString("input"), key=request.getString("key");
             if(cached==null || !Objects.equals(input,cachedPath)) {
-                cached=input==null ? new RpnCalculator() : RpnCalculator.load(Files.readAllBytes(new File(input).toPath()));
+                try { cached=input==null ? new RpnCalculator() : RpnCalculator.load(Files.readAllBytes(new File(input).toPath())); }
+                catch(IOException ex) {
+                    response.putBoolean("invalidCheckpoint",true);
+                    throw new IOException("Saved calculation is damaged or from an unsupported version",ex);
+                }
                 if(input==null) cached.setAngleUnit(RpnCalculator.AngleUnit.valueOf(request.getString("angle")));
                 cachedPath=input; cachedStackId=UUID.randomUUID().toString();
             }
@@ -91,9 +95,7 @@ public final class CalculationService extends Service {
             display.putString("checkpoint",snapshot.getAbsolutePath());
             // Only paths cross Binder; large stacks must not hit Binder's transaction-size limit.
             presentation=File.createTempFile("calculation-",".display",getNoBackupFilesDir());
-            Parcel parcel=Parcel.obtain();
-            try { parcel.writeBundle(display); Files.write(presentation.toPath(),parcel.marshall()); }
-            finally { parcel.recycle(); }
+            DisplayResult.write(presentation,display);
             response.putString("presentation",presentation.getAbsolutePath());
             cached=candidate; cachedPath=snapshot.getAbsolutePath(); cachedStackId=stackId;
         } catch(OutOfMemoryError ex) {

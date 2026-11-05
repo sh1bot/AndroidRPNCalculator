@@ -15,7 +15,7 @@ public final class KeyboardInput {
                 case 53: return "REDO";
                 case 32: return "DUP";
                 case 47: return "SWAP";
-                case 40: return "CLEAR";
+                case 40: return "SMART_CLEAR";
                 default: return null;
             }
         }

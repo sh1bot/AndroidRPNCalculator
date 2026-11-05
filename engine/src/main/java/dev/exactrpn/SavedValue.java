@@ -33,7 +33,7 @@ final class SavedValue {
             case "×": return a.multiply(b);
             case "÷": return a.divide(b);
             case "xʸ": return a.pow(b);
-            case "root": return a.pow(b.inverse());
+            case "root": return ExactFunctions.root(a,b);
             case "rem": case "mod": return ExactFunctions.remainder(a,b,op.equals("mod"));
             case "±": return a.negate();
             case "√": return a.sqrt();
