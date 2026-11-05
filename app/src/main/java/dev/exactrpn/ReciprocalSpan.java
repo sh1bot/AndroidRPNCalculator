@@ -13,14 +13,24 @@ final class ReciprocalSpan extends ReplacementSpan {
         return digits.measureText("1") + paint.measureText("⁄") + digits.measureText("x");
     }
 
-    @Override public int getSize(Paint paint, CharSequence text, int start, int end,
-            Paint.FontMetricsInt metrics) {
+    @Override
+    public int getSize(
+            Paint paint, CharSequence text, int start, int end, Paint.FontMetricsInt metrics) {
         if (metrics != null) paint.getFontMetricsInt(metrics);
         return (int) Math.ceil(width(paint));
     }
 
-    @Override public void draw(Canvas canvas, CharSequence text, int start, int end,
-            float x, int top, int y, int bottom, Paint paint) {
+    @Override
+    public void draw(
+            Canvas canvas,
+            CharSequence text,
+            int start,
+            int end,
+            float x,
+            int top,
+            int y,
+            int bottom,
+            Paint paint) {
         Paint digits = new Paint(paint);
         float size = paint.getTextSize();
         digits.setTextSize(size * .7f);

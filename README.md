@@ -73,6 +73,11 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 You can also open the project in Android Studio using a local Gradle distribution;
 a Gradle wrapper is not bundled. The app requires Android 8.0 or newer.
 
+UI text and error templates live in `app/src/main/res/values/strings.xml`.
+Translations go in the corresponding `values-<language>` directory; Android chooses
+the matching catalogue and falls back to English. Engine error codes and numeric
+arguments stay independent of translated text.
+
 ## Sources and license
 
 New code is licensed under [Apache 2.0](LICENSE). The arithmetic engine includes:
