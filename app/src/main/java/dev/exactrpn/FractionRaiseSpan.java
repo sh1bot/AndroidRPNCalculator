@@ -6,7 +6,17 @@ import android.text.style.MetricAffectingSpan;
 
 /** Center the complete fraction beside the whole number's digit height. */
 final class FractionRaiseSpan extends MetricAffectingSpan {
-    private void raise(TextPaint paint) { paint.baselineShift-=Math.round(paint.getTextSize()*.12f); }
-    @Override public void updateMeasureState(TextPaint paint) { raise(paint); }
-    @Override public void updateDrawState(TextPaint paint) { raise(paint); }
+    private void raise(TextPaint paint) {
+        paint.baselineShift -= Math.round(paint.getTextSize() * .12f);
+    }
+
+    @Override
+    public void updateMeasureState(TextPaint paint) {
+        raise(paint);
+    }
+
+    @Override
+    public void updateDrawState(TextPaint paint) {
+        raise(paint);
+    }
 }

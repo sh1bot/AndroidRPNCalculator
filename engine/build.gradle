@@ -1,3 +1,6 @@
 plugins { id 'java-library' }
 java { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
-tasks.register('regression', JavaExec) { dependsOn testClasses; classpath = sourceSets.test.runtimeClasspath; mainClass = 'dev.exactrpn.Regression' }
+dependencies { testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'; testRuntimeOnly 'org.junit.platform:junit-platform-launcher' }
+test { useJUnitPlatform() }
+// Keep the documented command and CI entry point; normal `test` runs the same suite.
+tasks.register('regression') { dependsOn test }
