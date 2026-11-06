@@ -102,10 +102,6 @@ public class MainActivity extends Activity {
                             public void tap(int index, Display display) {
                                 stackRowTapped(index, display);
                             }
-
-                            public boolean toggleAll(Display display) {
-                                return toggleAllStackRows(display);
-                            }
                         });
         configureWindow();
         boolean restoreSession = restoreSession();
@@ -298,7 +294,8 @@ public class MainActivity extends Activity {
     }
 
     private boolean toggleStackRow(int index, Display snapshot) {
-        if (!stackActionAllowed(snapshot)) return false;
+        if (session.display.editing || snapshot.editing || !stackActionAllowed(snapshot))
+            return false;
         int scrollY = scroll.getScrollY();
         View oldRow = stackRows.findViewWithTag("stack-row:" + index);
         int anchorCenter = oldRow == null ? 0 : oldRow.getTop() + oldRow.getHeight() / 2 - scrollY;
@@ -323,7 +320,7 @@ public class MainActivity extends Activity {
     }
 
     private boolean toggleAllStackRows(Display snapshot) {
-        if (!stackActionAllowed(snapshot)) return false;
+        if (session.display.editing || !stackActionAllowed(snapshot)) return false;
         if (session.selectedRows.size() == snapshot.rows.size()) session.selectedRows.clear();
         else for (int i = 0; i < snapshot.rows.size(); i++) session.selectedRows.add(i);
         selectionDirty = true;
@@ -335,6 +332,9 @@ public class MainActivity extends Activity {
         if (session.selectedRows.isEmpty()) return false;
         String action;
         switch (key) {
+            case Command.UNDO:
+                toggleAllStackRows(session.display);
+                return true;
             case "SMART_CLEAR":
             case "CLEAR":
                 action = "COPY";
@@ -400,6 +400,7 @@ public class MainActivity extends Activity {
 
     private void refresh() {
         Display display = session.display;
+        if (display.editing) clearStackSelection(false);
         if (rendered != display || selectionDirty) {
             numbers = numberFormat(display.numberMode);
             keys.setNumberFormat(numbers);
@@ -783,7 +784,9 @@ public class MainActivity extends Activity {
 
     private void refreshModes(Display display) {
         keys.setEditing(display.editing);
-        keys.setSelecting(!session.selectedRows.isEmpty());
+        keys.setSelecting(
+                !session.selectedRows.isEmpty(),
+                session.selectedRows.size() == display.rows.size());
         angleButton.setText(display.angleUnit.name());
         angleButton.setContentDescription(
                 getString(R.string.angle_description, display.angleUnit.name()));
@@ -832,9 +835,20 @@ public class MainActivity extends Activity {
                                                 : R.string.invalid_status)
                                 : display.editing
                                         ? getString(R.string.entry_status)
-                                        : getString(R.string.stack_status));
+                                        : getString(
+                                                session.selectedRows.isEmpty()
+                                                        ? R.string.stack_status
+                                                        : R.string.select_status));
         CharSequence calculationStatus = status.getText();
-        if (session.policy.temporary) status.setText(getString(R.string.temporary_status));
+        boolean temporarySelection = session.policy.temporary && !session.selectedRows.isEmpty();
+        if (status.getMaxLines() != (temporarySelection ? 2 : 1)) {
+            status.setSingleLine(!temporarySelection);
+            if (temporarySelection) status.setMaxLines(2);
+        }
+        if (session.policy.temporary)
+            status.setText(
+                    getString(R.string.temporary_status)
+                            + (temporarySelection ? "\n" + getString(R.string.select_status) : ""));
         status.setTextColor(session.policy.temporary ? colors.accent : colors.text);
         status.setContentDescription(
                 session.policy.temporary

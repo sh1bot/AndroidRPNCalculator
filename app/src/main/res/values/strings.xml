@@ -8,6 +8,11 @@
     <string name="drop_selected">Drop selected values</string>
     <string name="sum_selected">Sum selected values</string>
     <string name="product_selected">Product of selected values</string>
+    <string name="select_status">SELECT</string>
+    <string name="select_all">All</string>
+    <string name="select_none">None</string>
+    <string name="select_all_description">Select all stack rows</string>
+    <string name="select_none_description">Clear selection</string>
     <string name="clipboard_no_number">Clipboard does not contain a number</string>
     <string name="clipboard_too_long">Pasted number is too long (maximum 4096 characters)</string>
     <string name="clipboard_label">Calculator value</string>

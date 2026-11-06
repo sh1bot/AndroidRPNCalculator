@@ -16,6 +16,7 @@ import android.os.SystemClock;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CheckBox;
+import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -100,7 +101,7 @@ public final class StackSelectionTest {
     }
 
     @Test
-    public void labelsEnterSelectionRowsToggleAndLongPressTogglesAll() throws Exception {
+    public void labelsEnterSelectionAndUndoTogglesAllAndNone() throws Exception {
         MainActivity activity = open();
         CalculatorSession session = session(activity);
         try {
@@ -118,14 +119,29 @@ public final class StackSelectionTest {
                         assertEquals(
                                 new java.util.TreeSet<>(java.util.Arrays.asList(0)),
                                 session.selectedRows);
+                        assertFalse(tagged(activity, "stack-label:2").isLongClickable());
                         tagged(activity, "stack-label:2").performLongClick();
+                        assertEquals(1, session.selectedRows.size());
+                        assertTrue(
+                                ((TextView) tagged(activity, "calculation-status"))
+                                        .getText()
+                                        .toString()
+                                        .contains("SELECT"));
+                        assertEquals(
+                                "All", ((Button) tagged(activity, "UNDO")).getText().toString());
+                        tagged(activity, "UNDO").performClick();
                         assertEquals(3, session.selectedRows.size());
-                        tagged(activity, "stack-label:0").performLongClick();
+                        assertEquals(
+                                "None", ((Button) tagged(activity, "UNDO")).getText().toString());
+                        tagged(activity, "UNDO").performClick();
                         assertTrue(session.selectedRows.isEmpty());
                         assertNull(tagged(activity, "stack-checkbox:0"));
                         assertEquals("+", ((Button) tagged(activity, "+")).getText().toString());
-                        tagged(activity, "stack-label:1").performLongClick();
-                        assertEquals(3, session.selectedRows.size());
+                        assertEquals(
+                                "Undo", ((Button) tagged(activity, "UNDO")).getText().toString());
+                        assertNull(tagged(activity, "CLEAR").getForeground());
+                        tagged(activity, "stack-label:1").performClick();
+                        assertEquals(1, session.selectedRows.size());
                         activity.onBackPressed();
                         assertTrue(session.selectedRows.isEmpty());
                         assertFalse(activity.isFinishing());
@@ -146,7 +162,8 @@ public final class StackSelectionTest {
                     () -> {
                         Button copy = (Button) tagged(activity, "CLEAR");
                         assertEquals("", copy.getText().toString());
-                        assertNotNull(copy.getCompoundDrawablesRelative()[0]);
+                        assertNotNull(copy.getForeground());
+                        assertEquals(android.view.Gravity.CENTER, copy.getForegroundGravity());
                         assertEquals(
                                 "Pick", ((Button) tagged(activity, "SWAP")).getText().toString());
                         assertEquals("Σ", ((Button) tagged(activity, "+")).getText().toString());
@@ -202,43 +219,61 @@ public final class StackSelectionTest {
     }
 
     @Test
-    public void selectionOverridesEntryKeysAndDisablesTheirOldLongPressActions() throws Exception {
+    public void entryModeCannotEnterSelectionAndOldLongPressActionsStayDisabledWhileSelecting()
+            throws Exception {
         MainActivity activity = open();
         CalculatorSession session = session(activity);
         try {
             seed(activity);
             key(activity, "7");
+            await(
+                    () ->
+                            session.display.editing
+                                    && !tagged(activity, "stack-label:0").isClickable());
+            instrumentation.runOnMainSync(
+                    () -> {
+                        tagged(activity, "stack-label:0").performClick();
+                        tagged(activity, "stack-label:0").performLongClick();
+                        assertTrue(session.selectedRows.isEmpty());
+                        assertNull(tagged(activity, "stack-checkbox:0"));
+                        assertEquals(
+                                "CE", ((Button) tagged(activity, "CLEAR")).getText().toString());
+                        assertNull(tagged(activity, "CLEAR").getForeground());
+                        assertEquals("⌫", ((Button) tagged(activity, "BACK")).getText().toString());
+                    });
+            key(activity, "ENTER");
+            await(() -> tagged(activity, "stack-label:0").isClickable());
             selectEnds(activity);
             instrumentation.runOnMainSync(
                     () -> {
-                        assertEquals(
-                                "Drop", ((Button) tagged(activity, "BACK")).getText().toString());
                         assertFalse(tagged(activity, "BACK").isLongClickable());
                         assertFalse(tagged(activity, "SWAP").isLongClickable());
+                        assertFalse(tagged(activity, "UNDO").isLongClickable());
                         tagged(activity, "BACK").performLongClick();
                         tagged(activity, "SWAP").performLongClick();
+                        tagged(activity, "UNDO").performLongClick();
+                        assertEquals(2, session.selectedRows.size());
                     });
+            assertEquals(java.util.Arrays.asList("1", "2", "3", "7"), session.display.rows);
+            key(activity, "8");
+            await(
+                    () ->
+                            tagged(activity, "stack-checkbox:0") == null
+                                    && !tagged(activity, "stack-label:0").isClickable());
+            assertTrue(session.selectedRows.isEmpty());
+            assertEquals("8", session.display.entry);
+            instrumentation.runOnMainSync(
+                    () ->
+                            assertEquals(
+                                    "Undo",
+                                    ((Button) tagged(activity, "UNDO")).getText().toString()));
+            key(activity, "UNDO");
+            assertFalse(session.display.editing);
+            assertEquals(java.util.Arrays.asList("1", "2", "3", "7"), session.display.rows);
+            key(activity, "UNDO");
+            assertTrue(session.display.editing);
             assertEquals("7", session.display.entry);
             assertEquals(java.util.Arrays.asList("1", "2", "3"), session.display.rows);
-            key(activity, "SWAP");
-            key(activity, "+");
-            key(activity, "×");
-            assertEquals("7", session.display.entry);
-            assertTrue(session.display.editing);
-            key(activity, "BACK");
-            await(() -> tagged(activity, "stack-checkbox:0") == null);
-            assertEquals("7", session.display.entry);
-            instrumentation.runOnMainSync(
-                    () -> {
-                        assertEquals(
-                                "CE", ((Button) tagged(activity, "CLEAR")).getText().toString());
-                        assertNull(
-                                ((Button) tagged(activity, "CLEAR"))
-                                        .getCompoundDrawablesRelative()[0]);
-                        assertEquals("⌫", ((Button) tagged(activity, "BACK")).getText().toString());
-                        assertEquals(
-                                "Swap", ((Button) tagged(activity, "SWAP")).getText().toString());
-                    });
         } finally {
             finish(activity);
         }
