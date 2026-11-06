@@ -109,4 +109,6 @@
     <string name="close_complements">Close inverse and complementary functions</string>
     <string name="ceil_description">Ceiling of X: smallest integer no smaller than X</string>
     <string name="digit_pick_description">Digit %1$s; in stack mode, long press to pick level %2$d</string>
+    <string name="pi_toggle_description">Pi; long press to use tau</string>
+    <string name="tau_toggle_description">Tau (two pi); long press to use pi</string>
 </resources>

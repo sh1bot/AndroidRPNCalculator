@@ -34,7 +34,9 @@ public final class CalculatorKeypad extends ViewGroup {
     private LocaleNumbers numbers;
     private final Map<String, Button> numberButtons = new HashMap<>();
     private final LinearLayout controls;
-    private Button deleteButton, undoButton, clearButton;
+    private Button deleteButton, undoButton, clearButton, piButton;
+    private boolean tau;
+    private Consumer<Boolean> saveTau = enabled -> {};
     private boolean calculating;
     private boolean expanded, inverse;
     private final Map<String, Button> inverseButtons = new HashMap<>();
@@ -82,10 +84,12 @@ public final class CalculatorKeypad extends ViewGroup {
                 },
                 primaryRows);
         setEditing(false);
+        updateConstant();
         updateExpansion();
     }
 
     private String effectiveKey(String key) {
+        if (key.equals("π") && tau) return "τ";
         if (!inverse) return key;
         switch (key) {
             case "sin":
@@ -181,6 +185,23 @@ public final class CalculatorKeypad extends ViewGroup {
         updateExpansion();
     }
 
+    public void setTauPreference(boolean enabled, Consumer<Boolean> save) {
+        tau = enabled;
+        saveTau = save;
+        updateConstant();
+    }
+
+    private void updateConstant() {
+        piButton.setText(tau ? "τ" : "π");
+        piButton.setContentDescription(
+                getContext()
+                        .getString(
+                                tau
+                                        ? R.string.tau_toggle_description
+                                        : R.string.pi_toggle_description));
+        requestLayout();
+    }
+
     public void setNumberFormat(LocaleNumbers format) {
         if (numbers == format) return;
         numbers = format;
@@ -236,6 +257,7 @@ public final class CalculatorKeypad extends ViewGroup {
         Button b = new Button(getContext());
         if (key.equals("CLEAR")) clearButton = b;
         if (key.equals(Command.UNDO)) undoButton = b;
+        if (key.equals("π")) piButton = b;
         b.setAllCaps(false);
         b.setTag(key);
         if (Arrays.asList(
@@ -359,6 +381,14 @@ public final class CalculatorKeypad extends ViewGroup {
                                 key.equals(Command.UNDO) && calculating
                                         ? Command.CANCEL
                                         : key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
+        if (key.equals("π"))
+            b.setOnLongClickListener(
+                    v -> {
+                        tau = !tau;
+                        updateConstant();
+                        saveTau.accept(tau);
+                        return true;
+                    });
         if (key.matches("[0-9]"))
             b.setOnLongClickListener(
                     v -> {
@@ -417,7 +447,6 @@ public final class CalculatorKeypad extends ViewGroup {
                 FrameLayout cell = new FrameLayout(getContext());
                 Button b = button(key, label);
                 if (key.equals("BACK")) deleteButton = b;
-                if (key.equals(Command.UNDO)) undoButton = b;
                 cell.addView(b, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
                 row.addView(cell, new LinearLayout.LayoutParams(0, -1, 1));
             }
@@ -481,8 +510,11 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.matches("[0-9.]")) preferred = 26;
         else if (key.matches("[+−×÷±]")) preferred = 26;
         else if (key.equals("BACK") && button.getText().toString().equals("⌫")) preferred = 24;
-        else if (key.equals("π") || key.equals("e") || key.equals("φ") || key.equals("√"))
-            preferred = 24;
+        else if (key.equals("π")
+                || key.equals("τ")
+                || key.equals("e")
+                || key.equals("φ")
+                || key.equals("√")) preferred = 24;
         else if (key.equals("1/x")
                 || key.equals("eˣ")
                 || key.equals("xʸ")
