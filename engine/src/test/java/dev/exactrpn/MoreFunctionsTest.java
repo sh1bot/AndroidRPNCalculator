@@ -110,7 +110,7 @@ final class MoreFunctionsTest {
         RpnCalculator invalid = new RpnCalculator();
         invalid.paste("-1");
         assertThrows(ArithmeticException.class, () -> invalid.key("log10"));
-        assertEquals("-1", invalid.entry());
-        assertTrue(invalid.values().isEmpty());
+        assertFalse(invalid.isEditing());
+        assertEquals("-1", invalid.values().get(0).bigIntegerValue().toString());
     }
 }
