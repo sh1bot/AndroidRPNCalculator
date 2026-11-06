@@ -275,7 +275,11 @@ final class CalculatorSession {
         }
     }
 
-    private void setError(String message) {
+    void clearError() {
+        setError("");
+    }
+
+    private synchronized void setError(String message) {
         error = message;
         errorRevision++;
     }
