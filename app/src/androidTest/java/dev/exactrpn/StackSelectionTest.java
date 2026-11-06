@@ -51,7 +51,7 @@ public final class StackSelectionTest {
             if (ready.get()) return;
             SystemClock.sleep(25);
         } while (SystemClock.elapsedRealtime() < until);
-        fail("Timed out waiting for stack UI");
+        fail("Timed out waiting for stack UI at " + new Throwable().getStackTrace()[1]);
     }
 
     static CalculatorSession session(MainActivity activity) {
