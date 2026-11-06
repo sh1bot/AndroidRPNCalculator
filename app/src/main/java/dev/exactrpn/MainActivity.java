@@ -31,7 +31,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 /** Exact values and evaluation survive rotation; views consume immutable display snapshots. */
-public final class MainActivity extends Activity {
+public class MainActivity extends Activity {
     private CalculatorSession session;
     private ThemeColors colors;
     private EntryField entryView;
@@ -138,8 +138,12 @@ public final class MainActivity extends Activity {
                         });
         keys.setInverse(session.inverse);
         keys.setTauPreference(
-                getPreferences(0).getBoolean("tauConstant", false),
-                enabled -> getPreferences(0).edit().putBoolean("tauConstant", enabled).apply());
+                session.tauConstant,
+                enabled -> {
+                    session.tauConstant = enabled;
+                    if (session.canUseSavedState())
+                        getPreferences(0).edit().putBoolean("tauConstant", enabled).apply();
+                });
         root.addView(
                 new CalculatorWorkspace(this, stackPanel, keys),
                 new LinearLayout.LayoutParams(-1, 0, 1));
@@ -269,6 +273,7 @@ public final class MainActivity extends Activity {
     private final Runnable tick =
             new Runnable() {
                 public void run() {
+                    if (!session.background) session.onForeground();
                     refresh();
                     handler.postDelayed(this, 100);
                 }
@@ -348,6 +353,7 @@ public final class MainActivity extends Activity {
     }
 
     private void saveDisplayPreferences(Display display) {
+        if (!session.canUseSavedState()) return;
         android.content.SharedPreferences preferences = getPreferences(0);
         android.content.SharedPreferences.Editor editor = preferences.edit();
         boolean changed = false;
@@ -439,13 +445,15 @@ public final class MainActivity extends Activity {
     protected void onStart() {
         super.onStart();
         session.background = false;
+        session.onForeground();
     }
 
     @Override
     protected void onStop() {
         if (!isChangingConfigurations()) {
             session.background = true;
-            execute(Command.CHECKPOINT);
+            if (!session.policy.temporary && DeviceAccess.locked(this)) session.pauseForLock();
+            else execute(Command.CHECKPOINT);
         }
         super.onStop();
     }
@@ -505,6 +513,10 @@ public final class MainActivity extends Activity {
         }
     }
 
+    protected boolean temporaryLaunch() {
+        return false;
+    }
+
     private boolean restoreSession() {
         Locale locale = getResources().getConfiguration().getLocales().get(0);
         localNumbers = new LocaleNumbers(locale);
@@ -512,31 +524,45 @@ public final class MainActivity extends Activity {
         ungroupedNumbers = new LocaleNumbers(locale, NumberMode.UNGROUPED);
         session = (CalculatorSession) getLastNonConfigurationInstance();
         boolean restoreSession = session == null;
-        if (session == null)
-            session =
-                    new CalculatorSession(
-                            getPreferences(0).getBoolean("engineering", false)
-                                    ? ValueFormatter.Notation.ENGINEERING
-                                    : ValueFormatter.Notation.SCIENTIFIC,
-                            RpnCalculator.AngleUnit.valueOf(
-                                    getPreferences(0).getString("angleUnit", "RAD")),
-                            NumberMode.fromId(
-                                    getPreferences(0)
-                                            .getInt(
-                                                    "numberMode",
-                                                    getPreferences(0)
-                                                                    .getBoolean(
-                                                                            "computerNumbers",
-                                                                            false)
-                                                            ? 1
-                                                            : 0)),
-                            FractionMode.fromId(
-                                    getPreferences(0)
-                                            .getInt(
-                                                    "fractionMode",
-                                                    getPreferences(0).getBoolean("fractions", false)
-                                                            ? 1
-                                                            : 0)));
+        if (session == null) {
+            if (temporaryLaunch() || DeviceAccess.locked(this))
+                session =
+                        new CalculatorSession(
+                                ValueFormatter.Notation.SCIENTIFIC,
+                                RpnCalculator.AngleUnit.RAD,
+                                NumberMode.LOCALE,
+                                FractionMode.DECIMAL,
+                                true);
+            else {
+                session =
+                        new CalculatorSession(
+                                getPreferences(0).getBoolean("engineering", false)
+                                        ? ValueFormatter.Notation.ENGINEERING
+                                        : ValueFormatter.Notation.SCIENTIFIC,
+                                RpnCalculator.AngleUnit.valueOf(
+                                        getPreferences(0).getString("angleUnit", "RAD")),
+                                NumberMode.fromId(
+                                        getPreferences(0)
+                                                .getInt(
+                                                        "numberMode",
+                                                        getPreferences(0)
+                                                                        .getBoolean(
+                                                                                "computerNumbers",
+                                                                                false)
+                                                                ? 1
+                                                                : 0)),
+                                FractionMode.fromId(
+                                        getPreferences(0)
+                                                .getInt(
+                                                        "fractionMode",
+                                                        getPreferences(0)
+                                                                        .getBoolean(
+                                                                                "fractions", false)
+                                                                ? 1
+                                                                : 0)));
+                session.tauConstant = getPreferences(0).getBoolean("tauConstant", false);
+            }
+        }
         session.attach(this);
         numbers = numberFormat(session.display.numberMode);
         return restoreSession;
@@ -612,6 +638,7 @@ public final class MainActivity extends Activity {
         fractionButton.setOnClickListener(v -> execute("FRACTION"));
         header.addView(fractionButton, new LinearLayout.LayoutParams(dp(54), dp(48)));
         status = text(12);
+        status.setTag("calculation-status");
         status.setGravity(Gravity.CENTER_VERTICAL);
         status.setSingleLine(true);
         status.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -783,7 +810,13 @@ public final class MainActivity extends Activity {
                                 : display.editing
                                         ? getString(R.string.entry_status)
                                         : getString(R.string.stack_status));
-        status.setContentDescription(status.getText());
+        if (session.policy.temporary)
+            status.setText(getString(R.string.temporary_status, status.getText()));
+        status.setTextColor(session.policy.temporary ? colors.accent : colors.text);
+        status.setContentDescription(
+                session.policy.temporary
+                        ? getString(R.string.temporary_description, status.getText())
+                        : status.getText());
         if (!session.error.isEmpty() && !session.error.equals(shownError))
             showNotice(session.error, true);
         shownError = session.error;
