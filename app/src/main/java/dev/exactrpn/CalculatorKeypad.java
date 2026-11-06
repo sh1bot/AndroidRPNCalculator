@@ -56,7 +56,7 @@ public final class CalculatorKeypad extends ViewGroup {
         numbers = new LocaleNumbers(context.getResources().getConfiguration().getLocales().get(0));
         controls = new LinearLayout(context);
         controls.addView(
-                button("CLEAR", getContext().getString(R.string.clear)),
+                button(Command.UNDO, getContext().getString(R.string.undo)),
                 new LinearLayout.LayoutParams(0, dp(44), 1));
         functions = button("FUNCTIONS", "f()");
         complements = button("COMPLEMENTS", "f⁻¹()");
@@ -72,7 +72,7 @@ public final class CalculatorKeypad extends ViewGroup {
                     {"π", "e", "φ", "xʸ", "rem"}
                 },
                 scientificRows);
-        addRows(new String[][] {{Command.UNDO, "SWAP", "BACK", "÷"}}, primaryRows);
+        addRows(new String[][] {{"CLEAR", "BACK", "SWAP", "÷"}}, primaryRows);
         addRows(
                 new String[][] {
                     {"7", "8", "9", "×"},
@@ -189,6 +189,21 @@ public final class CalculatorKeypad extends ViewGroup {
     }
 
     public void setEditing(boolean editing) {
+        for (Map.Entry<String, Button> item : numberButtons.entrySet()) {
+            String digit = item.getKey();
+            if (digit.matches("[0-9]"))
+                item.getValue()
+                        .setContentDescription(
+                                editing
+                                        ? numbers.entry(digit)
+                                        : getContext()
+                                                .getString(
+                                                        R.string.digit_pick_description,
+                                                        numbers.entry(digit),
+                                                        digit.equals("0")
+                                                                ? 10
+                                                                : Integer.parseInt(digit)));
+        }
         clearButton.setText(editing ? "CE" : getContext().getString(R.string.clear));
         clearButton.setContentDescription(
                 editing
@@ -220,6 +235,7 @@ public final class CalculatorKeypad extends ViewGroup {
     private Button button(String key, CharSequence label) {
         Button b = new Button(getContext());
         if (key.equals("CLEAR")) clearButton = b;
+        if (key.equals(Command.UNDO)) undoButton = b;
         b.setAllCaps(false);
         b.setTag(key);
         if (Arrays.asList(
@@ -343,6 +359,12 @@ public final class CalculatorKeypad extends ViewGroup {
                                 key.equals(Command.UNDO) && calculating
                                         ? Command.CANCEL
                                         : key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
+        if (key.matches("[0-9]"))
+            b.setOnLongClickListener(
+                    v -> {
+                        command.accept("HOLD_DIGIT:" + key);
+                        return true;
+                    });
         if (key.equals(Command.UNDO))
             b.setOnLongClickListener(
                     v -> {

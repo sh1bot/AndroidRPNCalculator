@@ -15,6 +15,10 @@ last digit leaves entry mode active; **Enter** on an empty entry returns to the
 stack. Results return to the bottom after operations; exact integers display in
 full there, while values above an entry use compact notation.
 
+In stack mode, long-press a digit to **Pick** that level: 1 copies X, 2 copies Y,
+and 0 copies level 10. The original stays in place and the copy becomes X.
+During entry, holding a digit enters that digit.
+
 Your stack and entry are restored when you reopen the app.
 
 **Swap** exchanges X and Y. **Clear** clears the stack. During entry it becomes
