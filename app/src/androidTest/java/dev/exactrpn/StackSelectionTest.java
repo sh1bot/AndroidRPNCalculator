@@ -117,6 +117,27 @@ public final class StackSelectionTest {
                     () -> tagged(activity, "stack-checkbox:2").performClick());
             instrumentation.runOnMainSync(
                     () -> tagged(activity, "stack-value:1").performLongClick());
+            instrumentation.runOnMainSync(
+                    () -> {
+                        assertEquals(
+                                View.INVISIBLE,
+                                tagged(activity, "stack-checkbox:0").getVisibility());
+                        assertFalse(tagged(activity, "stack-row:0").isSelected());
+                        assertTrue(tagged(activity, "stack-row:1").isSelected());
+                        assertFalse(tagged(activity, "stack-row:2").isSelected());
+                        assertEquals(
+                                new java.util.TreeSet<>(java.util.Arrays.asList(0, 2)),
+                                session.selectedRows);
+                    });
+            androidx.test.espresso.Espresso.pressBack();
+            await(() -> tagged(activity, "stack-checkbox:0").getVisibility() == View.VISIBLE);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        assertTrue(tagged(activity, "stack-row:0").isSelected());
+                        assertFalse(tagged(activity, "stack-row:1").isSelected());
+                        assertTrue(tagged(activity, "stack-row:2").isSelected());
+                        tagged(activity, "stack-value:1").performLongClick();
+                    });
             choose("Pick");
             await(() -> !session.busy && tagged(activity, "stack-value:3") != null);
             instrumentation.runOnMainSync(
