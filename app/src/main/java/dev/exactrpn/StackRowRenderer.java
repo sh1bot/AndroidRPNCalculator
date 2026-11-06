@@ -18,7 +18,7 @@ final class StackRowRenderer {
 
         void tap(int index, Display display);
 
-        void menu(View anchor, int index, Display display);
+        boolean toggleAll(Display display);
     }
 
     private final Context context;
@@ -120,10 +120,10 @@ final class StackRowRenderer {
             label.setTag("stack-label:" + i);
             label.setOnLongClickListener(
                     v -> {
-                        actions.toggle(index, display);
+                        actions.toggleAll(display);
                         return true;
                     });
-            label.setOnClickListener(v -> actions.tap(index, display));
+            label.setOnClickListener(v -> actions.toggle(index, display));
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setTextColor(colors.muted);
             row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
@@ -184,17 +184,7 @@ final class StackRowRenderer {
             value.setTextIsSelectable(false);
             row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
             value.setTag("stack-value:" + i);
-            value.setOnLongClickListener(
-                    v -> {
-                        actions.menu(value, index, display);
-                        return true;
-                    });
             value.setOnClickListener(v -> actions.tap(index, display));
-            row.setOnLongClickListener(
-                    v -> {
-                        actions.menu(value, index, display);
-                        return true;
-                    });
             row.setOnClickListener(v -> actions.tap(index, display));
             row.setContentDescription(
                     rowDescription(
@@ -204,19 +194,14 @@ final class StackRowRenderer {
                             value.getText()));
             stackRows.addView(row);
         }
-        showSelection(stackRows, selectedRows, null);
+        showSelection(stackRows, selectedRows);
     }
 
-    /** Menu focus changes only presentation; the real selection keeps its row identities. */
-    void showSelection(
-            LinearLayout stackRows, SortedSet<Integer> selectedRows, Integer menuTarget) {
+    private void showSelection(LinearLayout stackRows, SortedSet<Integer> selectedRows) {
         for (int i = 0; i < stackRows.getChildCount(); i++) {
             View row = stackRows.getChildAt(i);
             if (!("stack-row:" + i).equals(row.getTag())) continue;
-            View checkbox = row.findViewWithTag("stack-checkbox:" + i);
-            if (checkbox != null)
-                checkbox.setVisibility(menuTarget == null ? View.VISIBLE : View.INVISIBLE);
-            boolean highlighted = menuTarget == null ? selectedRows.contains(i) : menuTarget == i;
+            boolean highlighted = selectedRows.contains(i);
             row.setSelected(highlighted);
             if (highlighted) {
                 android.graphics.drawable.GradientDrawable highlight =

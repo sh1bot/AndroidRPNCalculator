@@ -3,6 +3,11 @@
     <string name="drop">Drop</string>
     <string name="copy">Copy</string>
     <string name="pick">Pick</string>
+    <string name="copy_selected">Copy selected values</string>
+    <string name="pick_selected">Pick selected values</string>
+    <string name="drop_selected">Drop selected values</string>
+    <string name="sum_selected">Sum selected values</string>
+    <string name="product_selected">Product of selected values</string>
     <string name="clipboard_no_number">Clipboard does not contain a number</string>
     <string name="clipboard_too_long">Pasted number is too long (maximum 4096 characters)</string>
     <string name="clipboard_label">Calculator value</string>

@@ -14,6 +14,7 @@ public final class Command {
         DROP_ROWS,
         PICK_ROWS,
         SUM_ROWS,
+        PRODUCT_ROWS,
         HOLD_DIGIT,
         PASTE_RAW
     }
@@ -94,7 +95,10 @@ public final class Command {
         if (kind == Kind.HOLD_DIGIT && !payload.matches("[0-9]"))
             throw new IllegalArgumentException("Invalid digit shortcut");
         int[] rows =
-                kind == Kind.DROP_ROWS || kind == Kind.PICK_ROWS || kind == Kind.SUM_ROWS
+                kind == Kind.DROP_ROWS
+                                || kind == Kind.PICK_ROWS
+                                || kind == Kind.SUM_ROWS
+                                || kind == Kind.PRODUCT_ROWS
                         ? Arrays.stream(payload.split(",")).mapToInt(Integer::parseInt).toArray()
                         : new int[0];
         return new Command(kind, wire, payload, 0, 0, false, false, rows);
@@ -114,6 +118,7 @@ public final class Command {
                 || kind == Kind.DROP_ROWS
                 || kind == Kind.PICK_ROWS
                 || kind == Kind.SUM_ROWS
+                || kind == Kind.PRODUCT_ROWS
                 || kind == Kind.HOLD_DIGIT;
     }
 
@@ -132,6 +137,9 @@ public final class Command {
                 break;
             case SUM_ROWS:
                 calculator.sumRows(rows);
+                break;
+            case PRODUCT_ROWS:
+                calculator.productRows(rows);
                 break;
             case HOLD_DIGIT:
                 calculator.holdDigit(text);

@@ -34,10 +34,16 @@ public final class CalculatorKeypad extends ViewGroup {
     private LocaleNumbers numbers;
     private final Map<String, Button> numberButtons = new HashMap<>();
     private final LinearLayout controls;
-    private Button deleteButton, undoButton, clearButton, piButton;
+    private Button deleteButton,
+            undoButton,
+            clearButton,
+            piButton,
+            swapButton,
+            sumButton,
+            productButton;
     private boolean tau;
     private Consumer<Boolean> saveTau = enabled -> {};
-    private boolean calculating;
+    private boolean calculating, editing, selecting;
     private boolean expanded, inverse;
     private final Map<String, Button> inverseButtons = new HashMap<>();
     private final BiConsumer<Boolean, Boolean> savePanel;
@@ -210,6 +216,7 @@ public final class CalculatorKeypad extends ViewGroup {
     }
 
     public void setEditing(boolean editing) {
+        this.editing = editing;
         for (Map.Entry<String, Button> item : numberButtons.entrySet()) {
             String digit = item.getKey();
             if (digit.matches("[0-9]"))
@@ -225,15 +232,48 @@ public final class CalculatorKeypad extends ViewGroup {
                                                                 ? 10
                                                                 : Integer.parseInt(digit)));
         }
-        clearButton.setText(editing ? "CE" : getContext().getString(R.string.clear));
+        updateModeKeys();
+    }
+
+    public void setSelecting(boolean selecting) {
+        this.selecting = selecting;
+        updateModeKeys();
+    }
+
+    private void updateModeKeys() {
+        clearButton.setText(
+                selecting ? "" : editing ? "CE" : getContext().getString(R.string.clear));
         clearButton.setContentDescription(
-                editing
-                        ? getContext().getString(R.string.clear_entry)
-                        : getContext().getString(R.string.clear_stack));
-        deleteButton.setText(editing ? "⌫" : getContext().getString(R.string.drop));
+                getContext()
+                        .getString(
+                                selecting
+                                        ? R.string.copy_selected
+                                        : editing ? R.string.clear_entry : R.string.clear_stack));
+        android.graphics.drawable.Drawable copy =
+                selecting ? getContext().getDrawable(R.drawable.ic_copy) : null;
+        if (copy != null) copy.setTint(colors.text);
+        clearButton.setCompoundDrawablesRelativeWithIntrinsicBounds(copy, null, null, null);
+        deleteButton.setText(!selecting && editing ? "⌫" : getContext().getString(R.string.drop));
         deleteButton.setContentDescription(
                 getContext()
-                        .getString(editing ? R.string.backspace : R.string.drop_roll_description));
+                        .getString(
+                                selecting
+                                        ? R.string.drop_selected
+                                        : editing
+                                                ? R.string.backspace
+                                                : R.string.drop_roll_description));
+        deleteButton.setLongClickable(!selecting);
+        swapButton.setText(getContext().getString(selecting ? R.string.pick : R.string.swap));
+        swapButton.setContentDescription(
+                getContext()
+                        .getString(selecting ? R.string.pick_selected : R.string.swap_description));
+        swapButton.setLongClickable(!selecting);
+        sumButton.setText(selecting ? "Σ" : "+");
+        sumButton.setContentDescription(
+                selecting ? getContext().getString(R.string.sum_selected) : "+");
+        productButton.setText(selecting ? "Π" : "×");
+        productButton.setContentDescription(
+                selecting ? getContext().getString(R.string.product_selected) : "×");
     }
 
     public void setCalculating(boolean active) {
@@ -256,6 +296,9 @@ public final class CalculatorKeypad extends ViewGroup {
     private Button button(String key, CharSequence label) {
         Button b = new Button(getContext());
         if (key.equals("CLEAR")) clearButton = b;
+        if (key.equals("SWAP")) swapButton = b;
+        if (key.equals("+")) sumButton = b;
+        if (key.equals("×")) productButton = b;
         if (key.equals(Command.UNDO)) undoButton = b;
         if (key.equals("π")) piButton = b;
         b.setAllCaps(false);
@@ -404,13 +447,13 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.equals("BACK"))
             b.setOnLongClickListener(
                     v -> {
-                        command.accept("HOLD_DROP");
+                        if (!selecting) command.accept("HOLD_DROP");
                         return true;
                     });
         if (key.equals("SWAP"))
             b.setOnLongClickListener(
                     v -> {
-                        command.accept("ROLL_UP");
+                        if (!selecting) command.accept("ROLL_UP");
                         return true;
                     });
         if (key.equals(Command.ENTER))

@@ -488,6 +488,15 @@ public final class RpnCalculator {
 
     /** Append the exact sum of distinct selected rows, leaving the originals and entry intact. */
     public void sumRows(int... indices) {
+        aggregateRows(Operation.ADD, indices);
+    }
+
+    /** Append the exact product without consuming any selected value or unfinished entry. */
+    public void productRows(int... indices) {
+        aggregateRows(Operation.MULTIPLY, indices);
+    }
+
+    private void aggregateRows(Operation operation, int... indices) {
         TreeSet<Integer> rows = new TreeSet<>();
         for (int index : indices) {
             if (index < 0 || index >= stack.size())
@@ -503,8 +512,8 @@ public final class RpnCalculator {
                 sum = value;
                 expression = savedValues.get(value);
             } else {
-                sum = sum.add(value);
-                expression = SavedValue.of(sum, "+", expression, savedValues.get(value));
+                sum = operation.evaluate(sum, value, angleUnit);
+                expression = SavedValue.of(sum, operation.key, expression, savedValues.get(value));
             }
         }
         State before = new State(this);
