@@ -102,6 +102,34 @@ public final class AdaptiveKeypadTest {
     }
 
     @Test
+    public void piTauToggleOnlyChangesTheKeyAndAppliesInBothFunctionSets() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            AtomicReference<String> command = new AtomicReference<>();
+                            AtomicReference<Boolean> preference = new AtomicReference<>(false);
+                            CalculatorKeypad keypad =
+                                    new CalculatorKeypad(
+                                            context, command::set, true, (open, inverse) -> {});
+                            keypad.setTauPreference(false, preference::set);
+                            find(keypad, "π").performLongClick();
+                            assertTrue(preference.get());
+                            assertNull(command.get());
+                            find(keypad, "τ").performClick();
+                            assertEquals("τ", command.get());
+                            command.set(null);
+                            keypad.setInverse(true);
+                            assertNotNull(find(keypad, "τ"));
+                            find(keypad, "τ").performLongClick();
+                            assertFalse(preference.get());
+                            assertNull(command.get());
+                            find(keypad, "π").performClick();
+                            assertEquals("π", command.get());
+                        });
+    }
+
+    @Test
     public void toggleSwitchAndCloseWithoutSendingAnArithmeticCommand() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         InstrumentationRegistry.getInstrumentation()

@@ -137,6 +137,9 @@ public final class MainActivity extends Activity {
                             session.inverse = inverse;
                         });
         keys.setInverse(session.inverse);
+        keys.setTauPreference(
+                getPreferences(0).getBoolean("tauConstant", false),
+                enabled -> getPreferences(0).edit().putBoolean("tauConstant", enabled).apply());
         root.addView(
                 new CalculatorWorkspace(this, stackPanel, keys),
                 new LinearLayout.LayoutParams(-1, 0, 1));

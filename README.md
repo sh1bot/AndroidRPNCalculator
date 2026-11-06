@@ -39,6 +39,9 @@ power to the Xth root of Y, and remainder to modulo. Inverse trig results use th
 selected angle unit. **rem** calculates Y remainder X, with the sign of Y;
 **mod** uses the sign of X. **rem** is the default; f⁻¹() reveals mod.
 **⌊x⌋** rounds down toward negative infinity; its complement **⌈x⌉** rounds up toward positive infinity.
+Long-press **π/τ** to switch that key between pi and tau; the choice is saved
+between app launches. A short press inserts the displayed constant, with tau
+represented as exactly `2 × π`. Switching the key does not insert a value.
 **φ** pushes the exact golden ratio `(1 + √5) / 2`. Both accept exact rational operands. **x!** computes
 factorial for nonnegative integers. **Factorise** replaces a positive integer greater
 than 1 with its prime factors, pushed smallest first: `84 Factorise` gives `2, 2, 3, 7`

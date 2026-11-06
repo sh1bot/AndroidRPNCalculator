@@ -8,6 +8,7 @@ import java.util.Arrays;
 /** One definition of arithmetic, shared by live execution and saved expression replay. */
 public enum Operation {
     PI("π", 0),
+    TAU("τ", 0),
     E("e", 0),
     PHI("φ", 0),
     ADD("+", 2),
@@ -87,6 +88,8 @@ public enum Operation {
         switch (this) {
             case PI:
                 return UnifiedReal.PI;
+            case TAU:
+                return UnifiedReal.PI.multiply(UnifiedReal.TWO);
             case E:
                 return UnifiedReal.E;
             case PHI:

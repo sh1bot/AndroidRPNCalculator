@@ -62,6 +62,24 @@ final class MoreFunctionsTest {
     }
 
     @Test
+    void tauRetainsPiIdentitiesAndRestoresExactly() throws Exception {
+        RpnCalculator calculator = new RpnCalculator();
+        calculator.key("τ");
+        UnifiedReal tau = calculator.values().get(0);
+        assertTrue(tau.divide(UnifiedReal.TWO).definitelyEquals(UnifiedReal.PI));
+        assertTrue(tau.sin().definitelyZero());
+        assertTrue(tau.cos().definitelyOne());
+        UnifiedReal restored = RpnCalculator.load(calculator.save()).values().get(0);
+        assertTrue(restored.divide(UnifiedReal.TWO).definitelyEquals(UnifiedReal.PI));
+        assertTrue(restored.sin().definitelyZero());
+        assertTrue(restored.cos().definitelyOne());
+        calculator.key("UNDO");
+        assertTrue(calculator.values().isEmpty());
+        calculator.key("REDO");
+        assertTrue(calculator.values().get(0).definitelyEquals(tau));
+    }
+
+    @Test
     void goldenRatioIsExactAndSurvivesRestore() throws Exception {
         RpnCalculator calculator = new RpnCalculator();
         calculator.key("φ");
