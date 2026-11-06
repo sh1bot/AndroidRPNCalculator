@@ -273,8 +273,12 @@ public final class LockScreenTest {
             assertEquals(Arrays.asList("7"), session.display.rows);
             assertFalse(session.canUseSavedState());
             shell("locksettings clear --old 1234");
+            await(() -> !manager.isDeviceSecure());
             credential = false;
-            shell("wm dismiss-keyguard");
+            LockedCalculatorActivity unlocking = activity;
+            // The calculator occludes keyguard. Use its activity token to dismiss the
+            // now-unsecured keyguard; the shell command has no visible activity token.
+            instrumentation.runOnMainSync(() -> manager.requestDismissKeyguard(unlocking, null));
             await(() -> !DeviceAccess.locked(context));
             assertFalse(
                     "Unlock must not promote the temporary session", session.canUseSavedState());
@@ -297,9 +301,10 @@ public final class LockScreenTest {
             assertEquals("Neither lock nor unlock may touch saved files", 0, accesses.get());
         } finally {
             if (credential) shell("locksettings clear --old 1234");
+            if (activity != null) StackSelectionTest.finish(activity);
             shell("input keyevent KEYCODE_WAKEUP");
             shell("wm dismiss-keyguard");
-            if (activity != null) StackSelectionTest.finish(activity);
+            await(() -> !DeviceAccess.locked(context));
             observer.stopWatching();
             assertArrayEquals(before, Files.readAllBytes(saved.toPath()));
             store.clear();
