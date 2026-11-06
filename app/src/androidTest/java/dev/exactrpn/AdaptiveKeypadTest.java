@@ -7,7 +7,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import android.app.Instrumentation;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Rect;
 import android.view.View;
 import android.view.ViewGroup;
@@ -55,6 +57,48 @@ public final class AdaptiveKeypadTest {
             current = (View) current.getParent();
         }
         return new Rect(x, y, x + view.getWidth(), y + view.getHeight());
+    }
+
+    @Test
+    public void modesStayInsideTheStackAndKeypadUsesFullLandscapeHeight() throws Exception {
+        Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        Context context = instrumentation.getTargetContext();
+        MainActivity activity =
+                (MainActivity)
+                        instrumentation.startActivitySync(
+                                new Intent(context, MainActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        try {
+            instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(
+                    () -> {
+                        ViewGroup workspace =
+                                activity.getWindow()
+                                        .getDecorView()
+                                        .findViewWithTag("calculator-workspace");
+                        ViewGroup stack = workspace.findViewWithTag("stack-panel");
+                        ViewGroup modes = stack.findViewWithTag("mode-row");
+                        View keypad = workspace.getChildAt(1);
+                        assertEquals(stack, modes.getParent());
+                        size(context, workspace, 760, 280);
+                        assertEquals(0, keypad.getTop());
+                        assertEquals(workspace.getHeight(), keypad.getHeight());
+                        find(keypad, "f()").performClick();
+                        size(context, workspace, 660, 280);
+                        assertEquals(0, keypad.getTop());
+                        assertEquals(workspace.getHeight(), keypad.getHeight());
+                        assertEquals(stack.getWidth(), modes.getWidth());
+                        for (int i = 0; i < modes.getChildCount(); i++) {
+                            assertTrue(modes.getChildAt(i).getLeft() >= 0);
+                            assertTrue(modes.getChildAt(i).getRight() <= modes.getWidth());
+                        }
+                        size(context, workspace, 392, 700);
+                        assertEquals(stack.getBottom(), keypad.getTop());
+                        assertEquals(workspace.getWidth(), modes.getWidth());
+                    });
+        } finally {
+            StackSelectionTest.finish(activity);
+        }
     }
 
     @Test
