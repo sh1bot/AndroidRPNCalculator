@@ -13,6 +13,7 @@ public final class Command {
         SELECT,
         DROP_ROWS,
         PICK_ROWS,
+        HOLD_DIGIT,
         PASTE_RAW
     }
 
@@ -89,6 +90,8 @@ public final class Command {
                     false,
                     new int[0]);
         }
+        if (kind == Kind.HOLD_DIGIT && !payload.matches("[0-9]"))
+            throw new IllegalArgumentException("Invalid digit shortcut");
         int[] rows =
                 kind == Kind.DROP_ROWS || kind == Kind.PICK_ROWS
                         ? Arrays.stream(payload.split(",")).mapToInt(Integer::parseInt).toArray()
@@ -108,7 +111,8 @@ public final class Command {
         return PRESENTATION.contains(wire)
                 || kind == Kind.SELECT
                 || kind == Kind.DROP_ROWS
-                || kind == Kind.PICK_ROWS;
+                || kind == Kind.PICK_ROWS
+                || kind == Kind.HOLD_DIGIT;
     }
 
     public boolean isEntryUpdate() {
@@ -123,6 +127,9 @@ public final class Command {
                 break;
             case PICK_ROWS:
                 calculator.pickRows(rows);
+                break;
+            case HOLD_DIGIT:
+                calculator.holdDigit(text);
                 break;
             case PASTE_RAW:
                 calculator.pasteText(text, locale);

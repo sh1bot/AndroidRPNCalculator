@@ -4,6 +4,7 @@ package dev.exactrpn;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -65,6 +66,62 @@ final class CommandTest {
         assertEquals(
                 java.util.Arrays.asList("1", "2", "3"),
                 calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+    }
+
+    @Test
+    void heldDigitsPickOneBasedLevelsAndZeroPicksTen() throws Exception {
+        for (int depth = 1; depth <= 10; depth++) {
+            RpnCalculator calculator = new RpnCalculator();
+            for (int n = 101; n <= 110; n++) {
+                calculator.paste(Integer.toString(n));
+                calculator.key("ENTER");
+            }
+            com.android.calculator2.UnifiedReal original = calculator.values().get(10 - depth);
+            int history = calculator.undoCount();
+            String digit = depth == 10 ? "0" : Integer.toString(depth);
+            Command hold = Command.parse("HOLD_DIGIT:" + digit);
+            assertTrue(hold.preservesSelection());
+            hold.apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+            assertEquals(11, calculator.values().size());
+            assertSame(original, calculator.values().get(10));
+            assertEquals(history + 1, calculator.undoCount());
+            calculator = RpnCalculator.load(calculator.save());
+            assertEquals(original.bigIntegerValue(), calculator.values().get(10).bigIntegerValue());
+            calculator.key("UNDO");
+            assertEquals(10, calculator.values().size());
+            calculator.key("REDO");
+            assertEquals(11, calculator.values().size());
+        }
+    }
+
+    @Test
+    void heldDigitsEditAtTheCursorWithoutPickingOrCommitting() {
+        RpnCalculator calculator = new RpnCalculator();
+        calculator.key("π");
+        calculator.paste("45");
+        calculator.select(1, 1);
+        Command.parse("HOLD_DIGIT:7").apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+        assertEquals("475", calculator.entry());
+        assertEquals(1, calculator.values().size());
+        assertTrue(calculator.isEditing());
+        calculator.key("CE");
+        calculator.holdDigit("0");
+        assertEquals("0", calculator.entry());
+        assertEquals(1, calculator.values().size());
+    }
+
+    @Test
+    void unavailableLevelsDoNotChangeStackOrHistory() {
+        RpnCalculator calculator = new RpnCalculator();
+        calculator.key("π");
+        int history = calculator.undoCount();
+        assertThrows(IllegalArgumentException.class, () -> calculator.holdDigit("0"));
+        assertEquals(1, calculator.values().size());
+        assertEquals(history, calculator.undoCount());
+        assertTrue(calculator.entry().isEmpty());
+        assertFalse(calculator.isEditing());
+        for (String bad : new String[] {"", "10", "-1", "."})
+            assertThrows(IllegalArgumentException.class, () -> Command.parse("HOLD_DIGIT:" + bad));
     }
 
     @Test

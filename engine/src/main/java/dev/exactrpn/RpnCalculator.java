@@ -447,6 +447,18 @@ public final class RpnCalculator {
         remember(before);
     }
 
+    /** Long-press digits pick a one-based stack level; entry mode keeps their digit function. */
+    public void holdDigit(String digit) {
+        if (!digit.matches("[0-9]")) throw new IllegalArgumentException("Invalid digit shortcut");
+        if (editing) {
+            key(digit);
+            return;
+        }
+        int depth = digit.equals("0") ? 10 : Integer.parseInt(digit);
+        need(depth);
+        pickRows(stack.size() - depth);
+    }
+
     /** Copy rows onto the stack in display order, preserving their exact values and entry. */
     public void pickRows(int... indices) {
         TreeSet<Integer> rows = new TreeSet<>();

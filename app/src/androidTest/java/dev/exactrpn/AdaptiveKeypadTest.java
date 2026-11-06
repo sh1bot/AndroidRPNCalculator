@@ -146,6 +146,55 @@ public final class AdaptiveKeypadTest {
     }
 
     @Test
+    public void reorderedControlsAndHeldDigitsFollowTheirCurrentRoles() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            AtomicReference<String> command = new AtomicReference<>();
+                            CalculatorKeypad keypad =
+                                    new CalculatorKeypad(
+                                            context, command::set, false, (open, inverse) -> {});
+                            CalculatorWorkspace workspace =
+                                    new CalculatorWorkspace(context, new View(context), keypad);
+                            size(context, workspace, 392, 700);
+                            Rect undo = bounds(find(keypad, "Undo"), workspace),
+                                    clear = bounds(find(keypad, "Clear"), workspace),
+                                    drop = bounds(find(keypad, "Drop"), workspace),
+                                    swap = bounds(find(keypad, "Swap"), workspace);
+                            assertTrue(undo.bottom <= clear.top);
+                            assertEquals(clear.top, drop.top);
+                            assertEquals(drop.top, swap.top);
+                            assertTrue(clear.right <= drop.left);
+                            assertTrue(drop.right <= swap.left);
+                            RpnCalculator calculator = new RpnCalculator();
+                            for (String key : new String[] {"1", "ENTER", "2", "ENTER"})
+                                calculator.key(key);
+                            find(keypad, "2").performLongClick();
+                            assertEquals("HOLD_DIGIT:2", command.get());
+                            Command.parse(command.get())
+                                    .apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+                            assertEquals(
+                                    java.util.Arrays.asList("1", "2", "1"),
+                                    calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+                            find(keypad, "0").performLongClick();
+                            assertEquals("HOLD_DIGIT:0", command.get());
+                            calculator.paste("4");
+                            keypad.setEditing(true);
+                            find(keypad, "1").performLongClick();
+                            Command.parse(command.get())
+                                    .apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+                            assertEquals("41", calculator.entry());
+                            assertEquals(3, calculator.values().size());
+                            assertNotNull(find(keypad, "CE"));
+                            assertNotNull(find(keypad, "⌫"));
+                            keypad.setCalculating(true);
+                            find(keypad, "Cancel").performLongClick();
+                            assertEquals("CANCEL", command.get());
+                        });
+    }
+
+    @Test
     public void landscapeCollapseGivesWidthBackAndResizeKeepsPanelState() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         InstrumentationRegistry.getInstrumentation()
@@ -163,12 +212,12 @@ public final class AdaptiveKeypadTest {
                             size(context, workspace, 760, 280);
                             assertTrue(stack.getWidth() < closedWidth);
                             Rect sin = bounds(find(keypad, "sin"), workspace),
-                                    undo = bounds(find(keypad, "Undo"), workspace);
-                            assertTrue("Functions must open to the left", sin.right <= undo.left);
-                            Rect clear = bounds(find(keypad, "Clear"), workspace),
+                                    clear = bounds(find(keypad, "Clear"), workspace);
+                            assertTrue("Functions must open to the left", sin.right <= clear.left);
+                            Rect undo = bounds(find(keypad, "Undo"), workspace),
                                     functions = bounds(find(keypad, "f()"), workspace);
-                            assertTrue(functions.width() > clear.width() * 1.6);
-                            assertTrue(clear.bottom <= undo.top);
+                            assertTrue(functions.width() > undo.width() * 1.6);
+                            assertTrue(undo.bottom <= clear.top);
                             assertTrue(
                                     "Controls stay above digits (allow pixel rounding)",
                                     Math.abs(undo.left - clear.left) <= 1);
@@ -181,12 +230,12 @@ public final class AdaptiveKeypadTest {
                             assertNotNull(find(keypad, "asin"));
                             assertTrue(
                                     bounds(find(keypad, "asin"), workspace).bottom
-                                            <= bounds(find(keypad, "Undo"), workspace).top);
+                                            <= bounds(find(keypad, "Clear"), workspace).top);
                             size(context, workspace, 600, 300);
                             assertTrue(
                                     "Narrow landscape stacks the function rows",
                                     bounds(find(keypad, "asin"), workspace).bottom
-                                            <= bounds(find(keypad, "Undo"), workspace).top);
+                                            <= bounds(find(keypad, "Clear"), workspace).top);
                             assertTrue(stack.getWidth() >= dp(context, 200));
                         });
     }
