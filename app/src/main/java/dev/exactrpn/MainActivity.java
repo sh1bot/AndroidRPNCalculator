@@ -113,7 +113,6 @@ public final class MainActivity extends Activity {
         configureWindow();
         boolean restoreSession = restoreSession();
         LinearLayout root = createRoot();
-        addModeButtons(root);
         scroll = new ScrollView(this);
         scroll.setFillViewport(true);
         stackRows = new LinearLayout(this);
@@ -123,6 +122,9 @@ public final class MainActivity extends Activity {
         LinearLayout stackPanel = new LinearLayout(this);
         stackPanel.setOrientation(LinearLayout.VERTICAL);
         stackPanel.setTag("stack-panel");
+        addModeButtons(stackPanel);
+        stackPanel.addOnLayoutChangeListener(
+                (v, l, t, r, b, ol, ot, or, ob) -> positionNotice(root));
         stackPanel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
         addEntry(stackPanel);
         keys =
@@ -152,10 +154,18 @@ public final class MainActivity extends Activity {
     private void positionNotice(LinearLayout content) {
         if (noticeView == null) return;
         FrameLayout.LayoutParams layout = (FrameLayout.LayoutParams) noticeView.getLayoutParams();
-        layout.leftMargin = content.getPaddingLeft();
-        layout.rightMargin = content.getPaddingRight();
-        layout.topMargin = content.getPaddingTop() + dp(52);
-        noticeView.setLayoutParams(layout);
+        View stack = content.findViewWithTag("stack-panel");
+        int left = content.getPaddingLeft();
+        int right = content.getPaddingRight();
+        if (stack != null && stack.getWidth() > 0)
+            right = Math.max(right, content.getWidth() - left - stack.getWidth());
+        int top = content.getPaddingTop() + dp(52);
+        if (layout.leftMargin != left || layout.rightMargin != right || layout.topMargin != top) {
+            layout.leftMargin = left;
+            layout.rightMargin = right;
+            layout.topMargin = top;
+            noticeView.setLayoutParams(layout);
+        }
     }
 
     private void showNotice(String message, boolean error) {
@@ -569,7 +579,18 @@ public final class MainActivity extends Activity {
     }
 
     private void addModeButtons(LinearLayout root) {
-        LinearLayout header = new LinearLayout(this);
+        LinearLayout header =
+                new LinearLayout(this) {
+                    @Override
+                    protected void onMeasure(int widthSpec, int heightSpec) {
+                        int buttonWidth = Math.min(dp(54), View.MeasureSpec.getSize(widthSpec) / 5);
+                        for (int i = 0; i < getChildCount(); i++)
+                            if (getChildAt(i) instanceof Button)
+                                getChildAt(i).getLayoutParams().width = buttonWidth;
+                        super.onMeasure(widthSpec, heightSpec);
+                    }
+                };
+        header.setTag("mode-row");
         header.setGravity(Gravity.CENTER_VERTICAL);
         angleButton = new Button(this);
         styleModeButton(angleButton);
