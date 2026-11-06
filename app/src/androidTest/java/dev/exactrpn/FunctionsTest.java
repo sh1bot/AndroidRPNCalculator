@@ -159,7 +159,7 @@ public final class FunctionsTest {
                         () -> {
                             CalculatorKeypad keypad =
                                     new CalculatorKeypad(
-                                            context, command::set, true, expanded -> {});
+                                            context, command::set, true, (expanded, inverse) -> {});
                             keypad.setInverse(true);
                             for (String[] example :
                                     new String[][] {
@@ -169,9 +169,9 @@ public final class FunctionsTest {
                                         {"eˣ", "eˣ"},
                                         {"x²", "x²"},
                                         {"ˣ√y", "root"},
-                                        {"rem", "rem"},
+                                        {"mod", "mod"},
                                         {"10ˣ", "10ˣ"},
-                                        {"⌊x⌋", "floor"}
+                                        {"⌈x⌉", "ceil"}
                                     }) {
                                 Button button = find(keypad, example[0]);
                                 assertNotNull(example[0], button);

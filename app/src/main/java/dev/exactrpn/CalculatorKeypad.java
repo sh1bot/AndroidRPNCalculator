@@ -10,7 +10,7 @@ import android.text.SpannableString;
 import android.text.Spanned;
 import android.util.TypedValue;
 import android.view.Gravity;
-import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
@@ -20,13 +20,14 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 /** Round primary keys become shorter capsules to make room for scientific functions. */
-public final class CalculatorKeypad extends LinearLayout {
+public final class CalculatorKeypad extends ViewGroup {
     private final List<LinearLayout> primaryRows = new ArrayList<>();
     private final List<LinearLayout> scientificRows = new ArrayList<>();
-    private final Button expand;
+    private final Button functions, complements;
     private final ThemeColors colors;
     private LocaleNumbers numbers;
     private final Map<String, Button> numberButtons = new HashMap<>();
@@ -35,39 +36,38 @@ public final class CalculatorKeypad extends LinearLayout {
     private boolean calculating;
     private boolean expanded, inverse;
     private final Map<String, Button> inverseButtons = new HashMap<>();
-    private final Consumer<Boolean> saveExpanded;
+    private final BiConsumer<Boolean, Boolean> savePanel;
+    private boolean functionsBeside;
+    private int primaryWidth;
     private final Consumer<String> command;
 
     public CalculatorKeypad(
             Context context,
             Consumer<String> command,
             boolean expanded,
-            Consumer<Boolean> saveExpanded) {
+            BiConsumer<Boolean, Boolean> savePanel) {
         super(context);
         this.command = command;
         this.expanded = expanded;
-        this.saveExpanded = saveExpanded;
+        this.savePanel = savePanel;
         colors = new ThemeColors(context);
         numbers = new LocaleNumbers(context.getResources().getConfiguration().getLocales().get(0));
-        setOrientation(VERTICAL);
         controls = new LinearLayout(context);
         controls.addView(
                 button("CLEAR", getContext().getString(R.string.clear)),
                 new LinearLayout.LayoutParams(0, dp(44), 1));
-        expand = button("", "");
-        expand.setOnClickListener(
-                v -> {
-                    this.expanded = !this.expanded;
-                    updateExpansion();
-                    saveExpanded.accept(this.expanded);
-                });
-        controls.addView(expand, new LinearLayout.LayoutParams(0, dp(44), 3));
-        addView(controls, new LinearLayout.LayoutParams(-1, dp(48)));
+        functions = button("FUNCTIONS", "f()");
+        complements = button("COMPLEMENTS", "f⁻¹()");
+        functions.setOnClickListener(v -> togglePanel(false));
+        complements.setOnClickListener(v -> togglePanel(true));
+        controls.addView(functions, new LinearLayout.LayoutParams(0, dp(44), 2));
+        controls.addView(complements, new LinearLayout.LayoutParams(0, dp(44), 2));
+        addView(controls);
         addRows(
                 new String[][] {
-                    {Command.INVERSE, "sin", "cos", "tan", "1/x", "xʸ"},
-                    {"ln", "log10", "√", "floor", "!"},
-                    {"π", "e", "φ", "mod", "Factor"}
+                    {"sin", "cos", "tan", "1/x", "!"},
+                    {"ln", "log10", "√", "floor", "Factor"},
+                    {"π", "e", "φ", "xʸ", "rem"}
                 },
                 scientificRows);
         addRows(new String[][] {{Command.UNDO, "SWAP", "BACK", "÷"}}, primaryRows);
@@ -98,8 +98,10 @@ public final class CalculatorKeypad extends LinearLayout {
                 return "x²";
             case "xʸ":
                 return "root";
-            case "mod":
-                return "rem";
+            case "rem":
+                return "mod";
+            case "floor":
+                return "ceil";
             case "log10":
                 return "10ˣ";
             default:
@@ -121,6 +123,8 @@ public final class CalculatorKeypad extends LinearLayout {
                 return "log₁₀";
             case "floor":
                 return "⌊x⌋";
+            case "ceil":
+                return "⌈x⌉";
             default:
                 return key;
         }
@@ -128,6 +132,10 @@ public final class CalculatorKeypad extends LinearLayout {
 
     private String functionDescription(String key) {
         switch (key) {
+            case "floor":
+                return getContext().getString(R.string.floor_description);
+            case "ceil":
+                return getContext().getString(R.string.ceil_description);
             case "log10":
                 return getContext().getString(R.string.log10_description);
             case "10ˣ":
@@ -164,7 +172,7 @@ public final class CalculatorKeypad extends LinearLayout {
                                     : getContext().getString(R.string.off));
             }
         }
-        requestLayout();
+        updateExpansion();
     }
 
     public void setNumberFormat(LocaleNumbers format) {
@@ -211,7 +219,17 @@ public final class CalculatorKeypad extends LinearLayout {
         if (key.equals("CLEAR")) clearButton = b;
         b.setAllCaps(false);
         b.setTag(key);
-        if (Arrays.asList(Command.INVERSE, "sin", "cos", "tan", "ln", "√", "xʸ", "log10", "mod")
+        if (Arrays.asList(
+                        Command.INVERSE,
+                        "sin",
+                        "cos",
+                        "tan",
+                        "ln",
+                        "√",
+                        "xʸ",
+                        "log10",
+                        "rem",
+                        "floor")
                 .contains(key)) inverseButtons.put(key, b);
         if (key.equals("xʸ")
                 || key.equals(Command.INVERSE)
@@ -379,25 +397,54 @@ public final class CalculatorKeypad extends LinearLayout {
                 row.addView(cell, new LinearLayout.LayoutParams(0, -1, 1));
             }
             rows.add(row);
-            addView(row, new LinearLayout.LayoutParams(-1, dp(56)));
+            addView(row);
         }
+    }
+
+    private void togglePanel(boolean complementary) {
+        boolean close = expanded && inverse == complementary;
+        expanded = !close;
+        setInverse(complementary);
+        savePanel.accept(expanded, inverse);
+    }
+
+    public boolean isExpanded() {
+        return expanded;
+    }
+
+    void setGeometry(boolean beside, int primaryWidth) {
+        functionsBeside = beside;
+        this.primaryWidth = primaryWidth;
     }
 
     private void updateExpansion() {
         for (LinearLayout row : scientificRows) row.setVisibility(expanded ? VISIBLE : GONE);
-        expand.setText(
-                expanded
-                        ? getContext().getString(R.string.functions_expanded)
-                        : getContext().getString(R.string.functions_collapsed));
-        expand.setContentDescription(
-                expanded
-                        ? getContext().getString(R.string.hide_functions)
-                        : getContext().getString(R.string.show_functions));
-        if (Build.VERSION.SDK_INT >= 30)
-            expand.setStateDescription(
-                    expanded
-                            ? getContext().getString(R.string.expanded)
-                            : getContext().getString(R.string.collapsed));
+        functions.setActivated(expanded && !inverse);
+        complements.setActivated(expanded && inverse);
+        functions.setTextColor(expanded && !inverse ? colors.accent : colors.text);
+        complements.setTextColor(expanded && inverse ? colors.accent : colors.text);
+        functions.setContentDescription(
+                getContext()
+                        .getString(
+                                expanded && !inverse
+                                        ? R.string.close_functions
+                                        : R.string.open_functions));
+        complements.setContentDescription(
+                getContext()
+                        .getString(
+                                expanded && inverse
+                                        ? R.string.close_complements
+                                        : R.string.open_complements));
+        if (Build.VERSION.SDK_INT >= 30) {
+            functions.setStateDescription(
+                    getContext()
+                            .getString(
+                                    expanded && !inverse ? R.string.expanded : R.string.collapsed));
+            complements.setStateDescription(
+                    getContext()
+                            .getString(
+                                    expanded && inverse ? R.string.expanded : R.string.collapsed));
+        }
         requestLayout();
     }
 
@@ -418,6 +465,7 @@ public final class CalculatorKeypad extends LinearLayout {
                 || key.equals("x²")
                 || key.equals("!")
                 || key.equals("floor")
+                || key.equals("ceil")
                 || key.equals("10ˣ")) preferred = 22;
         else if (key.equals("sin")
                 || key.equals("cos")
@@ -445,57 +493,81 @@ public final class CalculatorKeypad extends LinearLayout {
 
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
-        int width =
-                Math.max(1, MeasureSpec.getSize(widthSpec) - getPaddingLeft() - getPaddingRight());
-        int columns = 1;
-        for (LinearLayout row : primaryRows) columns = Math.max(columns, row.getChildCount());
-        int naturalCell = width / columns;
-        int naturalHeight = dp(48) + naturalCell * primaryRows.size();
-        int available =
-                MeasureSpec.getMode(heightSpec) == MeasureSpec.UNSPECIFIED
-                        ? naturalHeight + dp(112)
-                        : MeasureSpec.getSize(heightSpec);
-        // Reserve room for the stack. Both modes get the SAME footprint, derived
-        // from the primary grid and actual parent constraints, not screen size.
-        int height =
-                Math.min(naturalHeight, Math.max(0, available - Math.min(dp(112), available / 3)));
-        int controlHeight = Math.min(dp(48), height / Math.max(1, primaryRows.size() + 1));
-        controls.getLayoutParams().height = controlHeight;
-        int controlGap = Math.min(dp(8), controlHeight / 6);
+        int width = MeasureSpec.getSize(widthSpec), height = MeasureSpec.getSize(heightSpec);
+        int digitsWidth = functionsBeside ? Math.min(primaryWidth, width) : width;
+        int controlHeight = Math.min(dp(48), Math.max(1, height / 6));
+        int gap = Math.min(dp(8), controlHeight / 6);
         for (int i = 0; i < controls.getChildCount(); i++) {
-            LinearLayout.LayoutParams lp =
-                    (LinearLayout.LayoutParams) controls.getChildAt(i).getLayoutParams();
-            lp.height = Math.max(1, controlHeight - controlGap);
-            lp.topMargin = controlGap / 2;
-            lp.bottomMargin = controlGap - controlGap / 2;
-            lp.leftMargin = controlGap / 2;
-            lp.rightMargin = controlGap / 2;
-            fitLabel((Button) controls.getChildAt(i), width / controls.getChildCount(), lp.height);
+            Button control = (Button) controls.getChildAt(i);
+            LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) control.getLayoutParams();
+            lp.height = Math.max(1, controlHeight - gap);
+            lp.topMargin = gap / 2;
+            lp.bottomMargin = gap - gap / 2;
+            lp.leftMargin = gap / 2;
+            lp.rightMargin = gap / 2;
+            fitLabel(control, digitsWidth * (i == 0 ? 1 : 2) / 5 - gap, lp.height);
         }
-        List<LinearLayout> activeRows = new ArrayList<>();
-        for (int i = 1; i < getChildCount(); i++) {
-            View row = getChildAt(i);
-            if (row.getVisibility() != GONE) activeRows.add((LinearLayout) row);
+        controls.measure(
+                MeasureSpec.makeMeasureSpec(digitsWidth, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(controlHeight, MeasureSpec.EXACTLY));
+        int body = Math.max(1, height - controlHeight);
+        int rows = 5 + (expanded && !functionsBeside ? 3 : 0);
+        for (int i = 0; i < primaryRows.size(); i++) {
+            int index = i + (expanded && !functionsBeside ? 3 : 0);
+            measureRow(
+                    primaryRows.get(i),
+                    digitsWidth,
+                    body * (index + 1) / rows - body * index / rows,
+                    !expanded);
         }
-        int bodyHeight = Math.max(0, height - controlHeight);
-        int count = Math.max(1, activeRows.size());
-        for (int r = 0; r < activeRows.size(); r++) {
-            LinearLayout row = activeRows.get(r);
-            int rowHeight = bodyHeight / count + (r < bodyHeight % count ? 1 : 0);
-            row.getLayoutParams().height = rowHeight;
-            int cellWidth = width / Math.max(1, row.getChildCount());
-            int gap = Math.min(dp(8), rowHeight / 6);
-            boolean round = !expanded && primaryRows.contains(row);
-            for (int c = 0; c < row.getChildCount(); c++) {
-                FrameLayout cell = (FrameLayout) row.getChildAt(c);
-                Button button = (Button) cell.getChildAt(0);
-                FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) button.getLayoutParams();
-                lp.height = Math.max(1, rowHeight - gap);
-                lp.width = Math.max(1, cellWidth - gap);
-                if (round) lp.width = lp.height = Math.min(lp.width, lp.height);
-                fitLabel(button, lp.width, lp.height);
+        if (expanded)
+            for (int i = 0; i < scientificRows.size(); i++) {
+                int functionWidth = functionsBeside ? width - digitsWidth - dp(12) : width;
+                int rowHeight =
+                        functionsBeside ? body / 5 : body * (i + 1) / rows - body * i / rows;
+                measureRow(
+                        scientificRows.get(i),
+                        Math.max(1, functionWidth),
+                        Math.max(1, rowHeight),
+                        false);
             }
+        setMeasuredDimension(width, height);
+    }
+
+    private void measureRow(LinearLayout row, int width, int height, boolean round) {
+        int gap = Math.min(dp(8), height / 6);
+        int cellWidth = width / row.getChildCount();
+        for (int c = 0; c < row.getChildCount(); c++) {
+            Button button = (Button) ((FrameLayout) row.getChildAt(c)).getChildAt(0);
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) button.getLayoutParams();
+            lp.width = Math.max(1, cellWidth - gap);
+            lp.height = Math.max(1, height - gap);
+            if (round) lp.width = lp.height = Math.min(lp.width, lp.height);
+            fitLabel(button, lp.width, lp.height);
         }
-        super.onMeasure(widthSpec, heightSpec);
+        row.measure(
+                MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(Math.max(1, height), MeasureSpec.EXACTLY));
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        int digitsWidth = controls.getMeasuredWidth();
+        int digitsX = getWidth() - digitsWidth;
+        controls.layout(digitsX, 0, getWidth(), controls.getMeasuredHeight());
+        int y = controls.getMeasuredHeight();
+        if (expanded) {
+            int fy = y;
+            for (LinearLayout row : scientificRows) {
+                int x = functionsBeside ? 0 : digitsX;
+                row.layout(x, fy, x + row.getMeasuredWidth(), fy + row.getMeasuredHeight());
+                fy += row.getMeasuredHeight();
+            }
+            if (!functionsBeside) y = fy;
+        }
+        for (LinearLayout row : primaryRows) {
+            row.layout(digitsX, y, getWidth(), y + row.getMeasuredHeight());
+            y += row.getMeasuredHeight();
+        }
     }
 }

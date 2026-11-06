@@ -120,16 +120,24 @@ public final class MainActivity extends Activity {
         stackRows.setOrientation(1);
         stackRows.setGravity(Gravity.BOTTOM);
         scroll.addView(stackRows, new ScrollView.LayoutParams(-1, -2));
-        root.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
-        addEntry(root);
+        LinearLayout stackPanel = new LinearLayout(this);
+        stackPanel.setOrientation(LinearLayout.VERTICAL);
+        stackPanel.setTag("stack-panel");
+        stackPanel.addView(scroll, new LinearLayout.LayoutParams(-1, 0, 1));
+        addEntry(stackPanel);
         keys =
                 new CalculatorKeypad(
                         this,
                         this::execute,
                         session.scientificExpanded,
-                        expanded -> session.scientificExpanded = expanded);
+                        (expanded, inverse) -> {
+                            session.scientificExpanded = expanded;
+                            session.inverse = inverse;
+                        });
         keys.setInverse(session.inverse);
-        root.addView(keys);
+        root.addView(
+                new CalculatorWorkspace(this, stackPanel, keys),
+                new LinearLayout.LayoutParams(-1, 0, 1));
         installContent(root);
         if (Build.VERSION.SDK_INT >= 33) {
             backCallback = this::handleBack;

@@ -21,20 +21,23 @@ Your stack and entry are restored when you reopen the app.
 **CE**, which clears only the line and stays in edit mode. Enter on an empty line
 or Back/Escape returns to stack mode. **Undo** reverses the last change; long-press
 Undo to redo. During a long calculation, Undo becomes
-**Cancel**. **Functions**
-expands the scientific keypad. Tap **RAD/DEG/GRAD** to change angle units and
+**Cancel**. **f()** opens the scientific functions; **f⁻¹()** opens their inverse
+and complementary functions. Tap the active button again to close, or the other
+to switch sets. Wide, short windows place the keypad beside the stack; functions
+open to the left of the digits when there is room. Closing them returns that
+space to the stack. Tap **RAD/DEG/GRAD** to change angle units and
 **SCI/ENG** for display notation. **DEC/FRAC/IMPR** cycles between decimals,
 mixed fractions (`2 1/3`) and improper fractions (`7/3`). Fraction digits are smaller, raised and lowered
 around the slash; the whole-number part stays full size. Irrational results remain decimal.
 
-**INV** switches sin/cos/tan to asin/acos/atan, ln to eˣ, log₁₀ to 10ˣ, square root to square,
-power to the Xth root of Y, and modulo to remainder. Inverse trig results use the
+**f⁻¹()** switches sin/cos/tan to asin/acos/atan, ln to eˣ, log₁₀ to 10ˣ, square root to square,
+power to the Xth root of Y, and remainder to modulo. Inverse trig results use the
 selected angle unit. **rem** calculates Y remainder X, with the sign of Y;
-**mod** uses the sign of X and is the default key; INV reveals rem.
-**⌊x⌋** rounds down toward negative infinity; INV leaves it unchanged.
+**mod** uses the sign of X. **rem** is the default; f⁻¹() reveals mod.
+**⌊x⌋** rounds down toward negative infinity; its complement **⌈x⌉** rounds up toward positive infinity.
 **φ** pushes the exact golden ratio `(1 + √5) / 2`. Both accept exact rational operands. **x!** computes
-factorial for nonnegative integers. **Factor** replaces a positive integer greater
-than 1 with its prime factors, pushed smallest first: `84 Factor` gives `2, 2, 3, 7`
+factorial for nonnegative integers. **Factorise** replaces a positive integer greater
+than 1 with its prime factors, pushed smallest first: `84 Factorise` gives `2, 2, 3, 7`
 (with 7 at X). Large factorisations may take time; Cancel stops them.
 Long-press **Drop** to move X to the top displayed row, or **Swap** to move the
 top displayed value down to X. Both roll the entire stack and commit any current
