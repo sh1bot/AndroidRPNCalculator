@@ -178,12 +178,12 @@ public final class FunctionsTest {
                                 button.performClick();
                                 assertEquals(example[1], command.get());
                             }
-                            Button drop = find(keypad, "Drop");
+                            Button drop = ((Button) keypad.findViewWithTag("BACK"));
                             drop.performLongClick();
                             assertEquals("HOLD_DROP", command.get());
                             drop.performClick();
                             assertEquals("BACK", command.get());
-                            Button swap = find(keypad, "Swap");
+                            Button swap = ((Button) keypad.findViewWithTag("SWAP"));
                             swap.performLongClick();
                             assertEquals("ROLL_UP", command.get());
                             swap.performClick();

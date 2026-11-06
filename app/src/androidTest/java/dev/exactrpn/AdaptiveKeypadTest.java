@@ -188,8 +188,14 @@ public final class AdaptiveKeypadTest {
                             size(context, workspace, 392, 700);
                             Rect undo = bounds(find(keypad, "Undo"), workspace),
                                     clear = bounds(find(keypad, "Clear"), workspace),
-                                    drop = bounds(find(keypad, "Drop"), workspace),
-                                    swap = bounds(find(keypad, "Swap"), workspace);
+                                    drop =
+                                            bounds(
+                                                    ((Button) keypad.findViewWithTag("BACK")),
+                                                    workspace),
+                                    swap =
+                                            bounds(
+                                                    ((Button) keypad.findViewWithTag("SWAP")),
+                                                    workspace);
                             assertTrue(undo.bottom <= clear.top);
                             assertEquals(clear.top, drop.top);
                             assertEquals(drop.top, swap.top);
