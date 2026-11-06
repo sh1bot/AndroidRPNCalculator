@@ -473,6 +473,8 @@ public final class CalculatorKeypad extends ViewGroup {
 
     private void updateExpansion() {
         for (LinearLayout row : scientificRows) row.setVisibility(expanded ? VISIBLE : GONE);
+        setExpansionIndicator(functions, expanded && !inverse);
+        setExpansionIndicator(complements, expanded && inverse);
         functions.setActivated(expanded && !inverse);
         complements.setActivated(expanded && inverse);
         functions.setTextColor(expanded && !inverse ? colors.accent : colors.text);
@@ -500,6 +502,15 @@ public final class CalculatorKeypad extends ViewGroup {
                                     expanded && inverse ? R.string.expanded : R.string.collapsed));
         }
         requestLayout();
+    }
+
+    private void setExpansionIndicator(Button button, boolean open) {
+        android.graphics.drawable.Drawable indicator =
+                getContext()
+                        .getDrawable(open ? R.drawable.ic_expand_less : R.drawable.ic_expand_more);
+        indicator.setTint(open ? colors.accent : colors.text);
+        button.setCompoundDrawablePadding(dp(4));
+        button.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, indicator, null);
     }
 
     private void fitLabel(Button button, int width, int height) {
