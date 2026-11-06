@@ -112,6 +112,6 @@
     <string name="pi_toggle_description">Pi; long press to use tau</string>
     <string name="tau_toggle_description">Tau (two pi); long press to use pi</string>
     <string name="unlock_to_resume">Unlock the phone to resume the saved calculation</string>
-    <string name="temporary_status">TEMP · %1$s</string>
+    <string name="temporary_status">TEMP</string>
     <string name="temporary_description">Temporary calculation, never saved. %1$s</string>
 </resources>

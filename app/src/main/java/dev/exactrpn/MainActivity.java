@@ -810,12 +810,12 @@ public class MainActivity extends Activity {
                                 : display.editing
                                         ? getString(R.string.entry_status)
                                         : getString(R.string.stack_status));
-        if (session.policy.temporary)
-            status.setText(getString(R.string.temporary_status, status.getText()));
+        CharSequence calculationStatus = status.getText();
+        if (session.policy.temporary) status.setText(getString(R.string.temporary_status));
         status.setTextColor(session.policy.temporary ? colors.accent : colors.text);
         status.setContentDescription(
                 session.policy.temporary
-                        ? getString(R.string.temporary_description, status.getText())
+                        ? getString(R.string.temporary_description, calculationStatus)
                         : status.getText());
         if (!session.error.isEmpty() && !session.error.equals(shownError))
             showNotice(session.error, true);

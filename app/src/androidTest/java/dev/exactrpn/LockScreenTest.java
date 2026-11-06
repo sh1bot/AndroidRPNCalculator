@@ -9,6 +9,7 @@ import static org.junit.Assert.fail;
 import static org.junit.Assume.assumeFalse;
 import static org.junit.Assume.assumeTrue;
 
+import android.app.Activity;
 import android.app.Instrumentation;
 import android.app.KeyguardManager;
 import android.content.ComponentName;
@@ -26,6 +27,8 @@ import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -42,6 +45,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class LockScreenTest {
@@ -75,10 +79,26 @@ public final class LockScreenTest {
     }
 
     private LockedCalculatorActivity open(Context context) {
-        return (LockedCalculatorActivity)
-                instrumentation.startActivitySync(
-                        new Intent(context, LockedCalculatorActivity.class)
-                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        // startActivitySync can wait indefinitely for a task/lock-screen transition.
+        // Start asynchronously, then require a resumed, usable activity with a bounded wait.
+        AtomicReference<LockedCalculatorActivity> shown = new AtomicReference<>();
+        instrumentation.runOnMainSync(
+                () ->
+                        context.startActivity(
+                                new Intent(context, LockedCalculatorActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        await(
+                () -> {
+                    for (Activity activity :
+                            ActivityLifecycleMonitorRegistry.getInstance()
+                                    .getActivitiesInStage(Stage.RESUMED))
+                        if (activity instanceof LockedCalculatorActivity) {
+                            shown.set((LockedCalculatorActivity) activity);
+                            return true;
+                        }
+                    return false;
+                });
+        return shown.get();
     }
 
     private void enter(MainActivity activity, String key) {
@@ -194,7 +214,7 @@ public final class LockScreenTest {
         }
     }
 
-    @Test
+    @Test(timeout = 90000)
     public void secureLockThenUnlockKeepsTheSameTemporarySession() throws Exception {
         Context context = instrumentation.getTargetContext();
         KeyguardManager manager = context.getSystemService(KeyguardManager.class);
@@ -213,9 +233,10 @@ public final class LockScreenTest {
             shell("locksettings set-pin 1234");
             credential = true;
             await(manager::isDeviceSecure);
-            shell("input keyevent KEYCODE_SLEEP");
-            await(() -> manager.isDeviceLocked());
-            shell("input keyevent KEYCODE_WAKEUP");
+            // Wake from the same shell invocation, so the test process need not resume
+            // itself after putting the emulator to sleep. The credential remains locked.
+            shell("input keyevent KEYCODE_SLEEP; input keyevent KEYCODE_WAKEUP");
+            await(manager::isDeviceLocked);
             activity = open(context);
             CalculatorSession session = StackSelectionTest.session(activity);
             await(() -> !session.busy);
@@ -260,14 +281,14 @@ public final class LockScreenTest {
             LockedCalculatorActivity shown = activity;
             instrumentation.runOnMainSync(
                     () ->
-                            assertTrue(
+                            assertEquals(
+                                    "TEMP",
                                     ((TextView)
                                                     shown.getWindow()
                                                             .getDecorView()
                                                             .findViewWithTag("calculation-status"))
                                             .getText()
-                                            .toString()
-                                            .startsWith("TEMP")));
+                                            .toString()));
             enter(activity, "2");
             enter(activity, "ENTER");
             assertEquals(Arrays.asList("7", "2"), session.display.rows);
