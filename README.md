@@ -71,14 +71,15 @@ include grouping. Copy follows **DEC/FRAC/IMPR**, using plain text such as `7/3`
 DEC preserves exact terminating decimals and copies recurring/irrational values
 to 40 significant digits. Tap a stack value
 to copy it. Tap a stack label to select its row and show checkboxes; while selecting,
-tap anywhere on a row to toggle it. Long-press a label to select all rows, or clear
-the selection if all are selected. Back/Escape also exits selection.
+tap anywhere on a row to toggle it. Selection is available only in stack mode.
+**Undo** becomes **All** to select every row, then **None** to clear the selection.
+Back/Escape also exits selection.
 
 During selection, **Clear** becomes a copy icon and **Swap** becomes **Pick**.
 Copy writes the selected values one per line, and Pick appends copies in display
 order. **Drop** removes the selected values. **+** becomes **Σ** (sum) and **×**
 becomes **Π** (product); both append an exact result, preserving the original
-values and selection. These actions leave any unfinished entry intact.
+values and selection.
 
 Long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces

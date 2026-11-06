@@ -43,7 +43,7 @@ public final class CalculatorKeypad extends ViewGroup {
             productButton;
     private boolean tau;
     private Consumer<Boolean> saveTau = enabled -> {};
-    private boolean calculating, editing, selecting;
+    private boolean calculating, editing, selecting, allSelected;
     private boolean expanded, inverse;
     private final Map<String, Button> inverseButtons = new HashMap<>();
     private final BiConsumer<Boolean, Boolean> savePanel;
@@ -235,8 +235,9 @@ public final class CalculatorKeypad extends ViewGroup {
         updateModeKeys();
     }
 
-    public void setSelecting(boolean selecting) {
+    public void setSelecting(boolean selecting, boolean allSelected) {
         this.selecting = selecting;
+        this.allSelected = allSelected;
         updateModeKeys();
     }
 
@@ -252,7 +253,8 @@ public final class CalculatorKeypad extends ViewGroup {
         android.graphics.drawable.Drawable copy =
                 selecting ? getContext().getDrawable(R.drawable.ic_copy) : null;
         if (copy != null) copy.setTint(colors.text);
-        clearButton.setCompoundDrawablesRelativeWithIntrinsicBounds(copy, null, null, null);
+        clearButton.setForegroundGravity(Gravity.CENTER);
+        clearButton.setForeground(copy);
         deleteButton.setText(!selecting && editing ? "⌫" : getContext().getString(R.string.drop));
         deleteButton.setContentDescription(
                 getContext()
@@ -274,19 +276,37 @@ public final class CalculatorKeypad extends ViewGroup {
         productButton.setText(selecting ? "Π" : "×");
         productButton.setContentDescription(
                 selecting ? getContext().getString(R.string.product_selected) : "×");
+        updateUndoButton();
     }
 
     public void setCalculating(boolean active) {
         if (calculating == active) return;
         calculating = active;
+        updateUndoButton();
+    }
+
+    private void updateUndoButton() {
         undoButton.setText(
-                active
-                        ? getContext().getString(R.string.cancel)
-                        : getContext().getString(R.string.undo));
+                getContext()
+                        .getString(
+                                calculating
+                                        ? R.string.cancel
+                                        : selecting
+                                                ? (allSelected
+                                                        ? R.string.select_none
+                                                        : R.string.select_all)
+                                                : R.string.undo));
         undoButton.setContentDescription(
-                active
-                        ? getContext().getString(R.string.cancel_calculation)
-                        : getContext().getString(R.string.undo_description));
+                getContext()
+                        .getString(
+                                calculating
+                                        ? R.string.cancel_calculation
+                                        : selecting
+                                                ? (allSelected
+                                                        ? R.string.select_none_description
+                                                        : R.string.select_all_description)
+                                                : R.string.undo_description));
+        undoButton.setLongClickable(!selecting || calculating);
     }
 
     private int dp(int n) {
@@ -441,7 +461,8 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.equals(Command.UNDO))
             b.setOnLongClickListener(
                     v -> {
-                        command.accept(calculating ? Command.CANCEL : Command.REDO);
+                        if (calculating || !selecting)
+                            command.accept(calculating ? Command.CANCEL : Command.REDO);
                         return true;
                     });
         if (key.equals("BACK"))

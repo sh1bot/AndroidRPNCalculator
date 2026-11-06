@@ -17,8 +17,6 @@ final class StackRowRenderer {
         boolean toggle(int index, Display display);
 
         void tap(int index, Display display);
-
-        boolean toggleAll(Display display);
     }
 
     private final Context context;
@@ -118,12 +116,7 @@ final class StackRowRenderer {
             label.setSingleLine(true);
             updateStackLabel(label, depth, display.rows.get(i));
             label.setTag("stack-label:" + i);
-            label.setOnLongClickListener(
-                    v -> {
-                        actions.toggleAll(display);
-                        return true;
-                    });
-            label.setOnClickListener(v -> actions.toggle(index, display));
+            if (!display.editing) label.setOnClickListener(v -> actions.toggle(index, display));
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setTextColor(colors.muted);
             row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
