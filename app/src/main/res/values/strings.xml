@@ -82,7 +82,7 @@
     <string name="select_level_value">Select stack level %1$d: %2$s</string>
     <string name="select_level_approximate">Select stack level %1$d, approximately: %2$s</string>
     <string name="app_name">Exact RPN</string>
-    <string name="error_need_values">Need %1$d stack values</string>
+    <string name="error_need_values">Enter another value before the operator</string>
     <string name="error_entry_too_long">Entry is too long (maximum %1$d characters)</string>
     <string name="error_row_missing">Stack row no longer exists</string>
     <string name="error_number_too_large">Number is too large</string>

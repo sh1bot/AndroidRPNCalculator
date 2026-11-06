@@ -17,7 +17,7 @@ import java.util.ArrayList;
 /** Explicit, transient display protocol; contains no Parcelable or Java object serialization. */
 final class DisplayResult {
     private static final String[] TEXT = {
-        "stackId", "entry", "problem", "angle", "notation", "checkpoint"
+        "stackId", "entry", "problem", "angle", "notation", "checkpoint", "operationError"
     };
     private static final String[] LISTS = {"rows", "clipboard", "compactRows"};
     private static final String[] INTS = {"numberMode", "fractionMode", "start", "end"};

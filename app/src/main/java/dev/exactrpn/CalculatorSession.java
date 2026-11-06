@@ -220,7 +220,12 @@ final class CalculatorSession {
                         numberMode = nextDisplay.numberMode;
                         fractionMode = nextDisplay.fractionMode;
                         display = nextDisplay;
-                        error = "";
+                        String operationError = result.getString("operationError", "");
+                        error =
+                                operationError.isEmpty()
+                                        ? ""
+                                        : context.getString(R.string.error_prefix, operationError);
+                        if (!operationError.isEmpty()) pending.clear();
                         if (!key.is(Command.CHECKPOINT)) loaded = true;
                     }
                 };

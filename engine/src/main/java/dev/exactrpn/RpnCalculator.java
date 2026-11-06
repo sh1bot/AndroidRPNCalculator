@@ -323,6 +323,7 @@ public final class RpnCalculator {
             return;
         }
         State before = new State(this);
+        State committed = null;
         try {
             if (key.matches("[0-9.]")) {
                 editing = true;
@@ -376,6 +377,7 @@ public final class RpnCalculator {
                 }
             } else {
                 commit();
+                committed = new State(this);
                 switch (key) {
                     case "Factor":
                         need(1);
@@ -422,7 +424,16 @@ public final class RpnCalculator {
             }
             remember(before);
         } catch (RuntimeException ex) {
-            restore(before);
+            if (ex instanceof com.hp.creals.CR.AbortedException) committed = null;
+            restore(committed == null ? before : committed);
+            if (committed != null) {
+                if (before.editing) {
+                    while (!undo.isEmpty()
+                            && undo.peek().editing
+                            && sameStack(undo.peek().stack, before.stack)) undo.pop();
+                }
+                remember(before);
+            }
             throw ex;
         }
     }

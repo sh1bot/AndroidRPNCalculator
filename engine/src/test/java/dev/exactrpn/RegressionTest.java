@@ -59,7 +59,7 @@ public final class RegressionTest {
             throw new AssertionError("zero division accepted");
         } catch (ArithmeticException expected) {
         }
-        check(c.values().size() == 1 && c.entry().equals("0"), "zero division preserves state");
+        check(c.values().size() == 2 && !c.isEditing(), "zero division preserves committed entry");
         keys(c, "CLEAR", "1", "±", "ENTER");
         try {
             c.key("√");
@@ -93,7 +93,7 @@ public final class RegressionTest {
         } finally {
             Thread.interrupted();
         }
-        check(c.values().size() == 1 && c.entry().equals("0"), "interruption/error rollback");
+        check(c.values().size() == 2 && !c.isEditing(), "operator error preserves committed entry");
     }
 
     @org.junit.jupiter.api.Test
@@ -332,17 +332,15 @@ public final class RegressionTest {
         } catch (ArithmeticException expected) {
         }
         check(
-                hp.isEditing()
-                        && hp.entry().equals("0")
-                        && top(hp).definitelyEquals(new UnifiedReal(9)),
-                "error restores edit mode and entry");
+                !hp.isEditing() && hp.values().size() == 2 && top(hp).definitelyZero(),
+                "error keeps committed zero on stack");
         hp.key("BACK");
         try {
             hp.key("+");
             throw new AssertionError("underflow accepted");
         } catch (IllegalArgumentException expected) {
         }
-        check(hp.isEditing() && hp.entry().isEmpty(), "failed operation preserves empty edit");
+        check(!hp.isEditing() && hp.values().size() == 1, "failed operation preserves stack");
         keys(hp, "CLEAR", "2", "ENTER", "3", "+");
         check(
                 !hp.isEditing() && top(hp).definitelyEquals(new UnifiedReal(5)),
@@ -1022,19 +1020,18 @@ public final class RegressionTest {
         check(operationHistory.entry().equals("9"), "discarded redo cannot replay stale Clear");
         RpnCalculator failedCommit = new RpnCalculator();
         number(failedCommit, "123");
-        int priorUndo = failedCommit.undoCount();
         try {
             failedCommit.key("+");
             throw new AssertionError("underflow accepted");
         } catch (IllegalArgumentException expected) {
         }
         check(
-                failedCommit.undoCount() == priorUndo,
-                "failed operation preserves entry edit history");
+                failedCommit.undoCount() == 2,
+                "failed operation commits entry and collapses edit history");
         failedCommit.key("UNDO");
         check(
-                failedCommit.entry().equals("12"),
-                "edits still undo individually after failed commit");
+                failedCommit.entry().equals("123"),
+                "undo restores complete entry after failed operation");
         RpnCalculator failedRedo = new RpnCalculator();
         keys(failedRedo, "π", "UNDO");
         try {
@@ -1179,8 +1176,9 @@ public final class RegressionTest {
         } catch (ArithmeticException expected) {
         }
         check(
-                top(zeroDivisor).definitelyEquals(new UnifiedReal(7))
-                        && zeroDivisor.entry().equals("0"),
+                top(zeroDivisor).definitelyZero()
+                        && zeroDivisor.values().size() == 2
+                        && !zeroDivisor.isEditing(),
                 "zero-divisor remainder leaves state intact");
         RpnCalculator irrationalRem = new RpnCalculator();
         keys(irrationalRem, "π", "2");
@@ -1190,8 +1188,9 @@ public final class RegressionTest {
         } catch (IllegalArgumentException expected) {
         }
         check(
-                top(irrationalRem).definitelyEquals(UnifiedReal.PI)
-                        && irrationalRem.entry().equals("2"),
+                top(irrationalRem).definitelyEquals(UnifiedReal.TWO)
+                        && irrationalRem.values().size() == 2
+                        && !irrationalRem.isEditing(),
                 "irrational remainder is rejected without changing state");
     }
 
@@ -1219,7 +1218,9 @@ public final class RegressionTest {
             } catch (IllegalArgumentException expected) {
             }
             check(
-                    rejected.entry().equals(invalid) && rejected.values().isEmpty(),
+                    !rejected.isEditing()
+                            && rejected.values().size() == 1
+                            && top(rejected).definitelyEquals(RpnCalculator.parse(invalid)),
                     "invalid factorial leaves entry intact");
         }
         RpnCalculator largeFactorial = new RpnCalculator();
@@ -1286,7 +1287,9 @@ public final class RegressionTest {
             } catch (IllegalArgumentException expected) {
             }
             check(
-                    rejected.entry().equals(invalid) && rejected.values().isEmpty(),
+                    !rejected.isEditing()
+                            && rejected.values().size() == 1
+                            && top(rejected).definitelyEquals(RpnCalculator.parse(invalid)),
                     "invalid factorisation is transactional");
         }
         RpnCalculator interruptedFactors = new RpnCalculator();
@@ -1478,8 +1481,9 @@ public final class RegressionTest {
             } catch (ArithmeticException expected) {
             }
             check(
-                    top(rejected).definitelyEquals(RpnCalculator.parse(invalid[0]))
-                            && rejected.entry().equals(invalid[1]),
+                    rejected.values().get(0).definitelyEquals(RpnCalculator.parse(invalid[0]))
+                            && top(rejected).definitelyEquals(RpnCalculator.parse(invalid[1]))
+                            && !rejected.isEditing(),
                     "invalid root preserves state");
         }
         check(

@@ -178,6 +178,7 @@ public class CalculationService extends Service {
         ValueFormatter.Notation notation;
         NumberMode numberMode;
         FractionMode fractionMode;
+        String operationError = "";
 
         Evaluation(Bundle request) {
             Command key = Command.parse(request.getString("key"));
@@ -198,7 +199,15 @@ public class CalculationService extends Service {
                                 : ValueFormatter.Notation.SCIENTIFIC;
             else if (key.is("NUMBER_FORMAT")) numberMode = numberMode.next();
             else if (key.is("FRACTION")) fractionMode = fractionMode.next();
-            else key.apply(candidate, local.profile(), format.profile());
+            else {
+                try {
+                    key.apply(candidate, local.profile(), format.profile());
+                } catch (IllegalArgumentException | ArithmeticException ex) {
+                    // The engine may have committed valid entry before the operator failed.
+                    // Publish that state together with the error, rather than losing the entry.
+                    operationError = ErrorMessages.describe(CalculationService.this, ex);
+                }
+            }
             stackId = sameStack(cached, candidate) ? cachedStackId : UUID.randomUUID().toString();
         }
 
@@ -211,6 +220,7 @@ public class CalculationService extends Service {
                 compact.add(ValueFormatter.format(value, false, notation, fractionMode));
             }
             Bundle display = new Bundle();
+            display.putString("operationError", operationError);
             display.putString("stackId", stackId);
             display.putStringArrayList("rows", rows);
             display.putStringArrayList("clipboard", copies);
