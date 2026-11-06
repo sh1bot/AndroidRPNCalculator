@@ -70,14 +70,17 @@ display grouping, and the locale decimal with no grouping. Copied numbers follow
 include grouping. Copy follows **DEC/FRAC/IMPR**, using plain text such as `7/3` or `2 1/3`;
 DEC preserves exact terminating decimals and copies recurring/irrational values
 to 40 significant digits. Tap a stack value
-to copy it. Long-press a stack label to select it, then use the checkboxes to select
-more rows. Long-press a value for **Drop**, **Copy** and **Pick**: pressing a selected row
-acts on the whole selection; pressing an unselected row acts only on that row.
-Dropping an unselected row keeps the other values selected. **Pick** copies the
-target rows onto the top of the stack in display order, preserving the originals
-and any unfinished entry. For multiple selected rows, **Σ** pushes their exact sum
-without changing the selection or removing the original values. Multiple values copy one per
-line in display order. Back/Escape exits selection. Long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
+to copy it. Tap a stack label to select its row and show checkboxes; while selecting,
+tap anywhere on a row to toggle it. Long-press a label to select all rows, or clear
+the selection if all are selected. Back/Escape also exits selection.
+
+During selection, **Clear** becomes a copy icon and **Swap** becomes **Pick**.
+Copy writes the selected values one per line, and Pick appends copies in display
+order. **Drop** removes the selected values. **+** becomes **Σ** (sum) and **×**
+becomes **Π** (product); both append an exact result, preserving the original
+values and selection. These actions leave any unfinished entry intact.
+
+Long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
 a selected separator explicitly. Backspace/Delete edit at the cursor.
 

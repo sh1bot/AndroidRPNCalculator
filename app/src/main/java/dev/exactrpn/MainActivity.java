@@ -19,7 +19,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
-import android.widget.PopupMenu;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -27,8 +26,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.SortedSet;
-import java.util.TreeSet;
 
 /** Exact values and evaluation survive rotation; views consume immutable display snapshots. */
 public class MainActivity extends Activity {
@@ -47,7 +44,6 @@ public class MainActivity extends Activity {
     private Display rendered;
     private StackRowRenderer rowRenderer;
     private boolean selectionDirty;
-    private Integer stackMenuTarget;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable hideNotice =
             () -> {
@@ -107,8 +103,8 @@ public class MainActivity extends Activity {
                                 stackRowTapped(index, display);
                             }
 
-                            public void menu(View anchor, int index, Display display) {
-                                showStackMenu(anchor, index, display);
+                            public boolean toggleAll(Display display) {
+                                return toggleAllStackRows(display);
                             }
                         });
         configureWindow();
@@ -228,6 +224,7 @@ public class MainActivity extends Activity {
             cancelCalculation();
             return;
         }
+        if (executeSelectionAction(wire)) return;
         if (!key.preservesSelection()) clearStackSelection(false);
         session.enqueue(key);
         if (!key.isEntryUpdate()) refresh();
@@ -325,44 +322,55 @@ public class MainActivity extends Activity {
         else copyValue(snapshot.clipboard.get(index));
     }
 
-    private void showStackMenu(View anchor, int index, Display snapshot) {
-        if (!stackActionAllowed(snapshot)) return;
-        PopupMenu menu = new PopupMenu(this, anchor);
-        SortedSet<Integer> rows = new TreeSet<>();
-        if (session.selectedRows.contains(index)) rows.addAll(session.selectedRows);
-        else {
-            rows.add(index);
-            stackMenuTarget = index;
-            rowRenderer.showSelection(stackRows, session.selectedRows, stackMenuTarget);
+    private boolean toggleAllStackRows(Display snapshot) {
+        if (!stackActionAllowed(snapshot)) return false;
+        if (session.selectedRows.size() == snapshot.rows.size()) session.selectedRows.clear();
+        else for (int i = 0; i < snapshot.rows.size(); i++) session.selectedRows.add(i);
+        selectionDirty = true;
+        refresh();
+        return true;
+    }
+
+    private boolean executeSelectionAction(String key) {
+        if (session.selectedRows.isEmpty()) return false;
+        String action;
+        switch (key) {
+            case "SMART_CLEAR":
+            case "CLEAR":
+                action = "COPY";
+                break;
+            case "SWAP":
+                action = "PICK_ROWS:";
+                break;
+            case "BACK":
+            case "DROP":
+            case "DELETE":
+                action = "DROP_ROWS:";
+                break;
+            case "+":
+                action = "SUM_ROWS:";
+                break;
+            case "×":
+                action = "PRODUCT_ROWS:";
+                break;
+            case "HOLD_DROP":
+            case "ROLL_UP":
+                return true;
+            default:
+                return false;
         }
-        menu.setOnDismissListener(
-                dismissed -> {
-                    stackMenuTarget = null;
-                    rowRenderer.showSelection(stackRows, session.selectedRows, null);
-                });
-        menu.getMenu().add(0, 1, 0, getString(R.string.drop));
-        menu.getMenu().add(0, 2, 1, getString(R.string.copy));
-        menu.getMenu().add(0, 3, 2, getString(R.string.pick));
-        if (rows.size() > 1) menu.getMenu().add(0, 4, 3, "Σ");
-        menu.setOnMenuItemClickListener(
-                item -> {
-                    if (!stackActionAllowed(snapshot)) return true;
-                    if (item.getItemId() == 1 || item.getItemId() == 3 || item.getItemId() == 4) {
-                        List<String> indices = new ArrayList<>();
-                        for (int row : rows) indices.add(Integer.toString(row));
-                        String command =
-                                item.getItemId() == 1
-                                        ? "DROP_ROWS:"
-                                        : item.getItemId() == 3 ? "PICK_ROWS:" : "SUM_ROWS:";
-                        execute(command + String.join(",", indices));
-                    } else {
-                        List<String> copies = new ArrayList<>();
-                        for (int row : rows) copies.add(session.display.clipboard.get(row));
-                        copyValue(String.join("\n", copies));
-                    }
-                    return true;
-                });
-        menu.show();
+        if (!stackActionAllowed(session.display)) return true;
+        if (action.equals("COPY")) {
+            List<String> values = new ArrayList<>();
+            for (int row : session.selectedRows) values.add(session.display.clipboard.get(row));
+            copyValue(String.join("\n", values));
+        } else {
+            List<String> indices = new ArrayList<>();
+            for (int row : session.selectedRows) indices.add(Integer.toString(row));
+            session.enqueue(Command.parse(action + String.join(",", indices)));
+            refresh();
+        }
+        return true;
     }
 
     private void saveDisplayPreferences(Display display) {
@@ -406,8 +414,6 @@ public class MainActivity extends Activity {
             selectionDirty = false;
             if (stackChanged) {
                 rowRenderer.render(stackRows, display, numbers, session.selectedRows);
-                if (stackMenuTarget != null)
-                    rowRenderer.showSelection(stackRows, session.selectedRows, stackMenuTarget);
             }
 
             refreshEntry(display);
@@ -777,6 +783,7 @@ public class MainActivity extends Activity {
 
     private void refreshModes(Display display) {
         keys.setEditing(display.editing);
+        keys.setSelecting(!session.selectedRows.isEmpty());
         angleButton.setText(display.angleUnit.name());
         angleButton.setContentDescription(
                 getString(R.string.angle_description, display.angleUnit.name()));

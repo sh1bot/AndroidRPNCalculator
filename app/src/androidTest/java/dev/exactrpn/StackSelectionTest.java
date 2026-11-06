@@ -1,11 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-import static androidx.test.espresso.Espresso.onView;
-import static androidx.test.espresso.action.ViewActions.click;
-import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
-import static androidx.test.espresso.matcher.ViewMatchers.withText;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -19,10 +14,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.SystemClock;
 import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.CheckBox;
-import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -78,316 +71,176 @@ public final class StackSelectionTest {
         return activity.getWindow().getDecorView().findViewWithTag(tag);
     }
 
-    private Button button(View view, String text) {
-        if (view instanceof Button && ((Button) view).getText().toString().equals(text))
-            return (Button) view;
-        if (view instanceof ViewGroup)
-            for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
-                Button found = button(((ViewGroup) view).getChildAt(i), text);
-                if (found != null) return found;
-            }
-        return null;
-    }
-
-    private void choose(String text) {
-        onView(withText(text)).inRoot(isPlatformPopup()).perform(click());
-    }
-
-    @Test
-    public void selectedSumAppendsTheResultAndKeepsSelection() throws Exception {
-        Context context = instrumentation.getTargetContext();
+    private MainActivity open() {
         MainActivity activity =
                 (MainActivity)
                         instrumentation.startActivitySync(
-                                new Intent(context, LockedCalculatorActivity.class)
+                                new Intent(
+                                                instrumentation.getTargetContext(),
+                                                LockedCalculatorActivity.class)
                                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        await(() -> !session(activity).busy);
+        return activity;
+    }
+
+    private void key(MainActivity activity, String key) {
+        instrumentation.runOnMainSync(() -> tagged(activity, key).performClick());
+        await(() -> !session(activity).busy);
+    }
+
+    private void seed(MainActivity activity) {
+        for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"})
+            key(activity, key);
+        await(() -> tagged(activity, "stack-label:2") != null);
+    }
+
+    private void selectEnds(MainActivity activity) {
+        instrumentation.runOnMainSync(() -> tagged(activity, "stack-label:0").performClick());
+        instrumentation.runOnMainSync(() -> tagged(activity, "stack-row:2").performClick());
+    }
+
+    @Test
+    public void labelsEnterSelectionRowsToggleAndLongPressTogglesAll() throws Exception {
+        MainActivity activity = open();
         CalculatorSession session = session(activity);
         try {
-            await(() -> !session.busy);
-            for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"}) {
-                instrumentation.runOnMainSync(() -> session.enqueue(Command.parse(key)));
-                await(() -> !session.busy);
-            }
-            await(() -> tagged(activity, "stack-label:2") != null);
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-label:0").performLongClick());
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-checkbox:2").performClick());
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-value:2").performLongClick());
-            choose("Σ");
-            await(() -> !session.busy && tagged(activity, "stack-value:3") != null);
+            seed(activity);
             instrumentation.runOnMainSync(
                     () -> {
+                        tagged(activity, "stack-label:1").performClick();
                         assertEquals(
-                                java.util.Arrays.asList("1", "2", "3", "4"), session.display.rows);
-                        assertEquals(
-                                new java.util.TreeSet<>(java.util.Arrays.asList(0, 2)),
+                                new java.util.TreeSet<>(java.util.Arrays.asList(1)),
                                 session.selectedRows);
+                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:1")).isChecked());
+                        tagged(activity, "stack-value:0").performClick();
                         assertTrue(((CheckBox) tagged(activity, "stack-checkbox:0")).isChecked());
-                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:2")).isChecked());
-                        assertFalse(((CheckBox) tagged(activity, "stack-checkbox:3")).isChecked());
+                        tagged(activity, "stack-row:1").performClick();
+                        assertEquals(
+                                new java.util.TreeSet<>(java.util.Arrays.asList(0)),
+                                session.selectedRows);
+                        tagged(activity, "stack-label:2").performLongClick();
+                        assertEquals(3, session.selectedRows.size());
+                        tagged(activity, "stack-label:0").performLongClick();
+                        assertTrue(session.selectedRows.isEmpty());
+                        assertNull(tagged(activity, "stack-checkbox:0"));
+                        assertEquals("+", ((Button) tagged(activity, "+")).getText().toString());
+                        tagged(activity, "stack-label:1").performLongClick();
+                        assertEquals(3, session.selectedRows.size());
+                        activity.onBackPressed();
+                        assertTrue(session.selectedRows.isEmpty());
+                        assertFalse(activity.isFinishing());
                     });
-            RpnCalculator restored =
-                    RpnCalculator.load(Files.readAllBytes(new File(session.checkpoint).toPath()));
-            assertEquals("4", restored.values().get(3).bigIntegerValue().toString());
-            restored.key("UNDO");
-            assertEquals(3, restored.values().size());
         } finally {
             finish(activity);
         }
     }
 
     @Test
-    public void pickCopiesOnlyTheTargetRowsAndKeepsOriginalSelection() throws Exception {
-        Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
-        File seed = File.createTempFile("pick-test-", ".state", context.getNoBackupFilesDir());
-        RpnCalculator calculator = new RpnCalculator();
-        for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"})
-            calculator.key(key);
-        Files.write(seed.toPath(), calculator.save());
-        store.save(seed.getAbsolutePath());
-        MainActivity activity =
-                (MainActivity)
-                        instrumentation.startActivitySync(
-                                new Intent(context, MainActivity.class)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    public void selectionKeysCopyPickSumProductAndDropWithoutConsumingOriginals() throws Exception {
+        MainActivity activity = open();
         CalculatorSession session = session(activity);
         try {
-            await(() -> !session.busy && tagged(activity, "stack-label:2") != null);
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-label:0").performLongClick());
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-checkbox:2").performClick());
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-value:1").performLongClick());
+            seed(activity);
+            selectEnds(activity);
             instrumentation.runOnMainSync(
                     () -> {
+                        Button copy = (Button) tagged(activity, "CLEAR");
+                        assertEquals("", copy.getText().toString());
+                        assertNotNull(copy.getCompoundDrawablesRelative()[0]);
                         assertEquals(
-                                View.INVISIBLE,
-                                tagged(activity, "stack-checkbox:0").getVisibility());
-                        assertFalse(tagged(activity, "stack-row:0").isSelected());
-                        assertTrue(tagged(activity, "stack-row:1").isSelected());
-                        assertFalse(tagged(activity, "stack-row:2").isSelected());
-                        assertEquals(
-                                new java.util.TreeSet<>(java.util.Arrays.asList(0, 2)),
-                                session.selectedRows);
+                                "Pick", ((Button) tagged(activity, "SWAP")).getText().toString());
+                        assertEquals("Σ", ((Button) tagged(activity, "+")).getText().toString());
+                        assertEquals("Π", ((Button) tagged(activity, "×")).getText().toString());
                     });
-            androidx.test.espresso.Espresso.pressBack();
-            await(() -> tagged(activity, "stack-checkbox:0").getVisibility() == View.VISIBLE);
-            instrumentation.runOnMainSync(
-                    () -> {
-                        assertTrue(tagged(activity, "stack-row:0").isSelected());
-                        assertFalse(tagged(activity, "stack-row:1").isSelected());
-                        assertTrue(tagged(activity, "stack-row:2").isSelected());
-                        tagged(activity, "stack-value:1").performLongClick();
-                    });
-            choose("Pick");
-            await(() -> !session.busy && tagged(activity, "stack-value:3") != null);
-            instrumentation.runOnMainSync(
-                    () -> {
-                        assertEquals(
-                                java.util.Arrays.asList("1", "2", "3", "2"), session.display.rows);
-                        assertEquals(
-                                new java.util.TreeSet<>(java.util.Arrays.asList(0, 2)),
-                                session.selectedRows);
-                        assertFalse(((CheckBox) tagged(activity, "stack-checkbox:3")).isChecked());
-                        tagged(activity, "stack-value:2").performLongClick();
-                    });
-            choose("Pick");
+            key(activity, "CLEAR");
+            ClipboardManager clipboard =
+                    (ClipboardManager)
+                            instrumentation
+                                    .getTargetContext()
+                                    .getSystemService(Context.CLIPBOARD_SERVICE);
             await(
                     () ->
-                            !session.busy
-                                    && tagged(activity, "stack-value:5") != null
-                                    && button(activity.getWindow().getDecorView(), "Undo") != null);
+                            clipboard.getPrimaryClip() != null
+                                    && "1\n3"
+                                            .contentEquals(
+                                                    clipboard
+                                                            .getPrimaryClip()
+                                                            .getItemAt(0)
+                                                            .getText()));
+            key(activity, "SWAP");
+            await(() -> tagged(activity, "stack-value:4") != null);
+            assertEquals(java.util.Arrays.asList("1", "2", "3", "1", "3"), session.display.rows);
+            key(activity, "+");
+            key(activity, "×");
+            await(() -> tagged(activity, "stack-value:6") != null);
             instrumentation.runOnMainSync(
                     () -> {
                         assertEquals(
-                                java.util.Arrays.asList("1", "2", "3", "2", "1", "3"),
+                                java.util.Arrays.asList("1", "2", "3", "1", "3", "4", "3"),
                                 session.display.rows);
                         assertEquals(
                                 new java.util.TreeSet<>(java.util.Arrays.asList(0, 2)),
                                 session.selectedRows);
-                        assertFalse(((CheckBox) tagged(activity, "stack-checkbox:4")).isChecked());
-                        assertFalse(((CheckBox) tagged(activity, "stack-checkbox:5")).isChecked());
-                        button(activity.getWindow().getDecorView(), "Undo").performClick();
+                        assertFalse(((CheckBox) tagged(activity, "stack-checkbox:6")).isChecked());
                     });
+            RpnCalculator restored =
+                    RpnCalculator.load(Files.readAllBytes(new File(session.checkpoint).toPath()));
+            restored.key("UNDO");
+            assertEquals(6, restored.values().size());
+            key(activity, "BACK");
             await(
                     () ->
-                            !session.busy
-                                    && tagged(activity, "stack-value:5") == null
-                                    && tagged(activity, "stack-value:3") != null);
-            instrumentation.runOnMainSync(
-                    () -> {
-                        assertEquals(
-                                java.util.Arrays.asList("1", "2", "3", "2"), session.display.rows);
-                        assertNull(tagged(activity, "stack-checkbox:0"));
-                    });
+                            tagged(activity, "stack-value:6") == null
+                                    && tagged(activity, "stack-checkbox:0") == null);
+            assertEquals(java.util.Arrays.asList("2", "1", "3", "4", "3"), session.display.rows);
+            assertTrue(session.selectedRows.isEmpty());
+            key(activity, "UNDO");
+            assertEquals(7, session.display.rows.size());
         } finally {
             finish(activity);
-            store.clear();
-            store.cleanWorkFiles(null);
-            seed.delete();
         }
     }
 
     @Test
-    public void selectionCopyDropAndUndoOperateOnWholeSelection() throws Exception {
-        Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
-        File seed = File.createTempFile("selection-test-", ".state", context.getNoBackupFilesDir());
-        RpnCalculator calculator = new RpnCalculator();
-        for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"})
-            calculator.key(key);
-        Files.write(seed.toPath(), calculator.save());
-        store.save(seed.getAbsolutePath());
-        MainActivity activity =
-                (MainActivity)
-                        instrumentation.startActivitySync(
-                                new Intent(context, MainActivity.class)
-                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    public void selectionOverridesEntryKeysAndDisablesTheirOldLongPressActions() throws Exception {
+        MainActivity activity = open();
         CalculatorSession session = session(activity);
         try {
-            await(() -> !session.busy && tagged(activity, "stack-label:2") != null);
-            // A mode change must not invalidate listeners on otherwise unchanged stack rows.
-            instrumentation.runOnMainSync(
-                    () -> {
-                        Button angle = null;
-                        for (String label : new String[] {"RAD", "DEG", "GRAD"}) {
-                            angle = button(activity.getWindow().getDecorView(), label);
-                            if (angle != null) break;
-                        }
-                        assertNotNull(angle);
-                        angle.performClick();
-                    });
-            await(() -> !session.busy);
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-label:0").performLongClick());
-            await(() -> tagged(activity, "stack-checkbox:2") != null);
-            instrumentation.runOnMainSync(
-                    () -> {
-                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:0")).isChecked());
-                        assertFalse(((CheckBox) tagged(activity, "stack-checkbox:1")).isChecked());
-                        tagged(activity, "stack-checkbox:2").performClick();
-                    });
-            ClipboardManager clipboard =
-                    (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
-            // Unselected row acts alone, without disturbing the existing selection.
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-value:1").performLongClick());
-            choose("Copy");
-            await(
-                    () ->
-                            clipboard.getPrimaryClip() != null
-                                    && "2"
-                                            .contentEquals(
-                                                    clipboard
-                                                            .getPrimaryClip()
-                                                            .getItemAt(0)
-                                                            .getText()));
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-value:2").performLongClick());
-            choose("Copy");
-            await(
-                    () ->
-                            clipboard.getPrimaryClip() != null
-                                    && "1\n3"
-                                            .contentEquals(
-                                                    clipboard
-                                                            .getPrimaryClip()
-                                                            .getItemAt(0)
-                                                            .getText()));
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-value:1").performLongClick());
-            choose("Drop");
-            await(
-                    () ->
-                            !session.busy
-                                    && tagged(activity, "stack-value:2") == null
-                                    && tagged(activity, "stack-value:1") != null
-                                    && ((TextView) tagged(activity, "stack-value:1"))
-                                            .getText()
-                                            .toString()
-                                            .equals("3"));
+            seed(activity);
+            key(activity, "7");
+            selectEnds(activity);
             instrumentation.runOnMainSync(
                     () -> {
                         assertEquals(
-                                new java.util.TreeSet<>(java.util.Arrays.asList(0, 1)),
-                                session.selectedRows);
-                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:0")).isChecked());
-                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:1")).isChecked());
-                        tagged(activity, "stack-value:1").performLongClick();
+                                "Drop", ((Button) tagged(activity, "BACK")).getText().toString());
+                        assertFalse(tagged(activity, "BACK").isLongClickable());
+                        assertFalse(tagged(activity, "SWAP").isLongClickable());
+                        tagged(activity, "BACK").performLongClick();
+                        tagged(activity, "SWAP").performLongClick();
                     });
-            choose("Copy");
-            await(
-                    () ->
-                            clipboard.getPrimaryClip() != null
-                                    && "1\n3"
-                                            .contentEquals(
-                                                    clipboard
-                                                            .getPrimaryClip()
-                                                            .getItemAt(0)
-                                                            .getText()));
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-value:1").performLongClick());
-            choose("Drop");
-            await(
-                    () ->
-                            !session.busy
-                                    && tagged(activity, "stack-value:0") == null
-                                    && button(activity.getWindow().getDecorView(), "Undo") != null);
-            instrumentation.runOnMainSync(
-                    () -> button(activity.getWindow().getDecorView(), "Undo").performClick());
-            await(() -> !session.busy && tagged(activity, "stack-value:1") != null);
-            // Deleting a row before the sole selected value must not select its replacement by
-            // index.
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-label:1").performLongClick());
-            instrumentation.runOnMainSync(
-                    () -> tagged(activity, "stack-value:0").performLongClick());
-            choose("Drop");
-            await(
-                    () ->
-                            !session.busy
-                                    && tagged(activity, "stack-value:1") == null
-                                    && tagged(activity, "stack-value:0") != null
-                                    && ((TextView) tagged(activity, "stack-value:0"))
-                                            .getText()
-                                            .toString()
-                                            .equals("3"));
+            assertEquals("7", session.display.entry);
+            assertEquals(java.util.Arrays.asList("1", "2", "3"), session.display.rows);
+            key(activity, "SWAP");
+            key(activity, "+");
+            key(activity, "×");
+            assertEquals("7", session.display.entry);
+            assertTrue(session.display.editing);
+            key(activity, "BACK");
+            await(() -> tagged(activity, "stack-checkbox:0") == null);
+            assertEquals("7", session.display.entry);
             instrumentation.runOnMainSync(
                     () -> {
                         assertEquals(
-                                new java.util.TreeSet<>(java.util.Arrays.asList(0)),
-                                session.selectedRows);
-                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:0")).isChecked());
-                        tagged(activity, "stack-value:0").performLongClick();
+                                "CE", ((Button) tagged(activity, "CLEAR")).getText().toString());
+                        assertNull(
+                                ((Button) tagged(activity, "CLEAR"))
+                                        .getCompoundDrawablesRelative()[0]);
+                        assertEquals("⌫", ((Button) tagged(activity, "BACK")).getText().toString());
+                        assertEquals(
+                                "Swap", ((Button) tagged(activity, "SWAP")).getText().toString());
                     });
-            choose("Copy");
-            await(
-                    () ->
-                            clipboard.getPrimaryClip() != null
-                                    && "3"
-                                            .contentEquals(
-                                                    clipboard
-                                                            .getPrimaryClip()
-                                                            .getItemAt(0)
-                                                            .getText()));
-            instrumentation.runOnMainSync(
-                    () -> {
-                        activity.onBackPressed();
-                        assertNull(tagged(activity, "stack-checkbox:0"));
-                        assertFalse(activity.isFinishing());
-                        tagged(activity, "stack-value:0").performLongClick();
-                    });
-            choose("Drop");
-            await(() -> !session.busy && tagged(activity, "stack-value:0") == null);
         } finally {
             finish(activity);
-            store.clear();
-            store.cleanWorkFiles(null);
-            seed.delete();
         }
     }
 }
