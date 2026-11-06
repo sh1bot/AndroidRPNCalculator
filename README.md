@@ -72,7 +72,8 @@ DEC preserves exact terminating decimals and copies recurring/irrational values
 to 40 significant digits. Tap a stack value
 to copy it. Tap a stack label to select its row and show checkboxes; while selecting,
 tap anywhere on a row to toggle it. Selection is available only in stack mode.
-**Undo** becomes **All** to select every row, then **None** to clear the selection.
+**Undo** becomes a stacked checkbox icon: checked to select every row, empty to
+clear the selection.
 Back/Escape also exits selection.
 
 During selection, **Clear** becomes a copy icon and **Swap** becomes **Pick**.

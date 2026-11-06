@@ -293,15 +293,14 @@ public final class CalculatorKeypad extends ViewGroup {
 
     private void updateUndoButton() {
         undoButton.setText(
-                getContext()
-                        .getString(
-                                calculating
-                                        ? R.string.cancel
-                                        : selecting
-                                                ? (allSelected
-                                                        ? R.string.select_none
-                                                        : R.string.select_all)
-                                                : R.string.undo));
+                calculating
+                        ? getContext().getString(R.string.cancel)
+                        : selecting ? "" : getContext().getString(R.string.undo));
+        setButtonIcon(
+                undoButton,
+                selecting && !calculating
+                        ? (allSelected ? R.drawable.ic_select_none : R.drawable.ic_select_all)
+                        : 0);
         undoButton.setContentDescription(
                 getContext()
                         .getString(

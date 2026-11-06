@@ -127,12 +127,16 @@ public final class StackSelectionTest {
                                         .getText()
                                         .toString()
                                         .contains("SELECT"));
+                        assertNotNull(tagged(activity, "UNDO").getForeground());
                         assertEquals(
-                                "All", ((Button) tagged(activity, "UNDO")).getText().toString());
+                                "Select all stack rows",
+                                tagged(activity, "UNDO").getContentDescription().toString());
                         tagged(activity, "UNDO").performClick();
                         assertEquals(3, session.selectedRows.size());
+                        assertNotNull(tagged(activity, "UNDO").getForeground());
                         assertEquals(
-                                "None", ((Button) tagged(activity, "UNDO")).getText().toString());
+                                "Clear selection",
+                                tagged(activity, "UNDO").getContentDescription().toString());
                         tagged(activity, "UNDO").performClick();
                         assertTrue(session.selectedRows.isEmpty());
                         assertNull(tagged(activity, "stack-checkbox:0"));
