@@ -39,9 +39,10 @@ selected angle unit. **rem** calculates Y remainder X, with the sign of Y;
 factorial for nonnegative integers. **Factorise** replaces a positive integer greater
 than 1 with its prime factors, pushed smallest first: `84 Factorise` gives `2, 2, 3, 7`
 (with 7 at X). Large factorisations may take time; Cancel stops them.
-Long-press **Drop** to move X to the top displayed row, or **Swap** to move the
-top displayed value down to X. Both roll the entire stack and commit any current
-entry first. Short presses still drop/backspace and swap respectively.
+In stack mode, long-press **Drop** to move X to the top displayed row.
+During entry, holding backspace only deletes from the entry.
+Long-press **Swap** to move the top displayed value down to X, committing any
+current entry first. Short presses still drop/backspace and swap respectively.
 
 Keyboard: digits, decimal point, and `+ - * /` enter numbers and operations.
 Enter/Space commits or duplicates; Backspace/Delete edits or drops X.
