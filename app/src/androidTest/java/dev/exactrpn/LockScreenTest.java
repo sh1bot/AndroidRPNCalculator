@@ -233,10 +233,9 @@ public final class LockScreenTest {
             shell("locksettings set-pin 1234");
             credential = true;
             await(manager::isDeviceSecure);
-            // Wake from the same shell invocation, so the test process need not resume
-            // itself after putting the emulator to sleep. The credential remains locked.
-            shell("input keyevent KEYCODE_SLEEP; input keyevent KEYCODE_WAKEUP");
+            shell("input keyevent KEYCODE_SLEEP");
             await(manager::isDeviceLocked);
+            shell("input keyevent KEYCODE_WAKEUP");
             activity = open(context);
             CalculatorSession session = StackSelectionTest.session(activity);
             await(() -> !session.busy);
