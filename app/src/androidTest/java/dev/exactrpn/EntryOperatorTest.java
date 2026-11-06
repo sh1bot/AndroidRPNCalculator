@@ -4,7 +4,10 @@ package dev.exactrpn;
 import static org.junit.Assert.*;
 
 import android.app.Instrumentation;
+import android.content.Intent;
 import android.os.SystemClock;
+import android.view.View;
+import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -16,6 +19,8 @@ import java.io.File;
 import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 
 @RunWith(AndroidJUnit4.class)
 public final class EntryOperatorTest {
@@ -26,6 +31,49 @@ public final class EntryOperatorTest {
         long until = SystemClock.elapsedRealtime() + 15000;
         while (session.busy && SystemClock.elapsedRealtime() < until) SystemClock.sleep(25);
         assertFalse("Calculation timed out", session.busy);
+    }
+
+    private void awaitUi(BooleanSupplier condition) {
+        long until = SystemClock.elapsedRealtime() + 10000;
+        do {
+            AtomicBoolean ready = new AtomicBoolean();
+            instrumentation.runOnMainSync(() -> ready.set(condition.getAsBoolean()));
+            if (ready.get()) return;
+            SystemClock.sleep(25);
+        } while (SystemClock.elapsedRealtime() < until);
+        fail("Timed out waiting for error notice");
+    }
+
+    @Test
+    public void repeatedUnderflowShowsTheNoticeAgainAfterItExpires() throws Exception {
+        MainActivity activity =
+                (MainActivity)
+                        instrumentation.startActivitySync(
+                                new Intent(
+                                                instrumentation.getTargetContext(),
+                                                LockedCalculatorActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        CalculatorSession session = StackSelectionTest.session(activity);
+        try {
+            TextView notice =
+                    activity.getWindow().getDecorView().findViewWithTag("calculation-notice");
+            key(session, "1");
+            key(session, "+");
+            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            String message = session.error;
+            long firstError = session.errorRevision;
+            awaitUi(() -> notice.getVisibility() == View.GONE);
+            // No intervening edit: this failure starts with the same value already on the stack.
+            key(session, "+");
+            assertEquals(message, session.error);
+            assertTrue(session.errorRevision > firstError);
+            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            instrumentation.runOnMainSync(() -> assertEquals(message, notice.getText().toString()));
+            assertEquals(Arrays.asList("1"), session.display.rows);
+            assertFalse(session.display.editing);
+        } finally {
+            StackSelectionTest.finish(activity);
+        }
     }
 
     @Test
