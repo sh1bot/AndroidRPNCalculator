@@ -250,12 +250,9 @@ public final class CalculatorKeypad extends ViewGroup {
                                 selecting
                                         ? R.string.copy_selected
                                         : editing ? R.string.clear_entry : R.string.clear_stack));
-        android.graphics.drawable.Drawable copy =
-                selecting ? getContext().getDrawable(R.drawable.ic_copy) : null;
-        if (copy != null) copy.setTint(colors.text);
-        clearButton.setForegroundGravity(Gravity.CENTER);
-        clearButton.setForeground(copy);
-        deleteButton.setText(!selecting && editing ? "⌫" : getContext().getString(R.string.drop));
+        setButtonIcon(clearButton, selecting ? R.drawable.ic_copy : 0);
+        deleteButton.setText(!selecting && editing ? "⌫" : "");
+        setButtonIcon(deleteButton, !selecting && editing ? 0 : R.drawable.ic_delete);
         deleteButton.setContentDescription(
                 getContext()
                         .getString(
@@ -265,7 +262,8 @@ public final class CalculatorKeypad extends ViewGroup {
                                                 ? R.string.backspace
                                                 : R.string.drop_roll_description));
         deleteButton.setLongClickable(!selecting);
-        swapButton.setText(getContext().getString(selecting ? R.string.pick : R.string.swap));
+        swapButton.setText(selecting ? getContext().getString(R.string.pick) : "");
+        setButtonIcon(swapButton, selecting ? 0 : R.drawable.ic_swap);
         swapButton.setContentDescription(
                 getContext()
                         .getString(selecting ? R.string.pick_selected : R.string.swap_description));
@@ -277,6 +275,14 @@ public final class CalculatorKeypad extends ViewGroup {
         productButton.setContentDescription(
                 selecting ? getContext().getString(R.string.product_selected) : "×");
         updateUndoButton();
+    }
+
+    private void setButtonIcon(Button button, int resource) {
+        android.graphics.drawable.Drawable icon =
+                resource == 0 ? null : getContext().getDrawable(resource);
+        if (icon != null) icon.setTint(colors.text);
+        button.setForegroundGravity(Gravity.CENTER);
+        button.setForeground(icon);
     }
 
     public void setCalculating(boolean active) {
