@@ -343,15 +343,18 @@ public class MainActivity extends Activity {
         menu.getMenu().add(0, 1, 0, getString(R.string.drop));
         menu.getMenu().add(0, 2, 1, getString(R.string.copy));
         menu.getMenu().add(0, 3, 2, getString(R.string.pick));
+        if (rows.size() > 1) menu.getMenu().add(0, 4, 3, "Σ");
         menu.setOnMenuItemClickListener(
                 item -> {
                     if (!stackActionAllowed(snapshot)) return true;
-                    if (item.getItemId() == 1 || item.getItemId() == 3) {
+                    if (item.getItemId() == 1 || item.getItemId() == 3 || item.getItemId() == 4) {
                         List<String> indices = new ArrayList<>();
                         for (int row : rows) indices.add(Integer.toString(row));
-                        execute(
-                                (item.getItemId() == 1 ? "DROP_ROWS:" : "PICK_ROWS:")
-                                        + String.join(",", indices));
+                        String command =
+                                item.getItemId() == 1
+                                        ? "DROP_ROWS:"
+                                        : item.getItemId() == 3 ? "PICK_ROWS:" : "SUM_ROWS:";
+                        execute(command + String.join(",", indices));
                     } else {
                         List<String> copies = new ArrayList<>();
                         for (int row : rows) copies.add(session.display.clipboard.get(row));
