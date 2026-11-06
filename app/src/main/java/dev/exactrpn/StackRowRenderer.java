@@ -112,13 +112,6 @@ final class StackRowRenderer {
                                 selected.setChecked(selectedRows.contains(index));
                         });
                 row.addView(selected, new LinearLayout.LayoutParams(dp(40), dp(40)));
-                if (selectedRows.contains(i)) {
-                    android.graphics.drawable.GradientDrawable highlight =
-                            new android.graphics.drawable.GradientDrawable();
-                    highlight.setColor(colors.numberKey);
-                    highlight.setCornerRadius(dp(8));
-                    row.setBackground(highlight);
-                }
             }
             TextView label = text(12);
             digits(label);
@@ -210,6 +203,28 @@ final class StackRowRenderer {
                             display.rows.get(i).startsWith("≈ "),
                             value.getText()));
             stackRows.addView(row);
+        }
+        showSelection(stackRows, selectedRows, null);
+    }
+
+    /** Menu focus changes only presentation; the real selection keeps its row identities. */
+    void showSelection(
+            LinearLayout stackRows, SortedSet<Integer> selectedRows, Integer menuTarget) {
+        for (int i = 0; i < stackRows.getChildCount(); i++) {
+            View row = stackRows.getChildAt(i);
+            if (!("stack-row:" + i).equals(row.getTag())) continue;
+            View checkbox = row.findViewWithTag("stack-checkbox:" + i);
+            if (checkbox != null)
+                checkbox.setVisibility(menuTarget == null ? View.VISIBLE : View.INVISIBLE);
+            boolean highlighted = menuTarget == null ? selectedRows.contains(i) : menuTarget == i;
+            row.setSelected(highlighted);
+            if (highlighted) {
+                android.graphics.drawable.GradientDrawable highlight =
+                        new android.graphics.drawable.GradientDrawable();
+                highlight.setColor(colors.numberKey);
+                highlight.setCornerRadius(dp(8));
+                row.setBackground(highlight);
+            } else row.setBackground(null);
         }
     }
 }

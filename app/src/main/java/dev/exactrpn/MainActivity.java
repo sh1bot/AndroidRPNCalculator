@@ -47,6 +47,7 @@ public class MainActivity extends Activity {
     private Display rendered;
     private StackRowRenderer rowRenderer;
     private boolean selectionDirty;
+    private Integer stackMenuTarget;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable hideNotice =
             () -> {
@@ -327,15 +328,24 @@ public class MainActivity extends Activity {
     private void showStackMenu(View anchor, int index, Display snapshot) {
         if (!stackActionAllowed(snapshot)) return;
         PopupMenu menu = new PopupMenu(this, anchor);
+        SortedSet<Integer> rows = new TreeSet<>();
+        if (session.selectedRows.contains(index)) rows.addAll(session.selectedRows);
+        else {
+            rows.add(index);
+            stackMenuTarget = index;
+            rowRenderer.showSelection(stackRows, session.selectedRows, stackMenuTarget);
+        }
+        menu.setOnDismissListener(
+                dismissed -> {
+                    stackMenuTarget = null;
+                    rowRenderer.showSelection(stackRows, session.selectedRows, null);
+                });
         menu.getMenu().add(0, 1, 0, getString(R.string.drop));
         menu.getMenu().add(0, 2, 1, getString(R.string.copy));
         menu.getMenu().add(0, 3, 2, getString(R.string.pick));
         menu.setOnMenuItemClickListener(
                 item -> {
                     if (!stackActionAllowed(snapshot)) return true;
-                    SortedSet<Integer> rows = new TreeSet<>();
-                    if (session.selectedRows.contains(index)) rows.addAll(session.selectedRows);
-                    else rows.add(index);
                     if (item.getItemId() == 1 || item.getItemId() == 3) {
                         List<String> indices = new ArrayList<>();
                         for (int row : rows) indices.add(Integer.toString(row));
@@ -393,6 +403,8 @@ public class MainActivity extends Activity {
             selectionDirty = false;
             if (stackChanged) {
                 rowRenderer.render(stackRows, display, numbers, session.selectedRows);
+                if (stackMenuTarget != null)
+                    rowRenderer.showSelection(stackRows, session.selectedRows, stackMenuTarget);
             }
 
             refreshEntry(display);
