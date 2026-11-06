@@ -25,7 +25,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 /** Arithmetic runs in :calculation, so Cancel can terminate even non-interruptible work. */
-public final class CalculationService extends Service {
+public class CalculationService extends Service {
     static final int HELLO = 1, EVALUATE = 2;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private RpnCalculator cached;
@@ -80,13 +80,19 @@ public final class CalculationService extends Service {
         Bundle response = new Bundle();
         File snapshot = null, presentation = null;
         try {
-            loadCheckpoint(request, response);
+            checkAccess();
+            File directory = workDirectory(request);
+            loadCheckpoint(request, response, directory);
             Evaluation evaluation = new Evaluation(request);
-            snapshot = File.createTempFile("calculation-", ".state", getNoBackupFilesDir());
-            Files.write(snapshot.toPath(), evaluation.candidate.save());
+            checkAccess();
+            snapshot = File.createTempFile("calculation-", ".state", directory);
+            byte[] state = evaluation.candidate.save();
+            checkAccess();
+            Files.write(snapshot.toPath(), state);
             Bundle display = evaluation.presentation(snapshot);
             // Only paths cross Binder; large stacks must not hit Binder's transaction-size limit.
-            presentation = File.createTempFile("calculation-", ".display", getNoBackupFilesDir());
+            checkAccess();
+            presentation = File.createTempFile("calculation-", ".display", directory);
             DisplayResult.write(presentation, display);
             response.putString("presentation", presentation.getAbsolutePath());
             cached = evaluation.candidate;
@@ -98,7 +104,8 @@ public final class CalculationService extends Service {
         } catch (IOException | RuntimeException | StackOverflowError ex) {
             if (snapshot != null) snapshot.delete();
             if (presentation != null) presentation.delete();
-            if (ex instanceof CalculationError) {
+            if (ex instanceof DeviceAccess.Locked) response.putBoolean("deviceLocked", true);
+            else if (ex instanceof CalculationError) {
                 CalculationError failure = (CalculationError) ex;
                 response.putString("errorCode", failure.code().name());
                 response.putInt("errorArgument", failure.argument());
@@ -114,8 +121,20 @@ public final class CalculationService extends Service {
         }
     }
 
-    private void loadCheckpoint(Bundle request, Bundle response) throws IOException {
+    private void loadCheckpoint(Bundle request, Bundle response, File directory)
+            throws IOException {
         String input = request.getString("input");
+        if (input != null
+                && !new File(input)
+                        .getCanonicalFile()
+                        .getParentFile()
+                        .equals(directory.getCanonicalFile()))
+            throw new IOException("Checkpoint outside calculation workspace");
+        if (temporaryService()
+                && input != null
+                && !new File(input).getName().startsWith("calculation-"))
+            throw new IOException("Temporary sessions cannot restore saved calculations");
+        checkAccess();
         if (cached == null || !Objects.equals(input, cachedPath)) {
             try {
                 cached =
@@ -132,6 +151,25 @@ public final class CalculationService extends Service {
             cachedPath = input;
             cachedStackId = UUID.randomUUID().toString();
         }
+    }
+
+    protected boolean temporaryService() {
+        return false;
+    }
+
+    private void checkAccess() {
+        if (!temporaryService()) DeviceAccess.requireUnlocked(this);
+    }
+
+    private File workDirectory(Bundle request) throws IOException {
+        if (!temporaryService()) return getNoBackupFilesDir();
+        String id = request.getString("workspace");
+        if (id == null || !id.matches("[a-f0-9-]{36}"))
+            throw new IOException("Invalid temporary workspace");
+        File directory = new File(getCacheDir(), "locked-calculations/" + id);
+        if (!directory.isDirectory() && !directory.mkdirs())
+            throw new IOException("Could not create temporary workspace");
+        return directory;
     }
 
     private final class Evaluation {

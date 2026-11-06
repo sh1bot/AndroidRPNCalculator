@@ -6,10 +6,12 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 
+import java.io.File;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -26,7 +28,12 @@ final class CalculatorSession {
     final SortedSet<Integer> selectedRows = new TreeSet<>();
     volatile boolean busy, cancelRequested, background;
     private CalculatorStore store;
-    private boolean loaded;
+    final SessionPolicy policy;
+    private final String workspace;
+    private File temporaryDirectory;
+    private volatile boolean restorePending;
+    boolean tauConstant;
+    private volatile boolean loaded;
     boolean scientificExpanded, inverse;
     volatile long busySince;
     private volatile Thread calculatingThread;
@@ -39,6 +46,17 @@ final class CalculatorSession {
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
             FractionMode fractionMode) {
+        this(n, angle, numberMode, fractionMode, false);
+    }
+
+    CalculatorSession(
+            ValueFormatter.Notation n,
+            RpnCalculator.AngleUnit angle,
+            NumberMode numberMode,
+            FractionMode fractionMode,
+            boolean temporary) {
+        policy = new SessionPolicy(temporary);
+        workspace = temporary ? UUID.randomUUID().toString() : "";
         notation = n;
         this.numberMode = numberMode;
         this.fractionMode = fractionMode;
@@ -53,12 +71,34 @@ final class CalculatorSession {
         this.context = context.getApplicationContext();
         localeTag = context.getResources().getConfiguration().getLocales().get(0).toLanguageTag();
         if (store == null) {
-            store = new CalculatorStore(context.getNoBackupFilesDir());
-            remote = new RemoteCalculator(context);
+            File directory;
+            if (policy.temporary) {
+                directory = new File(context.getCacheDir(), "locked-calculations/" + workspace);
+                if (!directory.isDirectory() && !directory.mkdirs())
+                    throw new IllegalStateException("Could not create temporary workspace");
+                temporaryDirectory = directory;
+            } else directory = context.getNoBackupFilesDir();
+            store = new CalculatorStore(directory, () -> policy.temporary || canUseSavedState());
+            remote = new RemoteCalculator(context, policy.temporary);
+        }
+    }
+
+    boolean canUseSavedState() {
+        return !policy.temporary && policy.canUseSavedState(DeviceAccess.locked(context));
+    }
+
+    void onForeground() {
+        if (restorePending && !busy && canUseSavedState()) {
+            restorePending = false;
+            enqueue(Command.parse(Command.RESTORE));
         }
     }
 
     void enqueue(Command command) {
+        if (!policy.temporary && DeviceAccess.locked(context)) {
+            if (command.is(Command.RESTORE)) restorePending = true;
+            return;
+        }
         boolean start;
         synchronized (this) {
             pending.addLast(command);
@@ -93,7 +133,14 @@ final class CalculatorSession {
             }
             try {
                 checkCancelled();
-                if (key.is(Command.RESTORE)) {
+                if (!policy.temporary && DeviceAccess.locked(context)) {
+                    if (key.is(Command.RESTORE)) restorePending = true;
+                    synchronized (this) {
+                        pending.clear();
+                    }
+                    continue;
+                }
+                if (key.is(Command.RESTORE) && !policy.temporary) {
                     try {
                         checkpoint = store.checkpoint();
                         store.cleanWorkFiles(checkpoint);
@@ -103,6 +150,7 @@ final class CalculatorSession {
                 }
                 Bundle request = new Bundle();
                 request.putString("key", key.wire);
+                request.putString("workspace", workspace);
                 request.putString("input", checkpoint);
                 request.putString("locale", localeTag);
                 request.putString("angle", display.angleUnit.name());
@@ -114,26 +162,35 @@ final class CalculatorSession {
                 publishResult(result, nextDisplay, key);
                 persistSession(false);
             } catch (RuntimeException ex) {
-                if (key.is(Command.RESTORE)) {
-                    checkpoint = null;
-                    remote.cancel();
-                    if (ex instanceof RemoteCalculator.InvalidCheckpoint) {
-                        try {
-                            store.quarantine();
-                        } catch (java.io.IOException backupError) {
-                            android.util.Log.e(
-                                    "ExactRPN", "Could not quarantine checkpoint", backupError);
+                if (ex instanceof DeviceAccess.Locked
+                        || (!policy.temporary
+                                && (DeviceAccess.locked(context)
+                                        || (restorePending && key.is(Command.RESTORE))))) {
+                    if (key.is(Command.RESTORE)) restorePending = true;
+                    error = context.getString(R.string.unlock_to_resume);
+                } else {
+
+                    if (key.is(Command.RESTORE)) {
+                        checkpoint = null;
+                        remote.cancel();
+                        if (ex instanceof RemoteCalculator.InvalidCheckpoint) {
+                            try {
+                                store.quarantine();
+                            } catch (java.io.IOException | DeviceAccess.Locked backupError) {
+                                android.util.Log.e(
+                                        "ExactRPN", "Could not quarantine checkpoint", backupError);
+                            }
                         }
                     }
+                    error =
+                            cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
+                                    ? context.getString(R.string.calculation_cancelled)
+                                    : key.is(Command.RESTORE)
+                                            ? context.getString(R.string.restore_failed)
+                                            : context.getString(
+                                                    R.string.error_prefix,
+                                                    ErrorMessages.describe(context, ex));
                 }
-                error =
-                        cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
-                                ? context.getString(R.string.calculation_cancelled)
-                                : key.is(Command.RESTORE)
-                                        ? context.getString(R.string.restore_failed)
-                                        : context.getString(
-                                                R.string.error_prefix,
-                                                ErrorMessages.describe(context, ex));
                 synchronized (this) {
                     pending.clear();
                 }
@@ -189,6 +246,12 @@ final class CalculatorSession {
     }
 
     private void persistSession(boolean idle) {
+        // Temporary checkpoints are worker transport only, never a saved calculation.
+        if (policy.temporary) {
+            store.cleanWorkFiles(checkpoint);
+            return;
+        }
+        if (!canUseSavedState()) return;
         // Called only by the serial worker, after a committed operation or when its queue drains.
         if (!loaded) {
             store.cleanWorkFiles(checkpoint);
@@ -211,6 +274,11 @@ final class CalculatorSession {
             throw new com.hp.creals.CR.AbortedException();
     }
 
+    void pauseForLock() {
+        if (!loaded) restorePending = true;
+        cancel();
+    }
+
     void cancel() {
         synchronized (this) {
             if (!busy) return;
@@ -227,7 +295,14 @@ final class CalculatorSession {
     }
 
     void close() {
+        cancel();
         remote.close();
+        if (policy.temporary)
+            worker.submit(
+                    () -> {
+                        store.cleanWorkFiles(null);
+                        if (temporaryDirectory != null) temporaryDirectory.delete();
+                    });
         worker.shutdown();
     }
 }

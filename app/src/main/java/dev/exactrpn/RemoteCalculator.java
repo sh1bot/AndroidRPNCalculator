@@ -37,6 +37,7 @@ final class RemoteCalculator {
     }
 
     private final Context context;
+    private final boolean temporary;
     private final Handler main = new Handler(Looper.getMainLooper());
     private Messenger remote;
     private ServiceConnection connection;
@@ -66,7 +67,12 @@ final class RemoteCalculator {
                             }));
 
     RemoteCalculator(Context context) {
+        this(context, false);
+    }
+
+    RemoteCalculator(Context context, boolean temporary) {
         this.context = context.getApplicationContext();
+        this.temporary = temporary;
     }
 
     Bundle evaluate(Bundle request) {
@@ -81,6 +87,7 @@ final class RemoteCalculator {
         }
         try {
             Bundle response = future.get();
+            if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
             if (response.getBoolean("invalidCheckpoint"))
                 throw new InvalidCheckpoint(response.getString("error"));
             if (response.containsKey("errorCode"))
@@ -166,7 +173,11 @@ final class RemoteCalculator {
                     synchronized (RemoteCalculator.this) {
                         if (epoch != generation) return;
                         if (!context.bindService(
-                                new Intent(context, CalculationService.class),
+                                new Intent(
+                                        context,
+                                        temporary
+                                                ? LockedCalculationService.class
+                                                : CalculationService.class),
                                 binding,
                                 Context.BIND_AUTO_CREATE))
                             fail(

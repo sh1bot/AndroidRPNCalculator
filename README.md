@@ -21,6 +21,13 @@ During entry, holding a digit enters that digit.
 
 Your stack and entry are restored when you reopen the app.
 
+Add **Exact RPN** using your phone’s Quick Settings editor. From the lock screen,
+the tile opens a separate temporary calculation; it never loads or saves the
+normal stack, even after unlocking. Close it to discard it. Clipboard access
+follows Android’s rules. When unlocked, the tile opens the normal calculator.
+Quick Settings must be accessible while locked; availability depends on the phone
+and its settings. The phone must have been unlocked once after a reboot.
+
 **Swap** exchanges X and Y. **Clear** clears the stack. During entry it becomes
 **CE**, which clears only the line and stays in edit mode. Enter on an empty line
 or Back/Escape returns to stack mode. **Undo** reverses the last change; long-press
