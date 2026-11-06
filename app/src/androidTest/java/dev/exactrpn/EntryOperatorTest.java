@@ -43,7 +43,7 @@ public final class EntryOperatorTest {
             key(session, "+");
             assertFalse(session.display.editing);
             assertEquals(Arrays.asList("1"), session.display.rows);
-            assertEquals("Error: Enter another value before the operator", session.error);
+            assertEquals("Error: Enter another value first, then the operator", session.error);
             RpnCalculator saved =
                     RpnCalculator.load(Files.readAllBytes(new File(session.checkpoint).toPath()));
             assertFalse(saved.isEditing());
