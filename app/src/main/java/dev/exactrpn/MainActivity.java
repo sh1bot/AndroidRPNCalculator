@@ -267,6 +267,7 @@ public class MainActivity extends Activity {
     }
 
     private void handleBack() {
+        dismissErrorNotice();
         if (session.busy) cancelCalculation();
         else if (!session.selectedRows.isEmpty()) clearStackSelection(true);
         else if (session.display.editing) execute("CANCEL_ENTRY");
@@ -465,6 +466,7 @@ public class MainActivity extends Activity {
         }
         if (event.getAction() != KeyEvent.ACTION_DOWN) return true;
         if (key.equals("ESCAPE")) {
+            dismissErrorNotice();
             if (session.busy) cancelCalculation();
             else if (!session.selectedRows.isEmpty()) clearStackSelection(true);
             else execute("CANCEL_ENTRY");
