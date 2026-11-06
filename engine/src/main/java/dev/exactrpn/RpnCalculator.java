@@ -290,6 +290,8 @@ public final class RpnCalculator {
 
     public void key(String key) {
         if (key.equals("SMART_CLEAR")) key = editing ? "CE" : "CLEAR";
+        // Resolve against the calculation state, even when UI updates trail queued input.
+        if (key.equals("HOLD_DROP")) key = editing ? "BACK" : "ROLL_DOWN";
         String direction = key.startsWith("SELECT_") ? key.substring(7) : key;
         if (direction.equals("LEFT")
                 || direction.equals("RIGHT")

@@ -8,6 +8,8 @@ import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
 import android.text.SpannableString;
 import android.text.Spanned;
+import android.text.style.RelativeSizeSpan;
+import android.text.style.SubscriptSpan;
 import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.ViewGroup;
@@ -109,7 +111,7 @@ public final class CalculatorKeypad extends ViewGroup {
         }
     }
 
-    private String functionLabel(String key) {
+    private CharSequence functionLabel(String key) {
         switch (key) {
             case Command.INVERSE:
                 return "INV";
@@ -120,7 +122,11 @@ public final class CalculatorKeypad extends ViewGroup {
             case "!":
                 return "x!";
             case "log10":
-                return "log₁₀";
+                SpannableString logarithm = new SpannableString("log10");
+                logarithm.setSpan(
+                        new RelativeSizeSpan(.7f), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                logarithm.setSpan(new SubscriptSpan(), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                return logarithm;
             case "floor":
                 return "⌊x⌋";
             case "ceil":
@@ -191,10 +197,7 @@ public final class CalculatorKeypad extends ViewGroup {
         deleteButton.setText(editing ? "⌫" : getContext().getString(R.string.drop));
         deleteButton.setContentDescription(
                 getContext()
-                        .getString(
-                                editing
-                                        ? R.string.backspace_roll_description
-                                        : R.string.drop_roll_description));
+                        .getString(editing ? R.string.backspace : R.string.drop_roll_description));
     }
 
     public void setCalculating(boolean active) {
@@ -214,7 +217,7 @@ public final class CalculatorKeypad extends ViewGroup {
         return Math.round(n * getResources().getDisplayMetrics().density);
     }
 
-    private Button button(String key, String label) {
+    private Button button(String key, CharSequence label) {
         Button b = new Button(getContext());
         if (key.equals("CLEAR")) clearButton = b;
         b.setAllCaps(false);
@@ -241,7 +244,7 @@ public final class CalculatorKeypad extends ViewGroup {
             SpannableString fraction = new SpannableString("1/x");
             fraction.setSpan(new ReciprocalSpan(), 0, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.setText(fraction);
-        } else b.setText(key.matches("[0-9.]") ? numbers.entry(label) : label);
+        } else b.setText(key.matches("[0-9.]") ? numbers.entry(label.toString()) : label);
         if (key.matches("[0-9.]")) {
             b.setFontFeatureSettings("tnum");
             numberButtons.put(key, b);
@@ -349,7 +352,7 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.equals("BACK"))
             b.setOnLongClickListener(
                     v -> {
-                        command.accept("ROLL_DOWN");
+                        command.accept("HOLD_DROP");
                         return true;
                     });
         if (key.equals("SWAP"))

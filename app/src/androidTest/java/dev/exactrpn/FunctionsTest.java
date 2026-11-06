@@ -180,7 +180,7 @@ public final class FunctionsTest {
                             }
                             Button drop = find(keypad, "Drop");
                             drop.performLongClick();
-                            assertEquals("ROLL_DOWN", command.get());
+                            assertEquals("HOLD_DROP", command.get());
                             drop.performClick();
                             assertEquals("BACK", command.get());
                             Button swap = find(keypad, "Swap");
@@ -190,8 +190,23 @@ public final class FunctionsTest {
                             assertEquals("SWAP", command.get());
                             keypad.setEditing(true);
                             find(keypad, "⌫").performLongClick();
-                            assertEquals("ROLL_DOWN", command.get());
+                            assertEquals("HOLD_DROP", command.get());
                             keypad.setInverse(false);
+                            Button log = find(keypad, "log10");
+                            assertNotNull(log);
+                            android.text.Spanned label = (android.text.Spanned) log.getText();
+                            android.text.style.SubscriptSpan[] bases =
+                                    label.getSpans(
+                                            0,
+                                            label.length(),
+                                            android.text.style.SubscriptSpan.class);
+                            assertEquals(1, bases.length);
+                            assertEquals(
+                                    "10",
+                                    label.subSequence(
+                                                    label.getSpanStart(bases[0]),
+                                                    label.getSpanEnd(bases[0]))
+                                            .toString());
                             Button sine = find(keypad, "sin");
                             assertNotNull(sine);
                             sine.performClick();

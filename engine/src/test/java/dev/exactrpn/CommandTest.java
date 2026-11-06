@@ -42,6 +42,32 @@ final class CommandTest {
     }
 
     @Test
+    void holdDropEditsWithoutCommittingOrMovingTheStack() {
+        RpnCalculator calculator = new RpnCalculator();
+        for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"})
+            calculator.key(key);
+        calculator.paste("45");
+        calculator.key("HOLD_DROP");
+        assertEquals("4", calculator.entry());
+        calculator.key("HOLD_DROP");
+        calculator.key("HOLD_DROP");
+        assertTrue(calculator.isEditing());
+        assertEquals("", calculator.entry());
+        assertEquals(
+                java.util.Arrays.asList("1", "2", "3"),
+                calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+        calculator.key("ENTER");
+        calculator.key("HOLD_DROP");
+        assertEquals(
+                java.util.Arrays.asList("3", "1", "2"),
+                calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+        calculator.key("UNDO");
+        assertEquals(
+                java.util.Arrays.asList("1", "2", "3"),
+                calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+    }
+
+    @Test
     void modeStorageIdsStayStable() {
         assertEquals(FractionMode.MIXED, FractionMode.fromId(2));
         assertEquals(FractionMode.IMPROPER, FractionMode.fromId(1));
