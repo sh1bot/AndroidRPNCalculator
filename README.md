@@ -75,7 +75,8 @@ more rows. Long-press a value for **Drop**, **Copy** and **Pick**: pressing a se
 acts on the whole selection; pressing an unselected row acts only on that row.
 Dropping an unselected row keeps the other values selected. **Pick** copies the
 target rows onto the top of the stack in display order, preserving the originals
-and any unfinished entry. Multiple values copy one per
+and any unfinished entry. For multiple selected rows, **Σ** pushes their exact sum
+without changing the selection or removing the original values. Multiple values copy one per
 line in display order. Back/Escape exits selection. Long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
 a selected separator explicitly. Backspace/Delete edit at the cursor.

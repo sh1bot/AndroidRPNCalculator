@@ -94,6 +94,51 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void selectedSumAppendsTheResultAndKeepsSelection() throws Exception {
+        Context context = instrumentation.getTargetContext();
+        MainActivity activity =
+                (MainActivity)
+                        instrumentation.startActivitySync(
+                                new Intent(context, LockedCalculatorActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        CalculatorSession session = session(activity);
+        try {
+            await(() -> !session.busy);
+            for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"}) {
+                instrumentation.runOnMainSync(() -> session.enqueue(Command.parse(key)));
+                await(() -> !session.busy);
+            }
+            await(() -> tagged(activity, "stack-label:2") != null);
+            instrumentation.runOnMainSync(
+                    () -> tagged(activity, "stack-label:0").performLongClick());
+            instrumentation.runOnMainSync(
+                    () -> tagged(activity, "stack-checkbox:2").performClick());
+            instrumentation.runOnMainSync(
+                    () -> tagged(activity, "stack-value:2").performLongClick());
+            choose("Σ");
+            await(() -> !session.busy && tagged(activity, "stack-value:3") != null);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        assertEquals(
+                                java.util.Arrays.asList("1", "2", "3", "4"), session.display.rows);
+                        assertEquals(
+                                new java.util.TreeSet<>(java.util.Arrays.asList(0, 2)),
+                                session.selectedRows);
+                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:0")).isChecked());
+                        assertTrue(((CheckBox) tagged(activity, "stack-checkbox:2")).isChecked());
+                        assertFalse(((CheckBox) tagged(activity, "stack-checkbox:3")).isChecked());
+                    });
+            RpnCalculator restored =
+                    RpnCalculator.load(Files.readAllBytes(new File(session.checkpoint).toPath()));
+            assertEquals("4", restored.values().get(3).bigIntegerValue().toString());
+            restored.key("UNDO");
+            assertEquals(3, restored.values().size());
+        } finally {
+            finish(activity);
+        }
+    }
+
+    @Test
     public void pickCopiesOnlyTheTargetRowsAndKeepsOriginalSelection() throws Exception {
         Context context = instrumentation.getTargetContext();
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());

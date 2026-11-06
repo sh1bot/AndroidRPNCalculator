@@ -486,6 +486,33 @@ public final class RpnCalculator {
         remember(before);
     }
 
+    /** Append the exact sum of distinct selected rows, leaving the originals and entry intact. */
+    public void sumRows(int... indices) {
+        TreeSet<Integer> rows = new TreeSet<>();
+        for (int index : indices) {
+            if (index < 0 || index >= stack.size())
+                throw CalculationError.invalid(CalculationError.Code.ROW_MISSING);
+            rows.add(index);
+        }
+        if (rows.isEmpty()) return;
+        UnifiedReal sum = null;
+        SavedValue expression = null;
+        for (int index : rows) {
+            UnifiedReal value = stack.get(index);
+            if (sum == null) {
+                sum = value;
+                expression = savedValues.get(value);
+            } else {
+                sum = sum.add(value);
+                expression = SavedValue.of(sum, "+", expression, savedValues.get(value));
+            }
+        }
+        State before = new State(this);
+        stack.add(sum);
+        savedValues.put(sum, expression);
+        remember(before);
+    }
+
     public boolean isEmpty() {
         return stack.isEmpty() && entry.isEmpty();
     }
