@@ -25,7 +25,20 @@ final class CalculatorSession {
     volatile Display display;
     volatile String error = "";
     volatile long errorRevision;
-    private final Deque<Command> pending = new ArrayDeque<>();
+    // A keypress dismisses notices from every earlier input, including unfinished requests.
+    private long inputGeneration;
+
+    private static final class PendingKey {
+        final Command command;
+        final long generation;
+
+        PendingKey(Command command, long generation) {
+            this.command = command;
+            this.generation = generation;
+        }
+    }
+
+    private final Deque<PendingKey> pending = new ArrayDeque<>();
     final SortedSet<Integer> selectedRows = new TreeSet<>();
     volatile boolean busy, cancelRequested, background;
     private CalculatorStore store;
@@ -102,7 +115,7 @@ final class CalculatorSession {
         }
         boolean start;
         synchronized (this) {
-            pending.addLast(command);
+            pending.addLast(new PendingKey(command, inputGeneration));
             start = !busy;
             if (start) {
                 cancelRequested = false;
@@ -116,6 +129,7 @@ final class CalculatorSession {
     private void drainKeys() {
         while (true) {
             Command key;
+            long generation;
             synchronized (this) {
                 if (cancelRequested) pending.clear();
                 if (pending.isEmpty()) {
@@ -123,13 +137,16 @@ final class CalculatorSession {
                     busy = false;
                     Thread.interrupted();
                     key = null;
+                    generation = inputGeneration;
                 } else {
-                    key = pending.removeFirst();
+                    PendingKey input = pending.removeFirst();
+                    key = input.command;
+                    generation = input.generation;
                     calculatingThread = Thread.currentThread();
                 }
             }
             if (key == null) {
-                persistSession(true);
+                persistSession(true, generation);
                 return;
             }
             try {
@@ -160,15 +177,15 @@ final class CalculatorSession {
                 request.putInt("fractionMode", fractionMode.id);
                 Bundle result = remote.evaluate(request);
                 Display nextDisplay = new Display(result);
-                publishResult(result, nextDisplay, key);
-                persistSession(false);
+                publishResult(result, nextDisplay, key, generation);
+                persistSession(false, generation);
             } catch (RuntimeException ex) {
                 if (ex instanceof DeviceAccess.Locked
                         || (!policy.temporary
                                 && (DeviceAccess.locked(context)
                                         || (restorePending && key.is(Command.RESTORE))))) {
                     if (key.is(Command.RESTORE)) restorePending = true;
-                    setError(context.getString(R.string.unlock_to_resume));
+                    setError(generation, context.getString(R.string.unlock_to_resume));
                 } else {
 
                     if (key.is(Command.RESTORE)) {
@@ -184,6 +201,7 @@ final class CalculatorSession {
                         }
                     }
                     setError(
+                            generation,
                             cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
                                     ? context.getString(R.string.calculation_cancelled)
                                     : key.is(Command.RESTORE)
@@ -193,7 +211,7 @@ final class CalculatorSession {
                                                     ErrorMessages.describe(context, ex)));
                 }
                 synchronized (this) {
-                    pending.clear();
+                    pending.removeIf(input -> input.generation <= generation);
                 }
             } finally {
                 Thread.interrupted();
@@ -201,7 +219,7 @@ final class CalculatorSession {
         }
     }
 
-    private void publishResult(Bundle result, Display nextDisplay, Command key) {
+    private void publishResult(Bundle result, Display nextDisplay, Command key, long generation) {
         Runnable accept =
                 () -> {
                     synchronized (this) {
@@ -222,11 +240,15 @@ final class CalculatorSession {
                         fractionMode = nextDisplay.fractionMode;
                         display = nextDisplay;
                         String operationError = result.getString("operationError", "");
-                        setError(
-                                operationError.isEmpty()
-                                        ? ""
-                                        : context.getString(R.string.error_prefix, operationError));
-                        if (!operationError.isEmpty()) pending.clear();
+                        if (!key.is(Command.CHECKPOINT))
+                            setError(
+                                    generation,
+                                    operationError.isEmpty()
+                                            ? ""
+                                            : context.getString(
+                                                    R.string.error_prefix, operationError));
+                        if (!operationError.isEmpty())
+                            pending.removeIf(input -> input.generation <= generation);
                         if (!key.is(Command.CHECKPOINT)) loaded = true;
                     }
                 };
@@ -251,7 +273,7 @@ final class CalculatorSession {
         }
     }
 
-    private void persistSession(boolean idle) {
+    private void persistSession(boolean idle, long generation) {
         // Temporary checkpoints are worker transport only, never a saved calculation.
         if (policy.temporary) {
             store.cleanWorkFiles(checkpoint);
@@ -271,15 +293,18 @@ final class CalculatorSession {
             store.cleanWorkFiles(checkpoint);
         } catch (java.io.IOException | RuntimeException ex) {
             android.util.Log.e("ExactRPN", "Could not save calculator", ex);
-            setError(context.getString(R.string.save_failed));
+            setError(generation, context.getString(R.string.save_failed));
         }
     }
 
-    void clearError() {
-        setError("");
+    synchronized void clearError() {
+        inputGeneration++;
+        setError(inputGeneration, "");
     }
 
-    private synchronized void setError(String message) {
+    private synchronized void setError(long generation, String message) {
+        // Completion order must never let an older result reverse a newer dismissal.
+        if (generation != inputGeneration) return;
         error = message;
         errorRevision++;
     }

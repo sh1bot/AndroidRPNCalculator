@@ -19,6 +19,8 @@ import org.junit.runner.RunWith;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.Arrays;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -43,6 +45,55 @@ public final class EntryOperatorTest {
             SystemClock.sleep(25);
         } while (SystemClock.elapsedRealtime() < until);
         fail("Timed out waiting for error notice");
+    }
+
+    @Test
+    public void olderFailureCannotRestoreItsNoticeOrDiscardTheNextKeypress() throws Exception {
+        MainActivity activity =
+                (MainActivity)
+                        instrumentation.startActivitySync(
+                                new Intent(
+                                                instrumentation.getTargetContext(),
+                                                LockedCalculatorActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        CalculatorSession session = StackSelectionTest.session(activity);
+        CountDownLatch release = new CountDownLatch(1);
+        try {
+            awaitUi(() -> !session.busy);
+            java.lang.reflect.Field workerField =
+                    CalculatorSession.class.getDeclaredField("worker");
+            workerField.setAccessible(true);
+            ExecutorService worker = (ExecutorService) workerField.get(session);
+            CountDownLatch paused = new CountDownLatch(1);
+            worker.submit(
+                    () -> {
+                        paused.countDown();
+                        try {
+                            release.await();
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                    });
+            assertTrue(paused.await(10, TimeUnit.SECONDS));
+            View root = activity.getWindow().getDecorView();
+            instrumentation.runOnMainSync(
+                    () -> {
+                        root.findViewWithTag("+").performClick();
+                        root.findViewWithTag("1").performClick();
+                    });
+            // Complete the earlier failing operator only after the next key has dismissed it.
+            release.countDown();
+            awaitUi(() -> !session.busy && session.display.entry.equals("1"));
+            assertEquals("", session.error);
+            instrumentation.runOnMainSync(
+                    () ->
+                            assertEquals(
+                                    View.GONE,
+                                    root.findViewWithTag("calculation-notice").getVisibility()));
+        } finally {
+            release.countDown();
+            StackSelectionTest.finish(activity);
+        }
     }
 
     @Test
