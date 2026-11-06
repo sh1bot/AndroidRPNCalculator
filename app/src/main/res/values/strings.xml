@@ -69,7 +69,7 @@
     <string name="inverse_on">Inverse functions on</string>
     <string name="backspace_roll_description">Backspace; long press to roll X to the top displayed row</string>
     <string name="drop_roll_description">Drop X; long press to roll X to the top displayed row</string>
-    <string name="factor">Factor</string>
+    <string name="factor">Factorise</string>
     <string name="calculation_cancelled">Calculation cancelled</string>
     <string name="restore_failed">Could not restore saved calculation. Started empty.</string>
     <string name="save_failed">Could not save calculator state</string>
@@ -103,4 +103,9 @@
     <string name="ten_power_description">Ten to the power of X</string>
     <string name="phi_description">Golden ratio</string>
     <string name="modulo_description">Y modulo X, with the sign of X</string>
+    <string name="open_functions">Open functions</string>
+    <string name="close_functions">Close functions</string>
+    <string name="open_complements">Open inverse and complementary functions</string>
+    <string name="close_complements">Close inverse and complementary functions</string>
+    <string name="ceil_description">Ceiling of X: smallest integer no smaller than X</string>
 </resources>

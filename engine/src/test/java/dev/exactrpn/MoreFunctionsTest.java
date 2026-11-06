@@ -54,6 +54,14 @@ final class MoreFunctionsTest {
     }
 
     @Test
+    void ceilingRoundsUpAcrossZeroAndAtIntegers() {
+        assertEquals(BigInteger.valueOf(3), apply("2.1", "ceil").bigIntegerValue());
+        assertEquals(BigInteger.valueOf(-2), apply("-2.9", "ceil").bigIntegerValue());
+        assertEquals(BigInteger.valueOf(-2), apply("-2", "ceil").bigIntegerValue());
+        assertEquals(BigInteger.ZERO, apply("-0.01", "ceil").bigIntegerValue());
+    }
+
+    @Test
     void goldenRatioIsExactAndSurvivesRestore() throws Exception {
         RpnCalculator calculator = new RpnCalculator();
         calculator.key("φ");

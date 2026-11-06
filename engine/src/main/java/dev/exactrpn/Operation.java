@@ -24,6 +24,7 @@ public enum Operation {
     FACTORIAL("!", 1),
     RECIPROCAL("1/x", 1),
     FLOOR("floor", 1),
+    CEIL("ceil", 1),
     LOG10("log10", 1),
     TEN_POWER("10ˣ", 1),
     LN("ln", 1),
@@ -92,6 +93,8 @@ public enum Operation {
                 return UnifiedReal.ONE.add(new UnifiedReal(5).sqrt()).divide(UnifiedReal.TWO);
             case FLOOR:
                 return ExactFunctions.floor(a);
+            case CEIL:
+                return ExactFunctions.floor(a.negate()).negate();
             case LOG10:
                 return a.ln().divide(new UnifiedReal(10).ln());
             case TEN_POWER:
