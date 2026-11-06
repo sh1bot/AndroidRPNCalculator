@@ -7,6 +7,7 @@ import android.app.Instrumentation;
 import android.content.Intent;
 import android.os.SystemClock;
 import android.view.View;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -42,6 +43,80 @@ public final class EntryOperatorTest {
             SystemClock.sleep(25);
         } while (SystemClock.elapsedRealtime() < until);
         fail("Timed out waiting for error notice");
+    }
+
+    @Test
+    public void keysDismissErrorsImmediatelyAndNewFailuresStillAppear() throws Exception {
+        MainActivity activity =
+                (MainActivity)
+                        instrumentation.startActivitySync(
+                                new Intent(
+                                                instrumentation.getTargetContext(),
+                                                LockedCalculatorActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        CalculatorSession session = StackSelectionTest.session(activity);
+        View root = activity.getWindow().getDecorView();
+        TextView notice = root.findViewWithTag("calculation-notice");
+        try {
+            key(session, "+");
+            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        root.findViewWithTag("FUNCTIONS").performClick();
+                        assertEquals(View.GONE, notice.getVisibility());
+                        assertEquals("", session.error);
+                    });
+            key(session, "+");
+            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        root.findViewWithTag("1").performClick();
+                        assertEquals(View.GONE, notice.getVisibility());
+                    });
+            awaitUi(() -> !session.busy && session.display.entry.equals("1"));
+            assertEquals("", session.error);
+            instrumentation.runOnMainSync(() -> root.findViewWithTag("+").performClick());
+            awaitUi(() -> !session.busy && notice.getVisibility() == View.VISIBLE);
+            assertFalse(session.error.isEmpty());
+            assertFalse(session.display.editing);
+        } finally {
+            StackSelectionTest.finish(activity);
+        }
+    }
+
+    @Test
+    public void modeButtonsStayEnabledAndQueueChangesWithDigitEntry() throws Exception {
+        MainActivity activity =
+                (MainActivity)
+                        instrumentation.startActivitySync(
+                                new Intent(
+                                                instrumentation.getTargetContext(),
+                                                LockedCalculatorActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        CalculatorSession session = StackSelectionTest.session(activity);
+        View root = activity.getWindow().getDecorView();
+        try {
+            awaitUi(() -> !session.busy);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        root.findViewWithTag("1").performClick();
+                        LinearLayout modes = root.findViewWithTag("mode-row");
+                        for (int i = 0; i < 4; i++) {
+                            assertTrue(
+                                    "Mode button must stay enabled",
+                                    modes.getChildAt(i).isEnabled());
+                            modes.getChildAt(i).performClick();
+                        }
+                    });
+            awaitUi(() -> !session.busy);
+            assertEquals("1", session.display.entry);
+            assertEquals(RpnCalculator.AngleUnit.DEG, session.display.angleUnit);
+            assertEquals(ValueFormatter.Notation.ENGINEERING, session.display.notation);
+            assertEquals(NumberMode.DOT, session.display.numberMode);
+            assertEquals(FractionMode.MIXED, session.display.fractionMode);
+        } finally {
+            StackSelectionTest.finish(activity);
+        }
     }
 
     @Test

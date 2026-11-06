@@ -126,6 +126,7 @@ public class MainActivity extends Activity {
                         this::execute,
                         session.scientificExpanded,
                         (expanded, inverse) -> {
+                            dismissErrorNotice();
                             session.scientificExpanded = expanded;
                             session.inverse = inverse;
                         });
@@ -133,6 +134,7 @@ public class MainActivity extends Activity {
         keys.setTauPreference(
                 session.tauConstant,
                 enabled -> {
+                    dismissErrorNotice();
                     session.tauConstant = enabled;
                     if (session.canUseSavedState())
                         getPreferences(0).edit().putBoolean("tauConstant", enabled).apply();
@@ -202,8 +204,15 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    private void dismissErrorNotice() {
+        session.clearError();
+        handler.removeCallbacks(hideNotice);
+        if (noticeView != null) noticeView.setVisibility(View.GONE);
+    }
+
     private void execute(String wire) {
         Command key = Command.parse(wire);
+        if (!key.is(Command.RESTORE) && !key.is(Command.CHECKPOINT)) dismissErrorNotice();
         if (key.is(Command.INVERSE)) {
             session.inverse = !session.inverse;
             keys.setInverse(session.inverse);
@@ -859,9 +868,5 @@ public class MainActivity extends Activity {
             showNotice(session.error, true);
         shownErrorRevision = errorRevision;
         keys.setCalculating(showProgress);
-        notationButton.setEnabled(!session.busy);
-        angleButton.setEnabled(!session.busy);
-        numberFormatButton.setEnabled(!session.busy);
-        fractionButton.setEnabled(!session.busy);
     }
 }
