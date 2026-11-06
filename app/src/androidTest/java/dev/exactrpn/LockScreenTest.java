@@ -210,9 +210,9 @@ public final class LockScreenTest {
         LockedCalculatorActivity activity = null;
         boolean credential = false;
         try {
-            String result = shell("locksettings set-pin 1234");
+            shell("locksettings set-pin 1234");
             credential = true;
-            assertTrue(result, result.toLowerCase(java.util.Locale.ROOT).contains("success"));
+            await(manager::isDeviceSecure);
             shell("input keyevent KEYCODE_SLEEP");
             await(() -> manager.isDeviceLocked());
             shell("input keyevent KEYCODE_WAKEUP");
