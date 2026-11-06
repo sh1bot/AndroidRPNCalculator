@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
     private CalculatorKeypad keys;
     private LocaleNumbers numbers, localNumbers, computerNumbers, ungroupedNumbers;
     private boolean changingEntry, entryShowsRaw;
-    private String shownError = "";
+    private long shownErrorRevision = -1;
     private android.window.OnBackInvokedCallback backCallback;
     private LinearLayout stackRows;
     private ScrollView scroll;
@@ -713,6 +713,7 @@ public class MainActivity extends Activity {
         FrameLayout screen = new FrameLayout(this);
         screen.addView(root, new FrameLayout.LayoutParams(-1, -1));
         noticeView = text(14);
+        noticeView.setTag("calculation-notice");
         noticeView.setPadding(dp(12), dp(10), dp(12), dp(10));
         noticeView.setMaxLines(3);
         noticeView.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -817,9 +818,10 @@ public class MainActivity extends Activity {
                 session.policy.temporary
                         ? getString(R.string.temporary_description, calculationStatus)
                         : status.getText());
-        if (!session.error.isEmpty() && !session.error.equals(shownError))
+        long errorRevision = session.errorRevision;
+        if (!session.error.isEmpty() && errorRevision != shownErrorRevision)
             showNotice(session.error, true);
-        shownError = session.error;
+        shownErrorRevision = errorRevision;
         keys.setCalculating(showProgress);
         notationButton.setEnabled(!session.busy);
         angleButton.setEnabled(!session.busy);

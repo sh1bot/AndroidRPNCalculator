@@ -24,6 +24,7 @@ final class CalculatorSession {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     volatile Display display;
     volatile String error = "";
+    volatile long errorRevision;
     private final Deque<Command> pending = new ArrayDeque<>();
     final SortedSet<Integer> selectedRows = new TreeSet<>();
     volatile boolean busy, cancelRequested, background;
@@ -167,7 +168,7 @@ final class CalculatorSession {
                                 && (DeviceAccess.locked(context)
                                         || (restorePending && key.is(Command.RESTORE))))) {
                     if (key.is(Command.RESTORE)) restorePending = true;
-                    error = context.getString(R.string.unlock_to_resume);
+                    setError(context.getString(R.string.unlock_to_resume));
                 } else {
 
                     if (key.is(Command.RESTORE)) {
@@ -182,14 +183,14 @@ final class CalculatorSession {
                             }
                         }
                     }
-                    error =
+                    setError(
                             cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
                                     ? context.getString(R.string.calculation_cancelled)
                                     : key.is(Command.RESTORE)
                                             ? context.getString(R.string.restore_failed)
                                             : context.getString(
                                                     R.string.error_prefix,
-                                                    ErrorMessages.describe(context, ex));
+                                                    ErrorMessages.describe(context, ex)));
                 }
                 synchronized (this) {
                     pending.clear();
@@ -221,10 +222,10 @@ final class CalculatorSession {
                         fractionMode = nextDisplay.fractionMode;
                         display = nextDisplay;
                         String operationError = result.getString("operationError", "");
-                        error =
+                        setError(
                                 operationError.isEmpty()
                                         ? ""
-                                        : context.getString(R.string.error_prefix, operationError);
+                                        : context.getString(R.string.error_prefix, operationError));
                         if (!operationError.isEmpty()) pending.clear();
                         if (!key.is(Command.CHECKPOINT)) loaded = true;
                     }
@@ -270,8 +271,13 @@ final class CalculatorSession {
             store.cleanWorkFiles(checkpoint);
         } catch (java.io.IOException | RuntimeException ex) {
             android.util.Log.e("ExactRPN", "Could not save calculator", ex);
-            error = context.getString(R.string.save_failed);
+            setError(context.getString(R.string.save_failed));
         }
+    }
+
+    private void setError(String message) {
+        error = message;
+        errorRevision++;
     }
 
     private void checkCancelled() {
