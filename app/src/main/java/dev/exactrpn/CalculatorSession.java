@@ -203,6 +203,7 @@ final class CalculatorSession {
                 }
                 Display nextDisplay = new Display(result);
                 publishResult(result, nextDisplay, key, generation);
+                if (background) persistSession(generation);
             } catch (RuntimeException ex) {
                 if (ex instanceof DeviceAccess.Locked
                         || (!policy.temporary
@@ -313,7 +314,7 @@ final class CalculatorSession {
             CalculationSnapshot accepted = checkpoint;
             if (accepted == null) return;
             try {
-                if (background && accepted.empty) {
+                if (background && !busy && accepted.empty) {
                     store.clear();
                     synchronized (this) {
                         if (checkpoint == accepted) checkpoint = null;
