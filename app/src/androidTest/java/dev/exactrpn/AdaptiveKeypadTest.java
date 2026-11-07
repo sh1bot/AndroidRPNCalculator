@@ -210,7 +210,9 @@ public final class AdaptiveKeypadTest {
                                     .apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
                             assertEquals(
                                     java.util.Arrays.asList("1", "2", "1"),
-                                    calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+                                    calculator.formattedValues(
+                                            ValueFormatter.Notation.SCIENTIFIC,
+                                            FractionMode.DECIMAL));
                             find(keypad, "0").performLongClick();
                             assertEquals("HOLD_DIGIT:0", command.get());
                             calculator.paste("4");

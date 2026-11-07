@@ -80,11 +80,6 @@ public final class NumberText {
         return parse(text, p.decimal, p.grouping, p.primary, p.secondary);
     }
 
-    public static String normalize(
-            String text, char decimal, char grouping, int primary, int secondary) {
-        return analyze(text, new Profile(decimal, grouping, primary, secondary)).canonical();
-    }
-
     private static String parse(
             String text, char decimal, char grouping, int primary, int secondary) {
         if (text == null || text.length() > 4096) throw invalid();

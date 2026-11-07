@@ -97,6 +97,20 @@ final class RemoteCalculator {
                                 CalculationError.Code.valueOf(response.getString("errorCode")),
                                 response.getInt("errorArgument")));
             if (response.containsKey("error")) throw new UserFailure(response.getString("error"));
+            if (response.containsKey("copyFile")) {
+                File copy = new File(response.getString("copyFile"));
+                try {
+                    Bundle result = new Bundle();
+                    result.putString(
+                            "copyText",
+                            new String(
+                                    java.nio.file.Files.readAllBytes(copy.toPath()),
+                                    java.nio.charset.StandardCharsets.UTF_8));
+                    return result;
+                } finally {
+                    copy.delete();
+                }
+            }
             File file = new File(response.getString("presentation"));
             try {
                 return DisplayResult.read(file);

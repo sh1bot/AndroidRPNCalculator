@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 final class Display {
-    final List<String> rows, clipboard, compactRows;
+    final List<String> rows, compactRows;
     final String entry, problem, stackId;
     final ValueFormatter.Notation notation;
     final boolean editing, raw;
@@ -21,7 +21,7 @@ final class Display {
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
             FractionMode fractionMode) {
-        rows = clipboard = compactRows = Collections.emptyList();
+        rows = compactRows = Collections.emptyList();
         entry = problem = "";
         stackId = "initial";
         this.notation = notation;
@@ -34,7 +34,6 @@ final class Display {
 
     Display(Bundle result) {
         rows = Collections.unmodifiableList(result.getStringArrayList("rows"));
-        clipboard = Collections.unmodifiableList(result.getStringArrayList("clipboard"));
         compactRows = Collections.unmodifiableList(result.getStringArrayList("compactRows"));
         stackId = result.getString("stackId");
         entry = result.getString("entry");

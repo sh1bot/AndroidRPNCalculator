@@ -11,12 +11,28 @@ public final class Command {
         KEY,
         EDIT,
         SELECT,
-        DROP_ROWS,
-        PICK_ROWS,
-        SUM_ROWS,
-        PRODUCT_ROWS,
+        DROP_ROWS(true),
+        PICK_ROWS(true),
+        SUM_ROWS(true),
+        PRODUCT_ROWS(true),
+        COPY_ROWS(true),
         HOLD_DIGIT,
-        PASTE_RAW
+        PASTE_RAW;
+        final boolean takesRows;
+
+        Kind() {
+            this(false);
+        }
+
+        Kind(boolean takesRows) {
+            this.takesRows = takesRows;
+        }
+    }
+
+    private static final java.util.Map<String, Kind> KINDS = new java.util.HashMap<>();
+
+    static {
+        for (Kind kind : Kind.values()) KINDS.put(kind.name(), kind);
     }
 
     public static final String ENTER = "ENTER",
@@ -60,12 +76,7 @@ public final class Command {
         int colon = wire.indexOf(':');
         String prefix = colon < 0 ? wire : wire.substring(0, colon);
         String payload = colon < 0 ? "" : wire.substring(colon + 1);
-        Kind kind;
-        try {
-            kind = Kind.valueOf(prefix);
-        } catch (IllegalArgumentException ex) {
-            kind = Kind.KEY;
-        }
+        Kind kind = KINDS.getOrDefault(prefix, Kind.KEY);
         if (kind == Kind.EDIT) {
             String[] fields = payload.split(":", 5);
             if (fields.length != 5) throw new IllegalArgumentException("Invalid edit command");
@@ -95,10 +106,7 @@ public final class Command {
         if (kind == Kind.HOLD_DIGIT && !payload.matches("[0-9]"))
             throw new IllegalArgumentException("Invalid digit shortcut");
         int[] rows =
-                kind == Kind.DROP_ROWS
-                                || kind == Kind.PICK_ROWS
-                                || kind == Kind.SUM_ROWS
-                                || kind == Kind.PRODUCT_ROWS
+                kind.takesRows
                         ? Arrays.stream(payload.split(",")).mapToInt(Integer::parseInt).toArray()
                         : new int[0];
         return new Command(kind, wire, payload, 0, 0, false, false, rows);
@@ -115,10 +123,7 @@ public final class Command {
     public boolean preservesSelection() {
         return PRESENTATION.contains(wire)
                 || kind == Kind.SELECT
-                || kind == Kind.DROP_ROWS
-                || kind == Kind.PICK_ROWS
-                || kind == Kind.SUM_ROWS
-                || kind == Kind.PRODUCT_ROWS
+                || kind.takesRows
                 || kind == Kind.HOLD_DIGIT;
     }
 

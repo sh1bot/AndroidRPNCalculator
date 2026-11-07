@@ -33,12 +33,8 @@ public final class ValueFormatter {
                     + decimal(rounded, notation);
         }
         if (newest) {
-            BoundedRational rational = value.boundedRationalValue();
-            int places = BoundedRational.digitsRequired(rational);
-            if (places <= 1000)
-                return new BigDecimal(rational.toStringTruncated(places))
-                        .stripTrailingZeros()
-                        .toPlainString();
+            String exact = terminatingDecimal(value);
+            if (exact != null) return exact;
         }
         // Bounded zero detection avoids an undecidable comparison with exact zero.
         StringFloatRep rep = value.crValue().toStringFloatRep(DIGITS + 8, 10, -1000);
@@ -87,15 +83,21 @@ public final class ValueFormatter {
     public static String clipboard(UnifiedReal value, Notation notation) {
         BigInteger integer = value.bigIntegerValue();
         if (integer != null) return integer.toString();
-        BoundedRational rational = value.boundedRationalValue();
-        int places = BoundedRational.digitsRequired(rational);
-        if (places <= 1000)
-            return new BigDecimal(rational.toStringTruncated(places))
-                    .stripTrailingZeros()
-                    .toPlainString();
+        String exact = terminatingDecimal(value);
+        if (exact != null) return exact;
         StringFloatRep rep = value.crValue().toStringFloatRep(COPY_DIGITS + 10, 10, -1000);
         if (rep.sign == 0) return "0";
         return decimal(rounded(rep, COPY_DIGITS), notation, COPY_DIGITS).replace('−', '-');
+    }
+
+    private static String terminatingDecimal(UnifiedReal value) {
+        BoundedRational rational = value.boundedRationalValue();
+        int places = BoundedRational.digitsRequired(rational);
+        return places <= 1000
+                ? new BigDecimal(rational.toStringTruncated(places))
+                        .stripTrailingZeros()
+                        .toPlainString()
+                : null;
     }
 
     private static BigDecimal rounded(StringFloatRep rep, int digits) {

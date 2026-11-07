@@ -19,13 +19,13 @@ final class DisplayResult {
     private static final String[] TEXT = {
         "stackId", "entry", "problem", "angle", "notation", "checkpoint", "operationError"
     };
-    private static final String[] LISTS = {"rows", "clipboard", "compactRows"};
+    private static final String[] LISTS = {"rows", "compactRows"};
     private static final String[] INTS = {"numberMode", "fractionMode", "start", "end"};
 
     static void write(File file, Bundle result) throws IOException {
         try (DataOutputStream out =
                 new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-            out.writeInt(0x44525031);
+            out.writeInt(0x44525032);
             for (String key : TEXT) writeText(out, result.getString(key));
             for (String key : LISTS) {
                 ArrayList<String> list = result.getStringArrayList(key);
@@ -41,7 +41,7 @@ final class DisplayResult {
     static Bundle read(File file) throws IOException {
         try (DataInputStream in =
                 new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
-            if (in.readInt() != 0x44525031) throw new IOException("Unknown display protocol");
+            if (in.readInt() != 0x44525032) throw new IOException("Unknown display protocol");
             Bundle result = new Bundle();
             for (String key : TEXT) result.putString(key, readText(in));
             for (String key : LISTS) {

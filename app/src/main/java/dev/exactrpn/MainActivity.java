@@ -251,13 +251,12 @@ public class MainActivity extends Activity {
         execute("PASTE_RAW:" + text.toString());
     }
 
-    private void copyValue(String text) {
+    private void copyValue(String text, NumberMode mode) {
         android.content.ClipboardManager clipboard =
                 (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
         clipboard.setPrimaryClip(
                 android.content.ClipData.newPlainText(
-                        getString(R.string.clipboard_label),
-                        numberFormat(session.display.numberMode).copy(text)));
+                        getString(R.string.clipboard_label), numberFormat(mode).copy(text)));
         if (Build.VERSION.SDK_INT <= 32) showNotice(getString(R.string.copied), false);
     }
 
@@ -325,8 +324,9 @@ public class MainActivity extends Activity {
     }
 
     private void stackRowTapped(int index, Display snapshot) {
+        if (!stackActionAllowed(snapshot)) return;
         if (!session.selectedRows.isEmpty()) toggleStackRow(index, snapshot);
-        else copyValue(snapshot.clipboard.get(index));
+        else session.copyRows(new int[] {index}, text -> copyValue(text, snapshot.numberMode));
     }
 
     private boolean toggleAllStackRows(Display snapshot) {
@@ -371,9 +371,9 @@ public class MainActivity extends Activity {
         }
         if (!stackActionAllowed(session.display)) return true;
         if (action.equals("COPY")) {
-            List<String> values = new ArrayList<>();
-            for (int row : session.selectedRows) values.add(session.display.clipboard.get(row));
-            copyValue(String.join("\n", values));
+            NumberMode mode = session.display.numberMode;
+            int[] rows = session.selectedRows.stream().mapToInt(Integer::intValue).toArray();
+            session.copyRows(rows, text -> copyValue(text, mode));
         } else {
             List<String> indices = new ArrayList<>();
             for (int row : session.selectedRows) indices.add(Integer.toString(row));
@@ -420,8 +420,7 @@ public class MainActivity extends Activity {
                             || !Objects.equals(rendered.stackId, display.stackId)
                             || rendered.numberMode != display.numberMode
                             || rendered.editing != display.editing
-                            || !rendered.rows.equals(display.rows)
-                            || !rendered.clipboard.equals(display.clipboard);
+                            || !rendered.rows.equals(display.rows);
             selectionDirty = false;
             if (stackChanged) {
                 rowRenderer.render(stackRows, display, numbers, session.selectedRows);
