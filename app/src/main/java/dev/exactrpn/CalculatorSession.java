@@ -342,7 +342,7 @@ final class CalculatorSession {
                     if (policy.temporary) {
                         store.cleanWorkFiles(null);
                         if (temporaryDirectory != null) temporaryDirectory.delete();
-                    } else persistSession(true);
+                    } else persistSession(true, inputGeneration);
                 });
         worker.shutdown();
     }
