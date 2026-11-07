@@ -126,12 +126,15 @@ jobs:
         run: |
           python3 - <<'PYTHON'
           import pathlib, zipfile
-          import gzip, html
+          import html
           with zipfile.ZipFile("dist/ExactRPN.apk") as apk:
-              legal = gzip.decompress(apk.read("assets/licenses.html.gzip")).decode()
+              for name in ["assets/licenses.html", "assets/help.html"]:
+                  assert apk.getinfo(name).compress_type == zipfile.ZIP_DEFLATED, name
+              assert not any(n.endswith(".gzip") for n in apk.namelist())
+              legal = apk.read("assets/licenses.html").decode()
               for source in ["NOTICE", "licenses/APACHE-2.0.txt", "licenses/CR-COPYRIGHT.txt"]:
                   assert html.escape(pathlib.Path(source).read_text(), quote=False).replace("\n", "<br>") in legal, source
-              help_text = gzip.decompress(apk.read("assets/help.html.gzip")).decode()
+              help_text = apk.read("assets/help.html").decode()
               assert "Your first calculation" in help_text and "Keyboard" in help_text
               assert "⇅" in help_text
           PYTHON
