@@ -186,6 +186,19 @@ public final class AdaptiveKeypadTest {
                             CalculatorWorkspace workspace =
                                     new CalculatorWorkspace(context, new View(context), keypad);
                             size(context, workspace, 392, 700);
+                            android.text.TextPaint buttonFont = find(keypad, "⎌").getPaint();
+                            android.util.Log.i(
+                                    "GlyphProbe",
+                                    "API="
+                                            + android.os.Build.VERSION.SDK_INT
+                                            + " trash="
+                                            + buttonFont.hasGlyph("🗑")
+                                            + " textTrash="
+                                            + buttonFont.hasGlyph("🗑︎")
+                                            + " emojiTrash="
+                                            + buttonFont.hasGlyph("🗑️")
+                                            + " swap="
+                                            + buttonFont.hasGlyph("⇅"));
                             assertTrue(
                                     "Undo glyph must be available in the button font",
                                     find(keypad, "⎌").getPaint().hasGlyph("⎌"));
