@@ -65,11 +65,12 @@ public final class MemoryTransportTest {
             RpnCalculator calculator = new RpnCalculator();
             calculator.setInputProfile(new LocaleNumbers(java.util.Locale.US).profile());
             List<String> literals = new ArrayList<>();
-            char[] digits = new char[4090];
+            int depth = 1100;
+            char[] digits = new char[990];
             java.util.Arrays.fill(digits, '9');
             String prefix = new String(digits);
-            for (int i = 0; i < 300; i++) {
-                String literal = prefix + String.format(java.util.Locale.ROOT, "%03d", i);
+            for (int i = 0; i < depth; i++) {
+                String literal = prefix + String.format(java.util.Locale.ROOT, "%04d", i);
                 literals.add(literal);
                 calculator.paste(literal);
                 calculator.key("ENTER");
@@ -82,10 +83,10 @@ public final class MemoryTransportTest {
             Bundle initial =
                     worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
                             .get(45, TimeUnit.SECONDS);
-            assertEquals(300, initial.getStringArrayList("rows").size());
+            assertEquals(depth, initial.getStringArrayList("rows").size());
             assertArrayEquals(state, initial.getByteArray("state"));
             String rows =
-                    java.util.stream.IntStream.range(0, 300)
+                    java.util.stream.IntStream.range(0, depth)
                             .mapToObj(Integer::toString)
                             .collect(java.util.stream.Collectors.joining(","));
             Bundle copied =
