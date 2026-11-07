@@ -150,7 +150,7 @@ public final class Command {
                 calculator.holdDigit(text);
                 break;
             case PASTE_RAW:
-                calculator.pasteText(text, locale);
+                calculator.pasteClipboard(text, locale);
                 break;
             case SELECT:
                 calculator.select(start, end);

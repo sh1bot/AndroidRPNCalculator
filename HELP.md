@@ -40,7 +40,7 @@ The constants are π, e and φ (the exact golden ratio). Long-press π/τ to swi
 
 Tap a stack value to copy it. Copy uses the configured decimal separator without grouping. Fraction modes copy plain text such as `7/3` or `2 1/3`. Decimal mode preserves terminating decimals and copies recurring or irrational values to 40 significant digits.
 
-Long-press Enter or press Ctrl+V to paste. Pasted text stays in entry mode. Safe input can proceed with Enter, an operator or a function. Ambiguous or invalid input is red and blocks those actions until corrected. Edit the separator to match the configured decimal character or remove ambiguous grouping.
+Long-press Enter or press Ctrl+V to paste. Multiple non-empty lines are added to the stack in order, with the last line at X, as one undoable action. Every line must be a valid, unambiguous number; otherwise an error identifies the line and nothing is added. Blank lines are ignored. Any current entry is committed first and must also be valid. Pasted text stays in entry mode. Safe input can proceed with Enter, an operator or a function. Ambiguous or invalid input is red and blocks those actions until corrected. Edit the separator to match the configured decimal character or remove ambiguous grouping.
 
 Tap a stack label to select a row. Checkboxes appear, and tapping a row toggles it. Selection is available only in stack mode. Back/Escape exits selection.
 

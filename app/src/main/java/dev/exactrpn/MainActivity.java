@@ -244,8 +244,14 @@ public class MainActivity extends Activity {
             return;
         }
         CharSequence text = clip.getItemAt(0).getText();
-        if (text.length() > RpnCalculator.MAX_ENTRY_LENGTH) {
-            showNotice(getString(R.string.clipboard_too_long), true);
+        int limit =
+                text.length() > RpnCalculator.MAX_PASTE_LENGTH
+                        ? RpnCalculator.MAX_PASTE_LENGTH
+                        : text.toString().split("\\R", -1).length > 1
+                                ? RpnCalculator.MAX_PASTE_LENGTH
+                                : RpnCalculator.MAX_ENTRY_LENGTH;
+        if (text.length() > limit) {
+            showNotice(getString(R.string.clipboard_too_long, limit), true);
             return;
         }
         execute("PASTE_RAW:" + text.toString());

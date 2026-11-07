@@ -24,6 +24,7 @@ import java.util.TreeSet;
 /** Exact stack values plus a cursor-editable, transactional number entry. */
 public final class RpnCalculator {
     public static final int MAX_ENTRY_LENGTH = 4096;
+    public static final int MAX_PASTE_LENGTH = 65536;
     private List<UnifiedReal> stack = new ArrayList<>();
     private String entry = "";
     private boolean editing, raw;
@@ -202,6 +203,58 @@ public final class RpnCalculator {
     }
 
     /** Clipboard text is retained, including ambiguous or invalid punctuation, for correction. */
+    /** Multiple nonblank lines are validated before any state is changed. */
+    public void pasteClipboard(String text, NumberText.Profile locale) {
+        if (text.length() > MAX_PASTE_LENGTH)
+            throw CalculationError.invalid(CalculationError.Code.ENTRY_TOO_LONG, MAX_PASTE_LENGTH);
+        String[] lines = text.split("\\R", -1);
+        List<UnifiedReal> values = new ArrayList<>();
+        int nonblank = 0;
+        for (String line : lines) if (!line.trim().isEmpty()) nonblank++;
+        if (nonblank < 2) {
+            pasteText(lines.length == 1 ? text : text.trim(), locale);
+            return;
+        }
+        for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            if (line.isEmpty()) continue;
+            try {
+                checkLength(line);
+                values.add(parseClipboardLine(line, locale));
+            } catch (IllegalArgumentException | ArithmeticException ex) {
+                throw CalculationError.invalid(CalculationError.Code.INVALID_PASTE_LINE, i + 1);
+            }
+        }
+        State before = new State(this);
+        // Commit any current entry only after the clipboard has passed validation.
+        try {
+            commit();
+        } catch (RuntimeException ex) {
+            restore(before);
+            throw ex;
+        }
+        for (UnifiedReal value : values) {
+            stack.add(value);
+            savedValues.put(value, SavedValue.of(value, "r", null, null));
+        }
+        if (before.editing) collapseEntryEdits(before);
+        remember(before);
+    }
+
+    private static final java.util.regex.Pattern COPIED_FRACTION =
+            java.util.regex.Pattern.compile("([+-]?[0-9]+)(?: ([0-9]+))?/([0-9]+)");
+
+    private static UnifiedReal parseClipboardLine(String text, NumberText.Profile locale) {
+        if (!text.contains("/")) return parse(NumberText.analyze(text, locale).canonical());
+        java.util.regex.Matcher fraction = COPIED_FRACTION.matcher(text);
+        if (!fraction.matches())
+            throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+        UnifiedReal whole = parse(fraction.group(1)), denominator = parse(fraction.group(3));
+        if (fraction.group(2) == null) return whole.divide(denominator);
+        UnifiedReal part = parse(fraction.group(2)).divide(denominator);
+        return text.startsWith("-") ? whole.negate().add(part).negate() : whole.add(part);
+    }
+
     public void pasteText(String text, NumberText.Profile locale) {
         checkLength(text);
         State before = new State(this);
