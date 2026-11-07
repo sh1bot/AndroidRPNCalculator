@@ -48,7 +48,7 @@ public final class EntryOperatorTest {
     }
 
     @Test
-    public void stopAndCloseFlushTheLatestEntryBeforeTheDebounceExpires() throws Exception {
+    public void onlyLifecycleCheckpointsAndClosePersistForegroundWork() throws Exception {
         android.content.Context context = instrumentation.getTargetContext();
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
         store.clear();
@@ -62,8 +62,17 @@ public final class EntryOperatorTest {
         boolean closed = false;
         try {
             key(session, "RESTORE");
+            key(session, "2");
+            key(session, "ENTER");
+            key(session, "√");
+            SystemClock.sleep(1100); // Longer than the former foreground save delay.
+            assertNull(
+                    "Foreground arithmetic must not persist the calculation", store.checkpoint());
+            key(session, "CLEAR");
             key(session, "1");
             key(session, "2");
+            SystemClock.sleep(1100);
+            assertNull("Foreground entry must not persist the calculation", store.checkpoint());
             session.background = true;
             key(session, "CHECKPOINT");
             RpnCalculator stopped =

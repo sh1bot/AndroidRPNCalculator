@@ -13,6 +13,7 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 
@@ -20,9 +21,7 @@ import java.util.concurrent.FutureTask;
 final class CalculatorSession {
     volatile String checkpoint;
     private RemoteCalculator remote;
-    private final java.util.concurrent.ScheduledExecutorService worker =
-            Executors.newSingleThreadScheduledExecutor();
-    private java.util.concurrent.ScheduledFuture<?> pendingSave;
+    private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private volatile boolean closing;
     private String persistedCheckpoint;
     volatile Display display;
@@ -167,7 +166,10 @@ final class CalculatorSession {
                 }
             }
             if (key == null) {
-                schedulePersistence(background, generation);
+                if (!closing) {
+                    if (background) persistSession(generation);
+                    else store.cleanWorkFiles(checkpoint);
+                }
                 return;
             }
             try {
@@ -196,9 +198,6 @@ final class CalculatorSession {
                 request.putString("notation", notation.name());
                 request.putInt("numberMode", numberMode.id);
                 request.putInt("fractionMode", fractionMode.id);
-                if (key.kind == Command.Kind.KEY
-                        && (Operation.find(key.wire) != null || key.is("Factor")))
-                    schedulePersistence(true, generation);
                 Bundle result = remote.evaluate(request);
                 if (key.kind == Command.Kind.COPY_ROWS) {
                     if (copy != null) handler.post(() -> copy.accept(result.getString("copyText")));
@@ -206,7 +205,7 @@ final class CalculatorSession {
                 }
                 Display nextDisplay = new Display(result);
                 publishResult(result, nextDisplay, key, generation);
-                if (background || key.is(Command.CHECKPOINT)) schedulePersistence(true, generation);
+                if (key.is(Command.CHECKPOINT)) persistSession(generation);
             } catch (RuntimeException ex) {
                 if (ex instanceof DeviceAccess.Locked
                         || (!policy.temporary
@@ -301,32 +300,22 @@ final class CalculatorSession {
         }
     }
 
-    private void schedulePersistence(boolean immediate, long generation) {
-        if (closing) return;
-        if (pendingSave != null) pendingSave.cancel(false);
-        if (immediate || policy.temporary) persistSession(true, generation);
-        else
-            pendingSave =
-                    worker.schedule(
-                            () -> persistSession(true, generation),
-                            750,
-                            java.util.concurrent.TimeUnit.MILLISECONDS);
-    }
-
-    private void persistSession(boolean idle, long generation) {
+    private void persistSession(long generation) {
         // Temporary checkpoints are worker transport only, never a saved calculation.
         if (policy.temporary) {
             store.cleanWorkFiles(checkpoint);
             return;
         }
         if (!canUseSavedState()) return;
-        // Called only by the serial worker, after a committed operation or when its queue drains.
+        // Called by the serial worker for lifecycle checkpoints and final close.
+        // If stopping overlaps queued work, its final accepted result is saved when the queue
+        // drains.
         if (!loaded) {
             store.cleanWorkFiles(checkpoint);
             return;
         }
         try {
-            if (idle && background && display.rows.isEmpty() && display.entry.isEmpty()) {
+            if (background && display.rows.isEmpty() && display.entry.isEmpty()) {
                 checkpoint = null;
                 store.clear();
                 persistedCheckpoint = null;
@@ -384,11 +373,10 @@ final class CalculatorSession {
         remote.close();
         worker.submit(
                 () -> {
-                    if (pendingSave != null) pendingSave.cancel(false);
                     if (policy.temporary) {
                         store.cleanWorkFiles(null);
                         if (temporaryDirectory != null) temporaryDirectory.delete();
-                    } else persistSession(true, inputGeneration);
+                    } else persistSession(inputGeneration);
                 });
         worker.shutdown();
     }
