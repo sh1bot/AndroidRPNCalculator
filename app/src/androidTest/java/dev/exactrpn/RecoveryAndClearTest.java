@@ -130,8 +130,8 @@ public final class RecoveryAndClearTest {
                             () ->
                                     !session.busy
                                             && !session.display.editing
-                                            && button(root, "Clear") != null);
-                    instrumentation.runOnMainSync(() -> button(root, "Clear").performClick());
+                                            && button(root, "AC") != null);
+                    instrumentation.runOnMainSync(() -> button(root, "AC").performClick());
                     await(() -> !session.busy && session.display.rows.isEmpty());
                 } finally {
                     StackSelectionTest.finish(activity);

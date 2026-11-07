@@ -186,8 +186,11 @@ public final class AdaptiveKeypadTest {
                             CalculatorWorkspace workspace =
                                     new CalculatorWorkspace(context, new View(context), keypad);
                             size(context, workspace, 392, 700);
-                            Rect undo = bounds(find(keypad, "Undo"), workspace),
-                                    clear = bounds(find(keypad, "Clear"), workspace),
+                            assertTrue(
+                                    "Undo glyph must be available in the button font",
+                                    find(keypad, "⎌").getPaint().hasGlyph("⎌"));
+                            Rect undo = bounds(find(keypad, "⎌"), workspace),
+                                    clear = bounds(find(keypad, "AC"), workspace),
                                     drop =
                                             bounds(
                                                     ((Button) keypad.findViewWithTag("BACK")),
@@ -248,9 +251,9 @@ public final class AdaptiveKeypadTest {
                             size(context, workspace, 760, 280);
                             assertTrue(stack.getWidth() < closedWidth);
                             Rect sin = bounds(find(keypad, "sin"), workspace),
-                                    clear = bounds(find(keypad, "Clear"), workspace);
+                                    clear = bounds(find(keypad, "AC"), workspace);
                             assertTrue("Functions must open to the left", sin.right <= clear.left);
-                            Rect undo = bounds(find(keypad, "Undo"), workspace),
+                            Rect undo = bounds(find(keypad, "⎌"), workspace),
                                     functions = bounds(find(keypad, "f()"), workspace);
                             assertTrue(functions.width() > undo.width() * 1.6);
                             assertTrue(undo.bottom <= clear.top);
@@ -266,12 +269,12 @@ public final class AdaptiveKeypadTest {
                             assertNotNull(find(keypad, "asin"));
                             assertTrue(
                                     bounds(find(keypad, "asin"), workspace).bottom
-                                            <= bounds(find(keypad, "Clear"), workspace).top);
+                                            <= bounds(find(keypad, "AC"), workspace).top);
                             size(context, workspace, 600, 300);
                             assertTrue(
                                     "Narrow landscape stacks the function rows",
                                     bounds(find(keypad, "asin"), workspace).bottom
-                                            <= bounds(find(keypad, "Clear"), workspace).top);
+                                            <= bounds(find(keypad, "AC"), workspace).top);
                             assertTrue(stack.getWidth() >= dp(context, 200));
                         });
     }
