@@ -1,4 +1,7 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!-- Stay offline even if a future library declares network access. -->
+    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
     <application android:label="@string/app_name" android:icon="@mipmap/ic_launcher" android:roundIcon="@mipmap/ic_launcher" android:theme="@style/Theme.ExactRpn" android:enableOnBackInvokedCallback="true" android:allowBackup="false" android:supportsRtl="true">
         <service android:name=".CalculationService" android:process=":calculation" android:exported="false"/>
         <service android:name=".LockedCalculationService" android:process=":locked_calculation" android:exported="false"/>
