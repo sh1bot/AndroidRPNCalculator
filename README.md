@@ -131,3 +131,6 @@ generates device-specific APKs; install the APK above when testing directly.
 To build a release bundle yourself, run `gradle :app:bundleRelease` with your
 signing configuration. The target SDK is Android 16 (API 36); the minimum remains
 Android 8.0 (API 26).
+
+The app requests no Android permissions and has no Internet access. CI checks the
+packaged APK and rejects builds that introduce requested permissions.

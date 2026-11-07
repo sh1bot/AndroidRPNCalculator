@@ -113,6 +113,15 @@ jobs:
             fi
           fi
 
+      - name: Require an APK with no requested permissions
+        run: |
+          permissions=$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump permissions dist/ExactRPN.apk)
+          printf '%s\n' "$permissions"
+          if [[ "$permissions" == *uses-permission* ]]; then
+            echo "::error::The calculator must not request any Android permissions."
+            exit 1
+          fi
+
       - name: Verify app bundle signature
         run: |
           python3 - <<'PYTHON'
