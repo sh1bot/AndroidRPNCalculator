@@ -11,6 +11,7 @@ on:
       - 'app/src/main/AndroidManifest.xml'
       - 'app/build.gradle'
       - 'gradle.properties'
+      - 'scripts/test-device.sh'
       - '.github/workflows/device-checks.yml'
 
 permissions:
@@ -63,11 +64,11 @@ jobs:
           script: |
             adb shell input keyevent KEYCODE_WAKEUP
             adb shell wm dismiss-keyguard
-            gradle --no-daemon --console=plain :app:connectedDebugAndroidTest
+            bash scripts/test-device.sh
       - name: Upload device test report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: device-test-report-${{ matrix.api }}
-          path: app/build/reports/androidTests/connected/
+          path: app/build/reports/device-tests/
           if-no-files-found: ignore

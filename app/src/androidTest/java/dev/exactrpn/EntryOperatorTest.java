@@ -299,7 +299,7 @@ public final class EntryOperatorTest {
             assertEquals("0", session.display.entry);
             assertEquals(Arrays.asList("1"), session.display.rows);
             key(session, "CE");
-            key(session, "PASTE:1,234");
+            key(session, "PASTE_RAW:1,234");
             key(session, "+");
             assertTrue(session.display.editing);
             assertEquals("1,234", session.display.entry);

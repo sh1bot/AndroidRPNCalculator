@@ -4,7 +4,6 @@ package dev.exactrpn;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import android.content.Context;
 import android.os.Bundle;
@@ -277,16 +276,14 @@ public final class FunctionsTest {
         RemoteCalculator remote = new RemoteCalculator(context);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
-            try {
-                worker.submit(() -> remote.evaluate(request("+", null, 0)))
-                        .get(15, TimeUnit.SECONDS);
-                fail("Missing operand accepted");
-            } catch (java.util.concurrent.ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof RemoteCalculator.UserFailure);
-                assertEquals(
-                        context.getString(R.string.error_need_values, 2),
-                        ex.getCause().getMessage());
-            }
+            Bundle result =
+                    worker.submit(() -> remote.evaluate(request("+", null, 0)))
+                            .get(15, TimeUnit.SECONDS);
+            assertEquals(
+                    context.getString(R.string.error_need_values, 2),
+                    result.getString("operationError"));
+            assertTrue(result.getStringArrayList("rows").isEmpty());
+            assertTrue(new File(result.getString("checkpoint")).isFile());
         } finally {
             remote.close();
             worker.shutdownNow();
