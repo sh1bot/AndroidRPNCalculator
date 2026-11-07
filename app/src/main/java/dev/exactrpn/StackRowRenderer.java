@@ -41,6 +41,25 @@ final class StackRowRenderer {
         return value;
     }
 
+    private float sp(int size) {
+        return android.util.TypedValue.applyDimension(
+                android.util.TypedValue.COMPLEX_UNIT_SP,
+                size,
+                context.getResources().getDisplayMetrics());
+    }
+
+    private void keepStackRowHeight(TextView value) {
+        android.text.TextPaint previous = new android.text.TextPaint(value.getPaint());
+        previous.setTextSize(sp(21));
+        android.graphics.Paint.FontMetricsInt oldMetrics = previous.getFontMetricsInt();
+        android.graphics.Paint.FontMetricsInt newMetrics = value.getPaint().getFontMetricsInt();
+        int oldTextHeight = oldMetrics.bottom - oldMetrics.top;
+        int newTextHeight = newMetrics.bottom - newMetrics.top;
+        int padding = Math.max(0, 2 * dp(6) - (newTextHeight - oldTextHeight));
+        value.setPadding(dp(4), padding / 2, dp(4), padding - padding / 2);
+        value.setMinimumHeight(oldTextHeight + 2 * dp(6));
+    }
+
     private void digits(TextView value) {
         value.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         value.setFontFeatureSettings("tnum");
@@ -121,16 +140,17 @@ final class StackRowRenderer {
             label.setTextColor(colors.muted);
             row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
             boolean result = !display.editing && depth == 1;
-            TextView value = text(result ? 32 : 21);
+            TextView value = text(result ? 32 : 22);
             digits(value);
             value.setGravity(Gravity.END);
             value.setText(numbers.stack(withoutApproximation(display.rows.get(i)), colors.muted));
             if (!result) {
+                keepStackRowHeight(value);
                 value.setSingleLine(true);
                 value.setHorizontallyScrolling(false);
                 value.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 value.setAutoSizeTextTypeUniformWithConfiguration(
-                        12, 21, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+                        12, 22, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
             }
             if (result
                     && display.fractionMode == FractionMode.DECIMAL
@@ -151,14 +171,13 @@ final class StackRowRenderer {
                             if (available <= 0) return;
                             android.text.TextPaint measure =
                                     new android.text.TextPaint(value.getPaint());
-                            float scale = context.getResources().getDisplayMetrics().scaledDensity;
                             int size = 32;
-                            for (; size > 21; size--) {
-                                measure.setTextSize(size * scale);
+                            for (; size > 22; size--) {
+                                measure.setTextSize(sp(size));
                                 if (android.text.Layout.getDesiredWidth(full, measure) <= available)
                                     break;
                             }
-                            measure.setTextSize(size * scale);
+                            measure.setTextSize(sp(size));
                             boolean fits =
                                     android.text.Layout.getDesiredWidth(full, measure) <= available;
                             CharSequence chosen = fits ? full : compact;
@@ -171,7 +190,7 @@ final class StackRowRenderer {
                                             chosen));
                             if (!value.getText().toString().equals(chosen.toString()))
                                 value.setText(chosen);
-                            if (value.getTextSize() != size * scale) value.setTextSize(size);
+                            if (value.getTextSize() != sp(size)) value.setTextSize(size);
                         });
             }
             value.setTextIsSelectable(false);
