@@ -52,9 +52,15 @@ public final class CancellationTest {
             assertFalse(calculator.values().get(0).definitelyZero());
             Files.write(seed.toPath(), calculator.save());
             store.save(seed.getAbsolutePath());
+            // Cold process startup/restoration is separate from the strict cancellation budget.
+            long restoring = SystemClock.elapsedRealtime();
             Bundle initial =
                     worker.submit(() -> remote.evaluate(request("RESTORE", store.checkpoint())))
-                            .get(15, TimeUnit.SECONDS);
+                            .get(30, TimeUnit.SECONDS);
+            System.out.println(
+                    "Initial checkpoint restore took "
+                            + (SystemClock.elapsedRealtime() - restoring)
+                            + " ms");
             String accepted = initial.getString("checkpoint");
             store.save(accepted);
             byte[] committed = Files.readAllBytes(new File(store.checkpoint()).toPath());
