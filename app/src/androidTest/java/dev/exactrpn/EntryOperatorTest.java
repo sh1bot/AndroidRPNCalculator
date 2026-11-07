@@ -48,6 +48,73 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void styledExponentRemainsEditableAtOriginalCursorOffsets() throws Exception {
+        MainActivity activity =
+                (MainActivity)
+                        instrumentation.startActivitySync(
+                                new Intent(
+                                                instrumentation.getTargetContext(),
+                                                LockedCalculatorActivity.class)
+                                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+        CalculatorSession session = StackSelectionTest.session(activity);
+        View root = activity.getWindow().getDecorView();
+        android.widget.EditText entry = root.findViewWithTag("number-entry");
+        try {
+            key(session, "PASTE:1.23");
+            awaitUi(() -> entry.getText().toString().equals("1.23"));
+            instrumentation.runOnMainSync(() -> root.findViewWithTag(".").performLongClick());
+            awaitUi(() -> !session.busy && entry.getText().toString().equals("1.23e"));
+            instrumentation.runOnMainSync(
+                    () -> {
+                        assertEquals(
+                                1,
+                                entry.getText()
+                                        .getSpans(0, entry.length(), ExponentMarkerSpan.class)
+                                        .length);
+                        root.findViewWithTag("4").performClick();
+                    });
+            awaitUi(() -> !session.busy && entry.getText().toString().equals("1.23e4"));
+            instrumentation.runOnMainSync(
+                    () -> {
+                        assertEquals(
+                                1,
+                                entry.getText()
+                                        .getSpans(
+                                                0,
+                                                entry.length(),
+                                                android.text.style.SuperscriptSpan.class)
+                                        .length);
+                        entry.setSelection(
+                                5); // Immediately after the single underlying e character.
+                    });
+            awaitUi(() -> !session.busy && session.display.start == 5);
+            instrumentation.runOnMainSync(() -> root.findViewWithTag("BACK").performClick());
+            awaitUi(() -> !session.busy && entry.getText().toString().equals("1.234"));
+            instrumentation.runOnMainSync(
+                    () -> {
+                        assertEquals(
+                                0,
+                                entry.getText()
+                                        .getSpans(0, entry.length(), ExponentMarkerSpan.class)
+                                        .length);
+                        assertEquals(
+                                0,
+                                entry.getText()
+                                        .getSpans(
+                                                0,
+                                                entry.length(),
+                                                android.text.style.SuperscriptSpan.class)
+                                        .length);
+                        root.findViewWithTag("ENTER").performClick();
+                    });
+            awaitUi(() -> !session.busy && !session.display.editing);
+            assertEquals(Arrays.asList("1.234"), session.display.rows);
+        } finally {
+            StackSelectionTest.finish(activity);
+        }
+    }
+
+    @Test
     public void olderFailureCannotRestoreItsNoticeOrDiscardTheNextKeypress() throws Exception {
         MainActivity activity =
                 (MainActivity)

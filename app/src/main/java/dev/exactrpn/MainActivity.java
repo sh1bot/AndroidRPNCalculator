@@ -681,6 +681,7 @@ public class MainActivity extends Activity {
 
     private void addEntry(LinearLayout root) {
         entryView = new EntryField(this);
+        entryView.setTag("number-entry");
         entryView.setTextSize(32);
         entryView.setGravity(Gravity.START);
         digits(entryView);
@@ -717,7 +718,7 @@ public class MainActivity extends Activity {
                     @Override
                     public void afterTextChanged(android.text.Editable text) {
                         if (changingEntry) return;
-                        numbers.styleDecimal(text);
+                        numbers.styleEntry(text);
                         boolean explicit =
                                 count == 1
                                         && start < text.length()
@@ -771,7 +772,7 @@ public class MainActivity extends Activity {
             entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
             String entry = display.raw ? display.entry : numbers.entry(display.entry);
             if (!entryView.getText().toString().equals(entry)) entryView.setText(entry);
-            numbers.styleDecimal(entryView.getText());
+            numbers.styleEntry(entryView.getText());
             entryView.setTextColor(display.problem.isEmpty() ? colors.text : colors.error);
             if (Build.VERSION.SDK_INT >= 30)
                 entryView.setStateDescription(

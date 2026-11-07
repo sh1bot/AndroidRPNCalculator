@@ -141,12 +141,66 @@ public final class LocaleNumbers {
         int start = text.length();
         text.append("\u2009×").append(entry("10"));
         text.setSpan(
-                new RelativeSizeSpan(.75f), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                new RelativeSizeSpan(ExponentMarkerSpan.MARKER_SCALE),
+                start,
+                text.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         start = text.length();
         text.append(entry(exponent.replace('-', '−')));
         text.setSpan(
-                new RelativeSizeSpan(.6f), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                new RelativeSizeSpan(ExponentMarkerSpan.INDEX_SCALE),
+                start,
+                text.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         text.setSpan(new SuperscriptSpan(), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
+    private static final class EntryIndexSize extends RelativeSizeSpan {
+        EntryIndexSize() {
+            super(ExponentMarkerSpan.INDEX_SCALE);
+        }
+    }
+
+    private static final class EntryIndexRaise extends SuperscriptSpan {}
+
+    /** Style entry in place: e/E stays one editable character, so offsets and copy stay literal. */
+    public void styleEntry(Spannable text) {
+        styleDecimal(text);
+        for (Object span : text.getSpans(0, text.length(), Object.class))
+            if (span instanceof ExponentMarkerSpan
+                    || span instanceof EntryIndexSize
+                    || span instanceof EntryIndexRaise) text.removeSpan(span);
+        int marker = -1;
+        for (int i = 0; i < text.length(); i++)
+            if (text.charAt(i) == 'e' || text.charAt(i) == 'E') {
+                marker = i;
+                break;
+            }
+        if (marker < 0
+                || !NumberText.analyze(text.subSequence(0, marker).toString(), profile()).valid())
+            return;
+        for (int i = marker + 1; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (i == marker + 1 && (c == '+' || c == '-' || c == '−')) continue;
+            if (Character.digit(c, 10) < 0) return;
+        }
+        text.setSpan(
+                new ExponentMarkerSpan(entry("10")),
+                marker,
+                marker + 1,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if (marker + 1 < text.length()) {
+            text.setSpan(
+                    new EntryIndexSize(),
+                    marker + 1,
+                    text.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            text.setSpan(
+                    new EntryIndexRaise(),
+                    marker + 1,
+                    text.length(),
+                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
     }
 
     /** Styling only: preserve characters, caret offsets, locale and validation colors. */
