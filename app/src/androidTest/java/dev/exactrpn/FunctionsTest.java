@@ -64,6 +64,21 @@ public final class FunctionsTest {
                                         styled.getSpanStart(powers[0]),
                                         styled.getSpanEnd(powers[0]))
                                 .toString());
+                android.text.SpannableStringBuilder entry =
+                        new android.text.SpannableStringBuilder(numbers.entry(input));
+                numbers.styleEntry(entry);
+                numbers.styleEntry(
+                        entry); // Re-rendering replaces our spans rather than accumulating them.
+                assertEquals(numbers.entry(input), entry.toString());
+                ExponentMarkerSpan[] markers =
+                        entry.getSpans(0, entry.length(), ExponentMarkerSpan.class);
+                assertEquals(1, markers.length);
+                assertEquals(marker, entry.getSpanStart(markers[0]));
+                assertEquals(marker + 1, entry.getSpanEnd(markers[0]));
+                android.text.style.SuperscriptSpan[] entryPowers =
+                        entry.getSpans(0, entry.length(), android.text.style.SuperscriptSpan.class);
+                assertEquals(1, entryPowers.length);
+                assertEquals(marker + 1, entry.getSpanStart(entryPowers[0]));
                 assertEquals(numbers.entry(input), numbers.copy(input));
                 assertTrue(numbers.entry(input).contains(input.substring(marker, marker + 1)));
             }
