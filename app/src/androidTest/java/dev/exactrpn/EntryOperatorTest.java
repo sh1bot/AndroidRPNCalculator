@@ -181,6 +181,9 @@ public final class EntryOperatorTest {
             instrumentation.runOnMainSync(
                     () -> {
                         session.enqueue(Command.parse("+"));
+                        // An intermediate empty result must retain history for queued Undo.
+                        session.enqueue(Command.parse("CLEAR"));
+                        session.enqueue(Command.parse("UNDO"));
                         session.background = true;
                         session.saveForLifecycle();
                     });
