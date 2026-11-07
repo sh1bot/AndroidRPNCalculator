@@ -139,8 +139,7 @@ public final class StackSelectionTest {
                         assertTrue(session.selectedRows.isEmpty());
                         assertNull(tagged(activity, "stack-checkbox:0"));
                         assertEquals("+", ((Button) tagged(activity, "+")).getText().toString());
-                        assertEquals(
-                                "Undo", ((Button) tagged(activity, "UNDO")).getText().toString());
+                        assertEquals("⎌", ((Button) tagged(activity, "UNDO")).getText().toString());
                         assertNull(tagged(activity, "CLEAR").getForeground());
                         tagged(activity, "stack-label:1").performClick();
                         assertEquals(1, session.selectedRows.size());
@@ -266,8 +265,7 @@ public final class StackSelectionTest {
             instrumentation.runOnMainSync(
                     () ->
                             assertEquals(
-                                    "Undo",
-                                    ((Button) tagged(activity, "UNDO")).getText().toString()));
+                                    "⎌", ((Button) tagged(activity, "UNDO")).getText().toString()));
             key(activity, "UNDO");
             assertFalse(session.display.editing);
             assertEquals(java.util.Arrays.asList("1", "2", "3", "7"), session.display.rows);

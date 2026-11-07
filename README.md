@@ -28,10 +28,10 @@ follows Android’s rules. When unlocked, the tile opens the normal calculator.
 Quick Settings must be accessible while locked; availability depends on the phone
 and its settings. The phone must have been unlocked once after a reboot.
 
-**Swap** exchanges X and Y. **Clear** clears the stack. During entry it becomes
+**Swap** exchanges X and Y. **AC** clears the stack. During entry it becomes
 **CE**, which clears only the line and stays in edit mode. Enter on an empty line
-or Back/Escape returns to stack mode. **Undo** reverses the last change; long-press
-Undo to redo. During a long calculation, Undo becomes
+or Back/Escape returns to stack mode. **⎌ (Undo)** reverses the last change; long-press
+it to redo. During a long calculation, it becomes
 **Cancel**. **f()** opens the scientific functions; **f⁻¹()** opens their inverse
 and complementary functions. Tap the active button again to close, or the other
 to switch sets. Wide, short windows place the keypad beside the stack; functions
@@ -72,11 +72,11 @@ DEC preserves exact terminating decimals and copies recurring/irrational values
 to 40 significant digits. Tap a stack value
 to copy it. Tap a stack label to select its row and show checkboxes; while selecting,
 tap anywhere on a row to toggle it. Selection is available only in stack mode.
-**Undo** becomes a stacked checkbox icon: checked to select every row, empty to
+**⎌** becomes a stacked checkbox icon: checked to select every row, empty to
 clear the selection.
 Back/Escape also exits selection.
 
-During selection, **Clear** becomes a copy icon and **Swap** becomes **Pick**.
+During selection, **AC** becomes a copy icon and **Swap** becomes **Pick**.
 Copy writes the selected values one per line, and Pick appends copies in display
 order. **Drop** removes the selected values. **+** becomes **Σ** (sum) and **×**
 becomes **Π** (product); both append an exact result, preserving the original

@@ -48,12 +48,12 @@
     <string name="stack_label_approximate">Stack %1$s, approximate value; long press to select</string>
     <string name="stack_label">Stack %1$s; long press to select</string>
     <string name="select_level">Select stack level %1$d</string>
-    <string name="clear">Clear</string>
+    <string name="clear" translatable="false">AC</string>
     <string name="clear_entry">Clear entry</string>
     <string name="clear_stack">Clear stack</string>
     <string name="drop_x">Drop X</string>
     <string name="backspace">Backspace</string>
-    <string name="undo">Undo</string>
+    <string name="undo" translatable="false">⎌</string>
     <string name="cancel">Cancel</string>
     <string name="swap">Swap</string>
     <string name="enter">Enter</string>
