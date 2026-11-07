@@ -63,6 +63,9 @@ final class ErrorMessages {
             case AMBIGUOUS_NUMBER:
                 id = R.string.error_ambiguous_number;
                 break;
+            case INVALID_PASTE_LINE:
+                id = R.string.error_invalid_paste_line;
+                break;
             case INVALID_NUMBER:
                 id = R.string.error_invalid_number;
                 break;

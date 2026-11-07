@@ -48,6 +48,34 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void multilinePasteIsAtomicAcrossTheWorkerAndUndoRemovesTheBatch() throws Exception {
+        android.content.Context context = instrumentation.getTargetContext();
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL,
+                        true);
+        session.attach(context);
+        try {
+            key(session, "RESTORE");
+            key(session, "PASTE_RAW:1\n2.5\n3");
+            assertEquals(Arrays.asList("1", "2.5", "3"), session.display.rows);
+            assertFalse(session.display.editing);
+            byte[] before = session.checkpoint.bytes;
+            key(session, "PASTE_RAW:4\nbad\n6");
+            assertTrue(session.error.contains("line 2"));
+            assertArrayEquals(before, session.checkpoint.bytes);
+            key(session, "UNDO");
+            assertTrue(session.display.rows.isEmpty());
+        } finally {
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     public void onlyLifecycleCheckpointsAndClosePersistForegroundWork() throws Exception {
         android.content.Context context = instrumentation.getTargetContext();
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());

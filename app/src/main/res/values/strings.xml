@@ -19,7 +19,7 @@
     <string name="select_all_description">Select all stack rows</string>
     <string name="select_none_description">Clear selection</string>
     <string name="clipboard_no_number">Clipboard does not contain a number</string>
-    <string name="clipboard_too_long">Pasted number is too long (maximum 4096 characters)</string>
+    <string name="clipboard_too_long">Clipboard text is too long (maximum %1$d characters)</string>
     <string name="clipboard_label">Calculator value</string>
     <string name="copied">Copied</string>
     <string name="wait_calculation">Wait for the calculation to finish</string>
@@ -133,4 +133,5 @@
     <string name="help">Help</string>
     <string name="licenses">Licenses</string>
     <string name="source_code">Source code</string>
+    <string name="error_invalid_paste_line">Cannot paste: line %1$d is invalid, ambiguous, or too large. Nothing was added.</string>
 </resources>

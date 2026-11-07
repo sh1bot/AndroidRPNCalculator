@@ -18,6 +18,7 @@ public interface CalculationError {
         EVEN_NEGATIVE_ROOT,
         AMBIGUOUS_NUMBER,
         INVALID_NUMBER,
+        INVALID_PASTE_LINE,
         UNDEFINED_RESULT,
         INTERNAL
     }
