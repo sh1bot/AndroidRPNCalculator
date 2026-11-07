@@ -26,6 +26,7 @@ import android.os.SystemClock;
 import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
 import androidx.test.runner.lifecycle.Stage;
@@ -214,6 +215,7 @@ public final class LockScreenTest {
         }
     }
 
+    @LargeTest
     @Test(timeout = 90000)
     public void secureLockThenUnlockKeepsTheSameTemporarySession() throws Exception {
         Context context = instrumentation.getTargetContext();
@@ -271,14 +273,10 @@ public final class LockScreenTest {
             enter(activity, "ENTER");
             assertEquals(Arrays.asList("7"), session.display.rows);
             assertFalse(session.canUseSavedState());
+            unlockWithPin(manager, activity);
             shell("locksettings clear --old 1234");
             await(() -> !manager.isDeviceSecure());
             credential = false;
-            LockedCalculatorActivity unlocking = activity;
-            // The calculator occludes keyguard. Use its activity token to dismiss the
-            // now-unsecured keyguard; the shell command has no visible activity token.
-            instrumentation.runOnMainSync(() -> manager.requestDismissKeyguard(unlocking, null));
-            await(() -> !DeviceAccess.locked(context));
             assertFalse(
                     "Unlock must not promote the temporary session", session.canUseSavedState());
             LockedCalculatorActivity shown = activity;
@@ -299,17 +297,41 @@ public final class LockScreenTest {
             activity = null;
             assertEquals("Neither lock nor unlock may touch saved files", 0, accesses.get());
         } finally {
-            if (credential) shell("locksettings clear --old 1234");
-            if (activity != null) StackSelectionTest.finish(activity);
-            shell("input keyevent KEYCODE_WAKEUP");
-            shell("wm dismiss-keyguard");
-            await(() -> !DeviceAccess.locked(context));
-            observer.stopWatching();
-            assertArrayEquals(before, Files.readAllBytes(saved.toPath()));
-            store.clear();
-            store.cleanWorkFiles(null);
-            seed.delete();
+            // Always stop the observer, even when emulator unlocking fails. Otherwise queued
+            // filesystem events can leak into the next test watching the same directory.
+            try {
+                if (credential) shell("locksettings clear --old 1234");
+                if (activity != null) StackSelectionTest.finish(activity);
+                shell("input keyevent KEYCODE_WAKEUP");
+                shell("wm dismiss-keyguard");
+            } finally {
+                observer.stopWatching();
+                assertArrayEquals(before, Files.readAllBytes(saved.toPath()));
+                store.clear();
+                store.cleanWorkFiles(null);
+                seed.delete();
+            }
         }
+    }
+
+    private void unlockWithPin(KeyguardManager manager, MainActivity activity) throws Exception {
+        android.accessibilityservice.AccessibilityServiceInfo info =
+                instrumentation.getUiAutomation().getServiceInfo();
+        info.flags |= android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
+        instrumentation.getUiAutomation().setServiceInfo(info);
+        instrumentation.runOnMainSync(() -> manager.requestDismissKeyguard(activity, null));
+        await(
+                () -> {
+                    android.view.accessibility.AccessibilityNodeInfo root =
+                            instrumentation.getUiAutomation().getRootInActiveWindow();
+                    return root != null
+                            && !root.findAccessibilityNodeInfosByViewId(
+                                            "com.android.systemui:id/pinEntry")
+                                    .isEmpty();
+                });
+        shell("input text 1234");
+        shell("input keyevent KEYCODE_ENTER");
+        await(() -> !DeviceAccess.locked(activity));
     }
 
     @Test
