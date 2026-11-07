@@ -84,7 +84,8 @@ values and selection.
 
 Long-press **Enter** or Ctrl+V to paste into entry. Safe input can proceed with **Enter**, an operator, or a function.
 Ambiguous or invalid input stays red and blocks all three until corrected. Tap to position the cursor or select text; the decimal key replaces
-a selected separator explicitly. Backspace/Delete edit at the cursor.
+a selected separator explicitly. Backspace/Delete edit at the cursor. In entry mode, long-press the decimal key
+to insert `e` for a power of ten, for example `1.23e4`.
 
 ## Build
 
