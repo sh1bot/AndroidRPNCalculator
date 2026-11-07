@@ -104,7 +104,8 @@ final class RemoteCalculator {
         try (MemoryPayload payload = input != null && !reuse ? MemoryPayload.create(input) : null) {
             if (payload != null) payload.put(outgoing, "input");
             synchronized (this) {
-                if (closed || epoch != generation) throw new com.hp.creals.CR.AbortedException();
+                if (closed || epoch != generation || Thread.currentThread().isInterrupted())
+                    throw new com.hp.creals.CR.AbortedException();
                 pending = future;
                 pendingRequest = outgoing;
                 pendingRequest.putString("sessionId", sessionId);
@@ -137,13 +138,22 @@ final class RemoteCalculator {
                 MemoryPayload.discard(response, "payload");
             }
         } catch (InterruptedException ex) {
+            cancel();
             Thread.currentThread().interrupt();
             throw new com.hp.creals.CR.AbortedException();
         } catch (ExecutionException ex) {
             throw new UserFailure(context.getString(R.string.process_stopped), ex);
         } catch (IOException ex) {
+            forgetSnapshot();
             throw new UserFailure(context.getString(R.string.result_unreadable), ex);
+        } catch (RuntimeException ex) {
+            forgetSnapshot();
+            throw ex;
         }
+    }
+
+    private synchronized void forgetSnapshot() {
+        remoteSnapshotId = null;
     }
 
     private void sendPending() {

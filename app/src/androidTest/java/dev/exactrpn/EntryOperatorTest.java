@@ -150,6 +150,60 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void outstandingWorkUpdatesTheSaveAfterFinishingInBackground() throws Exception {
+        android.content.Context context = instrumentation.getTargetContext();
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        store.clear();
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL);
+        session.attach(context);
+        CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
+        try {
+            key(session, "RESTORE");
+            for (String key : new String[] {"1", "ENTER", "2", "ENTER"}) key(session, key);
+            java.lang.reflect.Field field = CalculatorSession.class.getDeclaredField("worker");
+            field.setAccessible(true);
+            ExecutorService calculations = (ExecutorService) field.get(session);
+            calculations.submit(
+                    () -> {
+                        entered.countDown();
+                        try {
+                            release.await();
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                        }
+                    });
+            assertTrue(entered.await(5, TimeUnit.SECONDS));
+            instrumentation.runOnMainSync(
+                    () -> {
+                        session.enqueue(Command.parse("+"));
+                        session.background = true;
+                        session.saveForLifecycle();
+                    });
+            assertTrue(session.busy);
+            assertEquals(2, RpnCalculator.load(store.load()).values().size());
+            release.countDown();
+            calculations.submit(() -> {}).get(15, TimeUnit.SECONDS);
+            assertEquals(Arrays.asList("3"), session.display.rows);
+            RpnCalculator saved = RpnCalculator.load(store.load());
+            assertEquals(1, saved.values().size());
+            assertTrue(
+                    saved.values()
+                            .get(0)
+                            .definitelyEquals(new com.android.calculator2.UnifiedReal(3)));
+        } finally {
+            release.countDown();
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+            store.clear();
+        }
+    }
+
+    @Test
     public void styledExponentRemainsEditableAtOriginalCursorOffsets() throws Exception {
         MainActivity activity =
                 (MainActivity)

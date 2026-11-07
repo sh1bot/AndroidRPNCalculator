@@ -109,6 +109,38 @@ public final class MemoryTransportTest {
     }
 
     @Test
+    public void failedRequestReloadsAcceptedMemoryOnTheNextRequest() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        RemoteCalculator remote = new RemoteCalculator(context, true);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            RpnCalculator calculator = new RpnCalculator();
+            calculator.paste("42");
+            calculator.key("ENTER");
+            Bundle seed = new Bundle();
+            seed.putByteArray("state", calculator.save());
+            Bundle accepted =
+                    worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
+                            .get(20, TimeUnit.SECONDS);
+            Bundle invalid = request("RESTORE", accepted);
+            invalid.putString("notation", "invalid");
+            try {
+                worker.submit(() -> remote.evaluate(invalid)).get(15, TimeUnit.SECONDS);
+                fail("Invalid request unexpectedly succeeded");
+            } catch (java.util.concurrent.ExecutionException expected) {
+                assertTrue(expected.getCause() instanceof RemoteCalculator.UserFailure);
+            }
+            Bundle copied =
+                    worker.submit(() -> remote.evaluate(request("COPY_ROWS:0", accepted)))
+                            .get(15, TimeUnit.SECONDS);
+            assertEquals("42", copied.getString("copyText"));
+        } finally {
+            remote.close();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test
     public void androidEightMemoryPipeTransfersLargeDataAndHandlesAbandonment() throws Exception {
         byte[] bytes = new byte[2 * 1024 * 1024];
         new java.util.Random(42).nextBytes(bytes);
