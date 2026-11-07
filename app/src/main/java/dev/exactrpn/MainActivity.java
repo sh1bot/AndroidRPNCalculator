@@ -645,10 +645,15 @@ public class MainActivity extends Activity {
                 new LinearLayout(this) {
                     @Override
                     protected void onMeasure(int widthSpec, int heightSpec) {
-                        int buttonWidth = Math.min(dp(54), View.MeasureSpec.getSize(widthSpec) / 5);
+                        int width = View.MeasureSpec.getSize(widthSpec);
+                        int menuWidth = Math.min(dp(48), width / 6);
+                        int buttonWidth = Math.min(dp(54), (width - menuWidth) / 5);
                         for (int i = 0; i < getChildCount(); i++)
                             if (getChildAt(i) instanceof Button)
-                                getChildAt(i).getLayoutParams().width = buttonWidth;
+                                getChildAt(i).getLayoutParams().width =
+                                        "overflow-menu".equals(getChildAt(i).getTag())
+                                                ? menuWidth
+                                                : buttonWidth;
                         super.onMeasure(widthSpec, heightSpec);
                     }
                 };
@@ -676,6 +681,29 @@ public class MainActivity extends Activity {
         status.setSingleLine(true);
         status.setEllipsize(android.text.TextUtils.TruncateAt.END);
         header.addView(status, new LinearLayout.LayoutParams(0, dp(48), 1));
+        Button menu = new Button(this);
+        menu.setTag("overflow-menu");
+        styleModeButton(menu);
+        menu.setText("");
+        menu.setContentDescription(getString(R.string.more_options));
+        android.graphics.drawable.Drawable icon = getDrawable(R.drawable.ic_more);
+        icon.setTint(colors.text);
+        menu.setForegroundGravity(Gravity.CENTER);
+        menu.setForeground(icon);
+        menu.setOnClickListener(
+                v -> {
+                    dismissErrorNotice();
+                    android.widget.PopupMenu popup = new android.widget.PopupMenu(this, menu);
+                    popup.getMenu()
+                            .add(R.string.about)
+                            .setOnMenuItemClickListener(
+                                    item -> {
+                                        AboutDialog.show(this);
+                                        return true;
+                                    });
+                    popup.show();
+                });
+        header.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
         root.addView(header);
     }
 

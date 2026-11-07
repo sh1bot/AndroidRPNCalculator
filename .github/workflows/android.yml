@@ -122,6 +122,16 @@ jobs:
             exit 1
           fi
 
+      - name: Verify bundled offline licence texts
+        run: |
+          python3 - <<'PYTHON'
+          import pathlib, zipfile
+          sources = {"NOTICE.txt": "NOTICE", "APACHE-2.0.txt": "licenses/APACHE-2.0.txt", "CR-COPYRIGHT.txt": "licenses/CR-COPYRIGHT.txt"}
+          with zipfile.ZipFile("dist/ExactRPN.apk") as apk:
+              for name, source in sources.items():
+                  assert apk.read("assets/licenses/" + name) == pathlib.Path(source).read_bytes(), name
+          PYTHON
+
       - name: Verify app bundle signature
         run: |
           python3 - <<'PYTHON'

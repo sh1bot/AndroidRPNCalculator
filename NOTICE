@@ -2,6 +2,7 @@ Exact RPN for Android
 
 This project uses arithmetic code from the Android Open Source Project:
 UnifiedReal.java, BoundedRational.java, and StringUtils.java.
+Copyright (C) 2015, 2016 The Android Open Source Project.
 Copyright notices and the Apache License 2.0 terms are retained in those files
 and licenses/APACHE-2.0.txt.
 
