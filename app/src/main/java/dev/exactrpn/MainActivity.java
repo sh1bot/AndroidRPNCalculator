@@ -688,9 +688,18 @@ public class MainActivity extends Activity {
                 new android.graphics.drawable.GradientDrawable();
         mask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
         mask.setColor(Color.WHITE);
+        android.graphics.drawable.GradientDrawable active =
+                new android.graphics.drawable.GradientDrawable();
+        active.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        active.setColor(colors.ripple);
+        android.graphics.drawable.StateListDrawable surface =
+                new android.graphics.drawable.StateListDrawable();
+        surface.addState(new int[] {android.R.attr.state_activated}, active);
+        surface.addState(
+                new int[] {}, new android.graphics.drawable.ColorDrawable(Color.TRANSPARENT));
         menu.setBackground(
                 new android.graphics.drawable.RippleDrawable(
-                        android.content.res.ColorStateList.valueOf(colors.ripple), null, mask));
+                        android.content.res.ColorStateList.valueOf(colors.ripple), surface, mask));
         menu.setStateListAnimator(null);
         menu.setElevation(0);
         menu.setText("");
@@ -710,7 +719,9 @@ public class MainActivity extends Activity {
                                         AboutDialog.show(this);
                                         return true;
                                     });
+                    popup.setOnDismissListener(dismissed -> menu.setActivated(false));
                     popup.show();
+                    menu.setActivated(true);
                 });
         header.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
         root.addView(header);
