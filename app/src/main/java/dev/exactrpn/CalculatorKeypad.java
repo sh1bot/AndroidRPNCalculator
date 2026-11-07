@@ -272,8 +272,8 @@ public final class CalculatorKeypad extends ViewGroup {
                                                 ? R.string.backspace
                                                 : R.string.drop_roll_description));
         deleteButton.setLongClickable(!selecting);
-        swapButton.setText(selecting ? getContext().getString(R.string.pick) : "");
-        setButtonIcon(swapButton, selecting ? 0 : R.drawable.ic_swap);
+        swapButton.setText(selecting ? getContext().getString(R.string.pick) : "⇅");
+        setButtonIcon(swapButton, 0);
         swapButton.setContentDescription(
                 getContext()
                         .getString(selecting ? R.string.pick_selected : R.string.swap_description));

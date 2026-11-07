@@ -44,14 +44,33 @@ dependencies {
 
 
 
-// Keep distributed notices identical to the repository's authoritative copies.
+// Generate offline documents from their authoritative sources. No runtime Markdown dependency.
 def licenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
-def generateLicenseAssets = tasks.register('generateLicenseAssets', Sync) {
-    into licenseAssets.map { it.dir('licenses') }
-    from(rootProject.file('NOTICE')) { rename { 'NOTICE.txt' } }
-    from(rootProject.file('licenses')) {
-        include 'APACHE-2.0.txt', 'CR-COPYRIGHT.txt'
+def generateLicenseAssets = tasks.register('generateLicenseAssets') {
+    inputs.files(rootProject.file('HELP.md'), rootProject.file('README.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
+    outputs.dir(licenseAssets)
+    doLast {
+        def escape = { text -> text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') }
+        def help = rootProject.file('HELP.md').getText('UTF-8')
+        def embedded = help.replaceFirst('# Using Exact RPN', '### Using Exact RPN').replace('\n## ', '\n#### ')
+        assert rootProject.file('README.md').getText('UTF-8').contains('<!-- BEGIN HELP -->\n' + embedded + '<!-- END HELP -->'): 'README Use section must match HELP.md'
+        def html = help.readLines().collect { line ->
+            def match = (line =~ /^(#{1,6}) (.*)$/)
+            if (match.matches()) return '<h' + match[0][1].length() + '>' + escape(match[0][2]) + '</h' + match[0][1].length() + '>'
+            '<p>' + escape(line).replaceAll(/\*\*(.+?)\*\*/, '<b>$1</b>').replaceAll(/`(.+?)`/, '<tt>$1</tt>') + '</p>'
+        }.join('\n')
+        def legal = '<h1>Licenses and source credits</h1>'
+        ['Source credits':'NOTICE', 'Apache License 2.0':'licenses/APACHE-2.0.txt', 'Constructive-real library notices':'licenses/CR-COPYRIGHT.txt'].each { title, path ->
+            legal += '<h2>' + title + '</h2><p>' + escape(rootProject.file(path).getText('UTF-8')).replace('\n', '<br>') + '</p>'
+        }
+        delete licenseAssets
+        def directory = licenseAssets.get().asFile
+        directory.mkdirs()
+        ['help.html.gz':html, 'licenses.html.gz':legal].each { name, content ->
+            new java.util.zip.GZIPOutputStream(new FileOutputStream(new File(directory, name))).withCloseable { it.write(content.getBytes('UTF-8')) }
+        }
     }
 }
+android.androidResources.noCompress += ['gz']
 android.sourceSets.main.assets.srcDir(licenseAssets)
 tasks.named('preBuild').configure { dependsOn generateLicenseAssets }
