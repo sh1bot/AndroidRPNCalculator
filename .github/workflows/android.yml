@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    name: Test engine and build APK
+    name: Test engine and build APK and app bundle
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -36,7 +36,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
 
       - name: Install Android build packages
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+        run: sdkmanager "platforms;android-36" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
@@ -77,24 +77,27 @@ jobs:
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
             echo "Signing with the permanent key configured in repository secrets."
             echo "permanent_signing=true" >> "$GITHUB_OUTPUT"
-            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease
+            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
             cp app/build/outputs/apk/release/app-release.apk dist/ExactRPN.apk
+            cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
           else
             if [[ -n "$ANDROID_KEYSTORE_PASSWORD$ANDROID_KEY_ALIAS$ANDROID_KEY_PASSWORD" ]]; then
               echo "::error::Signing secrets are incomplete: ANDROID_KEYSTORE_BASE64 is missing."
               exit 1
             fi
-            gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
+            gradle --no-daemon --console=plain :engine:regression :app:assembleDebug :app:bundleDebug
             cp app/build/outputs/apk/debug/app-debug.apk dist/ExactRPN.apk
+            cp app/build/outputs/bundle/debug/app-debug.aab dist/ExactRPN.aab
             echo "::warning::No permanent signing key configured. This build uses a temporary debug key; in-place updates across builds will fail."
           fi
 
       - name: Build other branches and pull requests without signing secrets
         if: github.ref != 'refs/heads/main' || github.event_name == 'pull_request'
         run: |
-          gradle --no-daemon --console=plain :engine:regression :app:assembleDebug
+          gradle --no-daemon --console=plain :engine:regression :app:assembleDebug :app:bundleDebug
           mkdir -p dist
           cp app/build/outputs/apk/debug/app-debug.apk dist/ExactRPN.apk
+          cp app/build/outputs/bundle/debug/app-debug.aab dist/ExactRPN.aab
 
       - name: Verify APK signature and record checksum
         env:
@@ -110,11 +113,32 @@ jobs:
             fi
           fi
 
+      - name: Verify app bundle signature
+        run: |
+          python3 - <<'PYTHON'
+          import zipfile
+          with zipfile.ZipFile("dist/ExactRPN.aab") as bundle:
+              entries = bundle.namelist()
+              assert "BundleConfig.pb" in entries, "Not an Android App Bundle"
+              assert any(name.startswith("META-INF/") and name.endswith(".SF") for name in entries), "Unsigned app bundle"
+              assert any(name.startswith("META-INF/") and name.endswith((".RSA", ".DSA", ".EC")) for name in entries), "Missing app bundle signature"
+          PYTHON
+          jarsigner -verify dist/ExactRPN.aab
+          sha256sum dist/ExactRPN.aab
+
       - name: Upload APK
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ExactRPN
           path: dist/ExactRPN.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload app bundle
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ExactRPN-bundle
+          path: dist/ExactRPN.aab
           if-no-files-found: error
           retention-days: 30
 
@@ -134,6 +158,12 @@ jobs:
           name: ExactRPN
           path: dist
 
+      - name: Download verified app bundle
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ExactRPN-bundle
+          path: dist
+
       - name: Update rolling development release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -144,12 +174,12 @@ jobs:
         run: |
           set -euo pipefail
           tag="v0.1-dev.$BUILD_NUMBER"
-          (cd dist && sha256sum ExactRPN.apk > SHA256SUMS.txt)
+          (cd dist && sha256sum ExactRPN.apk ExactRPN.aab > SHA256SUMS.txt)
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Latest development build from main.
           Commit: $BUILD_SHA
 
-          Download **ExactRPN.apk** to install or update. Signed with the project's permanent key.
+          Download **ExactRPN.apk** to install or update. **ExactRPN.aab** is the app bundle for uploading to Google Play, not direct installation. Both are signed with the project's permanent key.
           EOF
           # Keep one release entry, but advance its version tag so Obtainium detects updates.
           current_tag=$(gh api --paginate --slurp "repos/$GH_REPO/releases" | jq -r '[.[][] | select(.name == "Latest development build")][0].tag_name // empty')
@@ -157,5 +187,5 @@ jobs:
             current_tag="$tag"
             gh release create "$tag" --target "$BUILD_SHA" --title "Latest development build" --draft --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
-          gh release upload "$current_tag" dist/ExactRPN.apk dist/SHA256SUMS.txt --clobber
+          gh release upload "$current_tag" dist/ExactRPN.apk dist/ExactRPN.aab dist/SHA256SUMS.txt --clobber
           gh release edit "$current_tag" --tag "$tag" --target "$BUILD_SHA" --title "Latest development build" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false --latest

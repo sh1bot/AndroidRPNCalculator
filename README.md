@@ -91,7 +91,7 @@ clipboard representation retain `e`.
 
 ## Build
 
-Requires JDK 17, Android SDK 35, and Gradle 8.11.1. Set `ANDROID_HOME` to your SDK,
+Requires JDK 17, Android SDK 36, and Gradle 8.11.1. Set `ANDROID_HOME` to your SDK,
 then run:
 
 ```sh
@@ -123,3 +123,11 @@ Upstream notices are retained in the source, [NOTICE](NOTICE), and [licenses](li
 
 
 
+
+GitHub also builds an Android App Bundle,
+[ExactRPN.aab](https://github.com/sh1bot/AndroidRPNCalculator/releases/latest/download/ExactRPN.aab),
+for uploading to Google Play. It contains the code and resources from which Play
+generates device-specific APKs; install the APK above when testing directly.
+To build a release bundle yourself, run `gradle :app:bundleRelease` with your
+signing configuration. The target SDK is Android 16 (API 36); the minimum remains
+Android 8.0 (API 26).
