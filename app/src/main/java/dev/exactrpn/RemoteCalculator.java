@@ -202,18 +202,24 @@ final class RemoteCalculator {
     }
 
     synchronized void close() {
+        if (closed) return;
         closed = true;
-        cancel();
+        if (pending != null) cancel();
+        else disconnect(false);
     }
 
     private void disconnect() {
+        disconnect(true);
+    }
+
+    private void disconnect(boolean terminate) {
         ++generation;
         int process = pid;
         ServiceConnection binding = connection;
         pid = 0;
         remote = null;
         connection = null;
-        if (process != 0) android.os.Process.killProcess(process);
+        if (terminate && process != 0) android.os.Process.killProcess(process);
         if (binding != null)
             main.post(
                     () -> {
