@@ -57,7 +57,7 @@ public final class AboutDialog extends DialogFragment {
         try {
             text.setText(
                     android.text.Html.fromHtml(
-                            read(getActivity(), help ? "help.html.gz" : "licenses.html.gz"),
+                            read(getActivity(), help ? "help.html.gzip" : "licenses.html.gzip"),
                             android.text.Html.FROM_HTML_MODE_LEGACY));
         } catch (IOException ex) {
             throw new IllegalStateException("Missing offline document", ex);

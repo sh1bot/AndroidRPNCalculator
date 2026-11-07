@@ -66,11 +66,11 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
         delete licenseAssets
         def directory = licenseAssets.get().asFile
         directory.mkdirs()
-        ['help.html.gz':html, 'licenses.html.gz':legal].each { name, content ->
+        ['help.html.gzip':html, 'licenses.html.gzip':legal].each { name, content ->
             new java.util.zip.GZIPOutputStream(new FileOutputStream(new File(directory, name))).withCloseable { it.write(content.getBytes('UTF-8')) }
         }
     }
 }
-android.androidResources.noCompress += ['gz']
+android.androidResources.noCompress += ['gzip']
 android.sourceSets.main.assets.srcDir(licenseAssets)
 tasks.named('preBuild').configure { dependsOn generateLicenseAssets }
