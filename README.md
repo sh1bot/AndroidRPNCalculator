@@ -120,6 +120,8 @@ New code is licensed under [Apache 2.0](LICENSE). The arithmetic engine includes
   with AOSP Apache 2.0 additions and the original SGI/HP permissive notices.
 
 Upstream notices are retained in the source, [NOTICE](NOTICE), and [licenses](licenses).
+The three-dot menu’s **About** page includes these credits and full licences
+offline, plus a link to the GitHub repository.
 
 
 

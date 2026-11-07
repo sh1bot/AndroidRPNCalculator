@@ -43,3 +43,15 @@ dependencies {
 }
 
 
+
+// Keep distributed notices identical to the repository's authoritative copies.
+def licenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
+def generateLicenseAssets = tasks.register('generateLicenseAssets', Sync) {
+    into licenseAssets.map { it.dir('licenses') }
+    from(rootProject.file('NOTICE')) { rename { 'NOTICE.txt' } }
+    from(rootProject.file('licenses')) {
+        include 'APACHE-2.0.txt', 'CR-COPYRIGHT.txt'
+    }
+}
+android.sourceSets.main.assets.srcDir(licenseAssets)
+tasks.named('preBuild').configure { dependsOn generateLicenseAssets }

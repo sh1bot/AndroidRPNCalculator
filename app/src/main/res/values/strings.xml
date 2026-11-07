@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="more_options">More options</string>
+    <string name="about">About</string>
+    <string name="about_description">Exact RPN\nAn exact-arithmetic RPN calculator.\n\nArithmetic code comes from AOSP ExactCalculator and Hans-J. Boehm’s constructive-real library. Source credits and full licence texts are included below.</string>
+    <string name="github_repository">GitHub repository</string>
+    <string name="source_credits">Source credits</string>
+    <string name="apache_license">Apache License 2.0</string>
+    <string name="constructive_real_notices">Constructive-real library notices</string>
     <string name="drop">Drop</string>
     <string name="copy">Copy</string>
     <string name="pick">Pick</string>
