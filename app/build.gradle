@@ -2,12 +2,12 @@ plugins { id 'com.android.application' }
 def signingFile = System.getenv('ANDROID_KEYSTORE_PATH')
 android {
     namespace 'dev.exactrpn'
-    compileSdk 35
+    compileSdk 36
     defaultConfig {
         applicationId 'dev.exactrpn'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         minSdk 26
-        targetSdk 35
+        targetSdk 36
         versionCode = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
         versionName = System.getenv('GITHUB_RUN_NUMBER') ? "0.1-dev.${System.getenv('GITHUB_RUN_NUMBER')}" : '0.1-dev'
     }
