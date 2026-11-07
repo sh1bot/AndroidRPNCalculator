@@ -9,14 +9,13 @@ import android.widget.*;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.util.zip.GZIPInputStream;
 
-/** Offline documents are inflated directly into memory, never extracted to disk. */
+/** Android streams APK-compressed documents into memory without extracting files. */
 public final class AboutDialog extends DialogFragment {
     static final String REPOSITORY = "https://github.com/sh1bot/AndroidRPNCalculator";
 
     static String read(Activity activity, String name) throws IOException {
-        try (InputStream in = new GZIPInputStream(activity.getAssets().open(name));
+        try (InputStream in = activity.getAssets().open(name);
                 ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             byte[] bytes = new byte[8192];
             int n;
@@ -57,7 +56,7 @@ public final class AboutDialog extends DialogFragment {
         try {
             text.setText(
                     android.text.Html.fromHtml(
-                            read(getActivity(), help ? "help.html.gzip" : "licenses.html.gzip"),
+                            read(getActivity(), help ? "help.html" : "licenses.html"),
                             android.text.Html.FROM_HTML_MODE_LEGACY));
         } catch (IOException ex) {
             throw new IllegalStateException("Missing offline document", ex);

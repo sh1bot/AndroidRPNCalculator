@@ -44,8 +44,8 @@ public final class AboutTest {
             onView(withText("Licenses")).inRoot(isPlatformPopup()).perform(click());
             onView(withTagValue(is("document-text")))
                     .check(matches(withSubstring("TERMS AND CONDITIONS")));
-            assertTrue(AboutDialog.read(activity, "licenses.html.gzip").contains("Hans-J. Boehm"));
-            assertTrue(AboutDialog.read(activity, "licenses.html.gzip").contains("Silicon Graphics"));
+            assertTrue(AboutDialog.read(activity, "licenses.html").contains("Hans-J. Boehm"));
+            assertTrue(AboutDialog.read(activity, "licenses.html").contains("Silicon Graphics"));
             pressBack();
         } finally {
             StackSelectionTest.finish(activity);
