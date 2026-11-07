@@ -3,13 +3,10 @@ package dev.exactrpn;
 
 import android.os.Bundle;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -22,10 +19,19 @@ final class DisplayResult {
     private static final String[] LISTS = {"rows", "compactRows"};
     private static final String[] INTS = {"numberMode", "fractionMode", "start", "end"};
 
-    static void write(File file, Bundle result) throws IOException {
-        try (DataOutputStream out =
-                new DataOutputStream(new BufferedOutputStream(new FileOutputStream(file)))) {
-            out.writeInt(0x44525032);
+    static byte[] encode(Bundle result) throws IOException {
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        try (DataOutputStream out = new DataOutputStream(bytes)) {
+            out.writeInt(0x44525033);
+            boolean copy = result.containsKey("copyText");
+            out.writeBoolean(copy);
+            if (copy) {
+                writeText(out, result.getString("copyText"));
+                return bytes.toByteArray();
+            }
+            byte[] state = result.getByteArray("state");
+            out.writeInt(state.length);
+            out.write(state);
             for (String key : TEXT) writeText(out, result.getString(key));
             for (String key : LISTS) {
                 ArrayList<String> list = result.getStringArrayList(key);
@@ -36,13 +42,23 @@ final class DisplayResult {
             out.writeBoolean(result.getBoolean("editing"));
             out.writeBoolean(result.getBoolean("raw"));
         }
+        return bytes.toByteArray();
     }
 
-    static Bundle read(File file) throws IOException {
-        try (DataInputStream in =
-                new DataInputStream(new BufferedInputStream(new FileInputStream(file)))) {
-            if (in.readInt() != 0x44525032) throw new IOException("Unknown display protocol");
+    static Bundle decode(byte[] bytes) throws IOException {
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
+            if (in.readInt() != 0x44525033) throw new IOException("Unknown display protocol");
             Bundle result = new Bundle();
+            if (in.readBoolean()) {
+                result.putString("copyText", readText(in));
+                if (in.read() != -1) throw new IOException("Trailing copy data");
+                return result;
+            }
+            int size = in.readInt();
+            if (size < 0 || size > in.available()) throw new IOException("Invalid snapshot length");
+            byte[] state = new byte[size];
+            in.readFully(state);
+            result.putByteArray("state", state);
             for (String key : TEXT) result.putString(key, readText(in));
             for (String key : LISTS) {
                 int count = in.readInt();
@@ -68,7 +84,7 @@ final class DisplayResult {
 
     private static String readText(DataInputStream in) throws IOException {
         int length = in.readInt();
-        if (length < 0 || length > 64 * 1024 * 1024)
+        if (length < 0 || length > 64 * 1024 * 1024 || length > in.available())
             throw new IOException("Invalid display string length");
         byte[] bytes = new byte[length];
         in.readFully(bytes);

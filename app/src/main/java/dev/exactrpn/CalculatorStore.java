@@ -35,9 +35,19 @@ final class CalculatorStore {
         }
     }
 
-    void save(String checkpoint) throws IOException {
+    byte[] load() throws IOException {
         checkAccess();
-        byte[] bytes = Files.readAllBytes(new File(checkpoint).toPath());
+        if (checkpoint() == null) return null;
+        try (FileInputStream in = file.openRead();
+                java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            byte[] buffer = new byte[8192];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            return out.toByteArray();
+        }
+    }
+
+    void save(byte[] bytes) throws IOException {
         checkAccess();
         FileOutputStream out = file.startWrite();
         try {
@@ -65,12 +75,10 @@ final class CalculatorStore {
         file.delete();
     }
 
-    void cleanWorkFiles(String keep) {
+    void removeLegacyWorkFiles() {
         if (!allowed.getAsBoolean()) return;
         File[] files = directory.listFiles((dir, name) -> name.startsWith("calculation-"));
-        if (files != null)
-            for (File temporary : files)
-                if (!temporary.getAbsolutePath().equals(keep)) temporary.delete();
+        if (files != null) for (File temporary : files) temporary.delete();
     }
 
     private void checkAccess() {

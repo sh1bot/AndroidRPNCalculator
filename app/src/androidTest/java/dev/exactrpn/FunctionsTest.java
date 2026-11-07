@@ -28,10 +28,10 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class FunctionsTest {
-    private Bundle request(String key, String input, int fractionMode) {
+    private Bundle request(String key, byte[] input, int fractionMode) {
         Bundle request = new Bundle();
         request.putString("key", key);
-        request.putString("input", input);
+        request.putByteArray("input", input);
         request.putString("angle", "RAD");
         request.putString("notation", "SCIENTIFIC");
         request.putString("locale", "en-US");
@@ -106,7 +106,10 @@ public final class FunctionsTest {
                     worker.submit(
                                     () ->
                                             remote.evaluate(
-                                                    request("RESTORE", seed.getAbsolutePath(), 1)))
+                                                    request(
+                                                            "RESTORE",
+                                                            Files.readAllBytes(seed.toPath()),
+                                                            1)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("7/3", improper.getStringArrayList("rows").get(0));
             Bundle mixed =
@@ -115,7 +118,7 @@ public final class FunctionsTest {
                                             remote.evaluate(
                                                     request(
                                                             "FRACTION",
-                                                            improper.getString("checkpoint"),
+                                                            improper.getByteArray("state"),
                                                             0)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals(2, mixed.getInt("fractionMode"));
@@ -126,7 +129,7 @@ public final class FunctionsTest {
                                             remote.evaluate(
                                                     request(
                                                             "COPY_ROWS:0",
-                                                            mixed.getString("checkpoint"),
+                                                            mixed.getByteArray("state"),
                                                             2)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("2 1/3", copied.getString("copyText"));
@@ -174,9 +177,7 @@ public final class FunctionsTest {
                                     longFraction.getSpanEnd(fullDenominator[0]))
                             .toString());
             assertTrue(
-                    RpnCalculator.load(
-                                    Files.readAllBytes(
-                                            new File(mixed.getString("checkpoint")).toPath()))
+                    RpnCalculator.load(mixed.getByteArray("state"))
                             .values()
                             .get(0)
                             .multiply(new com.android.calculator2.UnifiedReal(3))
@@ -188,7 +189,10 @@ public final class FunctionsTest {
                     worker.submit(
                                     () ->
                                             remote.evaluate(
-                                                    request("Factor", seed.getAbsolutePath(), 0)))
+                                                    request(
+                                                            "Factor",
+                                                            Files.readAllBytes(seed.toPath()),
+                                                            0)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals(Arrays.asList("2", "2", "3", "7"), factored.getStringArrayList("rows"));
             Bundle undone =
@@ -197,7 +201,7 @@ public final class FunctionsTest {
                                             remote.evaluate(
                                                     request(
                                                             "UNDO",
-                                                            factored.getString("checkpoint"),
+                                                            factored.getByteArray("state"),
                                                             0)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("84", undone.getString("entry"));
@@ -205,7 +209,7 @@ public final class FunctionsTest {
         } finally {
             remote.close();
             worker.shutdownNow();
-            store.cleanWorkFiles(null);
+            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }
@@ -292,7 +296,7 @@ public final class FunctionsTest {
                     context.getString(R.string.error_need_values, 2),
                     result.getString("operationError"));
             assertTrue(result.getStringArrayList("rows").isEmpty());
-            assertTrue(new File(result.getString("checkpoint")).isFile());
+            assertTrue(result.getByteArray("state").length > 0);
         } finally {
             remote.close();
             worker.shutdownNow();

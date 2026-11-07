@@ -6,7 +6,6 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
 
-import java.io.File;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.SortedSet;
@@ -17,13 +16,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 
-/** Retained calculation controller. Serial worker owns persistence; UI owns row selection. */
+/** Retained controller. Accepted snapshots remain safe to save during unfinished arithmetic. */
 final class CalculatorSession {
-    volatile String checkpoint;
+    volatile CalculationSnapshot checkpoint;
     private RemoteCalculator remote;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private volatile boolean closing;
     private String persistedCheckpoint;
+    private final Object persistenceLock = new Object();
     volatile Display display;
     volatile String error = "";
     volatile long errorRevision;
@@ -47,8 +47,6 @@ final class CalculatorSession {
     volatile boolean busy, cancelRequested, background;
     private CalculatorStore store;
     final SessionPolicy policy;
-    private final String workspace;
-    private File temporaryDirectory;
     private volatile boolean restorePending;
     boolean tauConstant;
     private volatile boolean loaded;
@@ -74,7 +72,6 @@ final class CalculatorSession {
             FractionMode fractionMode,
             boolean temporary) {
         policy = new SessionPolicy(temporary);
-        workspace = temporary ? UUID.randomUUID().toString() : "";
         notation = n;
         this.numberMode = numberMode;
         this.fractionMode = fractionMode;
@@ -88,15 +85,11 @@ final class CalculatorSession {
     void attach(android.content.Context context) {
         this.context = context.getApplicationContext();
         localeTag = context.getResources().getConfiguration().getLocales().get(0).toLanguageTag();
-        if (store == null) {
-            File directory;
-            if (policy.temporary) {
-                directory = new File(context.getCacheDir(), "locked-calculations/" + workspace);
-                if (!directory.isDirectory() && !directory.mkdirs())
-                    throw new IllegalStateException("Could not create temporary workspace");
-                temporaryDirectory = directory;
-            } else directory = context.getNoBackupFilesDir();
-            store = new CalculatorStore(directory, () -> policy.temporary || canUseSavedState());
+        if (remote == null) {
+            if (!policy.temporary) {
+                store = new CalculatorStore(context.getNoBackupFilesDir(), this::canUseSavedState);
+                store.removeLegacyWorkFiles();
+            }
             remote = new RemoteCalculator(context, policy.temporary);
         }
     }
@@ -128,6 +121,10 @@ final class CalculatorSession {
         if (closing) return;
         if (!policy.temporary && DeviceAccess.locked(context)) {
             if (command.is(Command.RESTORE)) restorePending = true;
+            return;
+        }
+        if (command.is(Command.CHECKPOINT)) {
+            saveForLifecycle();
             return;
         }
         boolean start;
@@ -166,10 +163,7 @@ final class CalculatorSession {
                 }
             }
             if (key == null) {
-                if (!closing) {
-                    if (background) persistSession(generation);
-                    else store.cleanWorkFiles(checkpoint);
-                }
+                if (!closing && background) persistSession(generation);
                 return;
             }
             try {
@@ -183,16 +177,20 @@ final class CalculatorSession {
                 }
                 if (key.is(Command.RESTORE) && !policy.temporary) {
                     try {
-                        checkpoint = store.checkpoint();
-                        store.cleanWorkFiles(checkpoint);
+                        byte[] saved = store.load();
+                        checkpoint =
+                                saved == null
+                                        ? null
+                                        : new CalculationSnapshot(
+                                                UUID.randomUUID().toString(), saved, false);
                     } catch (java.io.IOException ex) {
                         throw new IllegalStateException("Could not restore saved calculator", ex);
                     }
                 }
                 Bundle request = new Bundle();
                 request.putString("key", key.wire);
-                request.putString("workspace", workspace);
-                request.putString("input", checkpoint);
+                CalculationSnapshot input = checkpoint;
+                if (input != null) input.input(request);
                 request.putString("locale", localeTag);
                 request.putString("angle", display.angleUnit.name());
                 request.putString("notation", notation.name());
@@ -205,7 +203,6 @@ final class CalculatorSession {
                 }
                 Display nextDisplay = new Display(result);
                 publishResult(result, nextDisplay, key, generation);
-                if (key.is(Command.CHECKPOINT)) persistSession(generation);
             } catch (RuntimeException ex) {
                 if (ex instanceof DeviceAccess.Locked
                         || (!policy.temporary
@@ -261,7 +258,11 @@ final class CalculatorSession {
                             selectedRows.clear();
                             selectedRows.addAll(remaining);
                         }
-                        checkpoint = result.getString("checkpoint");
+                        checkpoint =
+                                new CalculationSnapshot(
+                                        result.getString("checkpoint"),
+                                        result.getByteArray("state"),
+                                        nextDisplay.rows.isEmpty() && nextDisplay.entry.isEmpty());
                         notation = nextDisplay.notation;
                         numberMode = nextDisplay.numberMode;
                         fractionMode = nextDisplay.fractionMode;
@@ -300,33 +301,32 @@ final class CalculatorSession {
         }
     }
 
+    void saveForLifecycle() {
+        persistSession(inputGeneration);
+    }
+
     private void persistSession(long generation) {
-        // Temporary checkpoints are worker transport only, never a saved calculation.
-        if (policy.temporary) {
-            store.cleanWorkFiles(checkpoint);
-            return;
-        }
-        if (!canUseSavedState()) return;
-        // Called by the serial worker for lifecycle checkpoints and final close.
-        // If stopping overlaps queued work, its final accepted result is saved when the queue
-        // drains.
-        if (!loaded) {
-            store.cleanWorkFiles(checkpoint);
-            return;
-        }
-        try {
-            if (background && display.rows.isEmpty() && display.entry.isEmpty()) {
-                checkpoint = null;
-                store.clear();
-                persistedCheckpoint = null;
-            } else if (checkpoint != null && !checkpoint.equals(persistedCheckpoint)) {
-                store.save(checkpoint);
-                persistedCheckpoint = checkpoint;
+        if (!canUseSavedState() || !loaded) return;
+        // onStop must finish saving the last accepted state before returning. Arithmetic never
+        // holds this lock; background completion and stop cannot reorder durable writes.
+        synchronized (persistenceLock) {
+            CalculationSnapshot accepted = checkpoint;
+            if (accepted == null) return;
+            try {
+                if (background && accepted.empty) {
+                    store.clear();
+                    synchronized (this) {
+                        if (checkpoint == accepted) checkpoint = null;
+                    }
+                    persistedCheckpoint = null;
+                } else if (!accepted.id.equals(persistedCheckpoint)) {
+                    store.save(accepted.bytes);
+                    persistedCheckpoint = accepted.id;
+                }
+            } catch (java.io.IOException | RuntimeException ex) {
+                android.util.Log.e("ExactRPN", "Could not save calculator", ex);
+                setError(generation, context.getString(R.string.save_failed));
             }
-            store.cleanWorkFiles(checkpoint);
-        } catch (java.io.IOException | RuntimeException ex) {
-            android.util.Log.e("ExactRPN", "Could not save calculator", ex);
-            setError(generation, context.getString(R.string.save_failed));
         }
     }
 
@@ -371,13 +371,7 @@ final class CalculatorSession {
         closing = true;
         cancel();
         remote.close();
-        worker.submit(
-                () -> {
-                    if (policy.temporary) {
-                        store.cleanWorkFiles(null);
-                        if (temporaryDirectory != null) temporaryDirectory.delete();
-                    } else persistSession(inputGeneration);
-                });
+        saveForLifecycle();
         worker.shutdown();
     }
 }

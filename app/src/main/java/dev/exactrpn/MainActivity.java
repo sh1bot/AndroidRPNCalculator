@@ -485,7 +485,7 @@ public class MainActivity extends Activity {
         if (!isChangingConfigurations()) {
             session.background = true;
             if (!session.policy.temporary && DeviceAccess.locked(this)) session.pauseForLock();
-            else if (!isFinishing()) execute(Command.CHECKPOINT);
+            else session.saveForLifecycle();
         }
         super.onStop();
     }

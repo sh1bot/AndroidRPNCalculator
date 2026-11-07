@@ -94,7 +94,58 @@ public final class EntryOperatorTest {
                 session.awaitClosed(15, TimeUnit.SECONDS);
             }
             store.clear();
-            store.cleanWorkFiles(null);
+            store.removeLegacyWorkFiles();
+        }
+    }
+
+    @Test
+    public void stoppingSavesAcceptedMemoryWithoutWaitingForOrCancellingArithmetic()
+            throws Exception {
+        android.content.Context context = instrumentation.getTargetContext();
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        store.clear();
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL);
+        session.attach(context);
+        try {
+            key(session, "RESTORE");
+            for (String key : new String[] {"π", "e", "+", "e", "π", "+", "−"}) key(session, key);
+            CalculationSnapshot accepted = session.checkpoint;
+            instrumentation.runOnMainSync(() -> session.enqueue(Command.parse("1/x")));
+            SystemClock.sleep(300);
+            assertTrue("Reciprocal of unknown zero should still be calculating", session.busy);
+            long started = SystemClock.elapsedRealtime();
+            instrumentation.runOnMainSync(
+                    () -> {
+                        session.background = true;
+                        session.saveForLifecycle();
+                    });
+            long saveTime = SystemClock.elapsedRealtime() - started;
+            System.out.println(
+                    "Lifecycle saved "
+                            + accepted.bytes.length
+                            + " bytes in "
+                            + saveTime
+                            + " ms during blocked arithmetic");
+            assertTrue("Stop must not wait for arithmetic", saveTime < 2000);
+            assertTrue(session.busy);
+            assertFalse(session.cancelRequested);
+            assertSame(accepted, session.checkpoint);
+            assertArrayEquals(accepted.bytes, store.load());
+            session.cancel();
+            awaitUi(() -> !session.busy);
+            session.background = false;
+            key(session, "CLEAR");
+            key(session, "UNDO");
+            assertEquals(1, session.display.rows.size());
+        } finally {
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+            store.clear();
         }
     }
 
@@ -336,8 +387,7 @@ public final class EntryOperatorTest {
             assertFalse(session.display.editing);
             assertEquals(Arrays.asList("1"), session.display.rows);
             assertEquals("Error: Enter another value first, then the operator", session.error);
-            RpnCalculator saved =
-                    RpnCalculator.load(Files.readAllBytes(new File(session.checkpoint).toPath()));
+            RpnCalculator saved = RpnCalculator.load(session.checkpoint.bytes);
             assertFalse(saved.isEditing());
             assertEquals("1", saved.values().get(0).bigIntegerValue().toString());
             key(session, "0");

@@ -13,7 +13,6 @@ import android.os.Message;
 import android.os.Messenger;
 import android.os.RemoteException;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
@@ -43,6 +42,8 @@ final class RemoteCalculator {
     private ServiceConnection connection;
     private int pid, generation, nextRequest;
     private boolean closed;
+    private final String sessionId = java.util.UUID.randomUUID().toString();
+    private String remoteSnapshotId;
     private CompletableFuture<Bundle> pending;
     private Bundle pendingRequest;
     private final Messenger replies =
@@ -51,7 +52,10 @@ final class RemoteCalculator {
                             Looper.getMainLooper(),
                             message -> {
                                 synchronized (this) {
-                                    if (message.arg2 != generation) return true;
+                                    if (message.arg2 != generation) {
+                                        MemoryPayload.discard(message.getData(), "payload");
+                                        return true;
+                                    }
                                     if (message.what == CalculationService.HELLO) {
                                         pid = message.arg1;
                                         if (pending != null) sendPending();
@@ -61,6 +65,8 @@ final class RemoteCalculator {
                                         pending.complete(message.getData());
                                         pending = null;
                                         pendingRequest = null;
+                                    } else if (message.what == CalculationService.EVALUATE) {
+                                        MemoryPayload.discard(message.getData(), "payload");
                                     }
                                 }
                                 return true;
@@ -76,46 +82,59 @@ final class RemoteCalculator {
     }
 
     Bundle evaluate(Bundle request) {
+        if (!temporary) DeviceAccess.requireUnlocked(context);
+        Object state = request.get("input");
+        if (state != null && !(state instanceof byte[]))
+            throw new UserFailure("Expected an in-memory calculation snapshot");
         CompletableFuture<Bundle> future = new CompletableFuture<>();
-        synchronized (this) {
-            if (closed) throw new com.hp.creals.CR.AbortedException();
-            pending = future;
-            pendingRequest = new Bundle(request);
-            pendingRequest.putInt("requestId", ++nextRequest);
-            if (remote != null && pid != 0) sendPending();
-            else if (connection == null) bind();
+        Bundle outgoing = new Bundle(request);
+        byte[] input = outgoing.getByteArray("input");
+        outgoing.remove("input");
+        String inputId = outgoing.getString("inputId");
+        if (input != null && inputId == null) {
+            inputId = java.util.UUID.randomUUID().toString();
+            outgoing.putString("inputId", inputId);
         }
-        try {
-            Bundle response = future.get();
-            if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
-            if (response.getBoolean("invalidCheckpoint"))
-                throw new InvalidCheckpoint(response.getString("error"));
-            if (response.containsKey("errorCode"))
-                throw new UserFailure(
-                        ErrorMessages.fromCode(
-                                context,
-                                CalculationError.Code.valueOf(response.getString("errorCode")),
-                                response.getInt("errorArgument")));
-            if (response.containsKey("error")) throw new UserFailure(response.getString("error"));
-            if (response.containsKey("copyFile")) {
-                File copy = new File(response.getString("copyFile"));
-                try {
-                    Bundle result = new Bundle();
-                    result.putString(
-                            "copyText",
-                            new String(
-                                    java.nio.file.Files.readAllBytes(copy.toPath()),
-                                    java.nio.charset.StandardCharsets.UTF_8));
-                    return result;
-                } finally {
-                    copy.delete();
-                }
+        int epoch;
+        boolean reuse;
+        synchronized (this) {
+            epoch = generation;
+            reuse = inputId != null && inputId.equals(remoteSnapshotId);
+        }
+        try (MemoryPayload payload = input != null && !reuse ? MemoryPayload.create(input) : null) {
+            if (payload != null) payload.put(outgoing, "input");
+            synchronized (this) {
+                if (closed || epoch != generation) throw new com.hp.creals.CR.AbortedException();
+                pending = future;
+                pendingRequest = outgoing;
+                pendingRequest.putString("sessionId", sessionId);
+                pendingRequest.putInt("requestId", ++nextRequest);
+                if (remote != null && pid != 0) sendPending();
+                else if (connection == null) bind();
             }
-            File file = new File(response.getString("presentation"));
+            Bundle response = future.get();
             try {
-                return DisplayResult.read(file);
+                if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
+                if (response.getBoolean("invalidCheckpoint"))
+                    throw new InvalidCheckpoint(response.getString("error"));
+                if (response.containsKey("errorCode"))
+                    throw new UserFailure(
+                            ErrorMessages.fromCode(
+                                    context,
+                                    CalculationError.Code.valueOf(response.getString("errorCode")),
+                                    response.getInt("errorArgument")));
+                if (response.containsKey("error"))
+                    throw new UserFailure(response.getString("error"));
+                Bundle result = DisplayResult.decode(MemoryPayload.take(response, "payload"));
+                synchronized (this) {
+                    if (closed || epoch != generation)
+                        throw new com.hp.creals.CR.AbortedException();
+                    if (result.containsKey("state"))
+                        remoteSnapshotId = result.getString("checkpoint");
+                }
+                return result;
             } finally {
-                file.delete();
+                MemoryPayload.discard(response, "payload");
             }
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
@@ -228,6 +247,7 @@ final class RemoteCalculator {
 
     private void disconnect(boolean terminate) {
         ++generation;
+        remoteSnapshotId = null;
         int process = pid;
         ServiceConnection binding = connection;
         pid = 0;

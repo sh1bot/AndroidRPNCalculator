@@ -28,10 +28,10 @@ import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 public final class CancellationTest {
-    private Bundle request(String key, String input) {
+    private Bundle request(String key, byte[] input) {
         Bundle request = new Bundle();
         request.putString("key", key);
-        request.putString("input", input);
+        request.putByteArray("input", input);
         request.putString("angle", "RAD");
         request.putString("notation", "SCIENTIFIC");
         request.putString("locale", "en-US");
@@ -50,7 +50,7 @@ public final class CancellationTest {
                             worker.submit(() -> remote.evaluate(request("RESTORE", null)))
                                     .get(20, TimeUnit.SECONDS);
                     assertTrue(result.getStringArrayList("rows").isEmpty());
-                    new File(result.getString("checkpoint")).delete();
+                    assertTrue(result.getByteArray("state").length > 0);
                 } finally {
                     remote.close();
                 }
@@ -74,17 +74,17 @@ public final class CancellationTest {
             for (String key : new String[] {"π", "e", "+", "e", "π", "+", "−"}) calculator.key(key);
             assertFalse(calculator.values().get(0).definitelyZero());
             Files.write(seed.toPath(), calculator.save());
-            store.save(seed.getAbsolutePath());
+            store.save(Files.readAllBytes(seed.toPath()));
             // Cold process startup/restoration is separate from the strict cancellation budget.
             long restoring = SystemClock.elapsedRealtime();
             Bundle initial =
-                    worker.submit(() -> remote.evaluate(request("RESTORE", store.checkpoint())))
+                    worker.submit(() -> remote.evaluate(request("RESTORE", store.load())))
                             .get(30, TimeUnit.SECONDS);
             System.out.println(
                     "Initial checkpoint restore took "
                             + (SystemClock.elapsedRealtime() - restoring)
                             + " ms");
-            String accepted = initial.getString("checkpoint");
+            byte[] accepted = initial.getByteArray("state");
             store.save(accepted);
             byte[] committed = Files.readAllBytes(new File(store.checkpoint()).toPath());
             Future<Bundle> stuck = worker.submit(() -> remote.evaluate(request("1/x", accepted)));
@@ -114,9 +114,7 @@ public final class CancellationTest {
                     worker.submit(
                                     () ->
                                             remote.evaluate(
-                                                    request(
-                                                            "UNDO",
-                                                            cleared.getString("checkpoint"))))
+                                                    request("UNDO", cleared.getByteArray("state"))))
                             .get(15, TimeUnit.SECONDS);
             assertEquals(
                     "Cancellation preserves the old stack and undo",
@@ -126,7 +124,7 @@ public final class CancellationTest {
             remote.close();
             worker.shutdownNow();
             store.clear();
-            store.cleanWorkFiles(null);
+            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }

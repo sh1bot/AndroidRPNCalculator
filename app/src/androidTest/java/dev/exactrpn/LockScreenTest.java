@@ -115,7 +115,7 @@ public final class LockScreenTest {
         calculator.key("ENTER");
         File seed = File.createTempFile("locked-test-", ".state", context.getNoBackupFilesDir());
         Files.write(seed.toPath(), calculator.save());
-        store.save(seed.getAbsolutePath());
+        store.save(Files.readAllBytes(seed.toPath()));
         return seed;
     }
 
@@ -152,17 +152,13 @@ public final class LockScreenTest {
             enter(activity, "7");
             enter(activity, "ENTER");
             assertEquals(Arrays.asList("7"), session.display.rows);
-            assertTrue(
-                    new File(session.checkpoint)
-                            .getCanonicalPath()
-                            .startsWith(context.getCacheDir().getCanonicalPath() + File.separator));
+            assertTrue(session.checkpoint.bytes.length > 0);
+            assertEquals(1, RpnCalculator.load(session.checkpoint.bytes).values().size());
             enter(activity, "CLEAR");
             enter(activity, "UNDO");
             assertEquals(Arrays.asList("7"), session.display.rows);
-            File temporary = new File(session.checkpoint);
             StackSelectionTest.finish(activity);
             activity = null;
-            assertFalse(temporary.exists());
             activity = open(context);
             CalculatorSession reopened = StackSelectionTest.session(activity);
             await(() -> !reopened.busy);
@@ -175,13 +171,13 @@ public final class LockScreenTest {
             observer.stopWatching();
             assertArrayEquals(before, Files.readAllBytes(saved.toPath()));
             store.clear();
-            store.cleanWorkFiles(null);
+            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }
 
     @Test
-    public void lockedWorkerRejectsAnyNormalCheckpointBeforeReadingIt() throws Exception {
+    public void temporaryTransportRejectsFilePathsWithoutReadingSavedState() throws Exception {
         Context context = instrumentation.getTargetContext();
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
         File seed = seed(context, store);
@@ -210,7 +206,7 @@ public final class LockScreenTest {
             worker.shutdownNow();
             observer.stopWatching();
             store.clear();
-            store.cleanWorkFiles(null);
+            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }
@@ -308,7 +304,7 @@ public final class LockScreenTest {
                 observer.stopWatching();
                 assertArrayEquals(before, Files.readAllBytes(saved.toPath()));
                 store.clear();
-                store.cleanWorkFiles(null);
+                store.removeLegacyWorkFiles();
                 seed.delete();
             }
         }
