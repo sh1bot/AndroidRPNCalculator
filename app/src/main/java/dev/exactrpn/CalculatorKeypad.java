@@ -600,7 +600,13 @@ public final class CalculatorKeypad extends ViewGroup {
 
     private void fitLabel(Button button, int width, int height) {
         int minimum =
-                Math.max(1, Math.round(10 * getResources().getDisplayMetrics().scaledDensity));
+                Math.max(
+                        1,
+                        Math.round(
+                                TypedValue.applyDimension(
+                                        TypedValue.COMPLEX_UNIT_SP,
+                                        10,
+                                        getResources().getDisplayMetrics())));
         String key = effectiveKey((String) button.getTag());
         int preferred = 16;
         if (key.matches("[0-9.]")) preferred = 26;
@@ -631,13 +637,22 @@ public final class CalculatorKeypad extends ViewGroup {
                 || key.equals("rem")
                 || key.equals("mod")) preferred = 20;
         else if (key.equals(Command.ENTER)) preferred = 18;
+        // A small folded-only increase; expanded function labels keep their existing sizes.
+        if (!expanded) preferred += preferred >= 24 ? 2 : 1;
         int preferredPixels =
-                Math.round(preferred * getResources().getDisplayMetrics().scaledDensity);
-        // Grow only up to a consistent type size; smaller keys may shrink to fit.
+                Math.round(
+                        TypedValue.applyDimension(
+                                TypedValue.COMPLEX_UNIT_SP,
+                                preferred,
+                                getResources().getDisplayMetrics()));
+        // Restore one third of the former 55%-to-80% headroom, with modest sp caps.
+        float sizeFraction = expanded ? .55f : .55f + (.8f - .55f) / 3;
         int maximum =
                 Math.max(
                         minimum,
-                        Math.min(preferredPixels, Math.round(Math.min(width, height) * .55f)));
+                        Math.min(
+                                preferredPixels,
+                                Math.round(Math.min(width, height) * sizeFraction)));
         if (button.getAutoSizeMaxTextSize() != maximum
                 || button.getAutoSizeMinTextSize() != minimum)
             button.setAutoSizeTextTypeUniformWithConfiguration(
