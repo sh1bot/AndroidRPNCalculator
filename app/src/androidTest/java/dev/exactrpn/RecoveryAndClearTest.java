@@ -66,7 +66,7 @@ public final class RecoveryAndClearTest {
         try {
             for (byte[] bad : new byte[][] {{1}, {0, 0, 0, 0}}) {
                 Files.write(seed.toPath(), bad);
-                store.save(seed.getAbsolutePath());
+                store.save(Files.readAllBytes(seed.toPath()));
                 MainActivity activity =
                         (MainActivity)
                                 instrumentation.startActivitySync(
@@ -111,7 +111,7 @@ public final class RecoveryAndClearTest {
                                             && session.display.editing
                                             && session.display.entry.isEmpty());
                     assertEquals(java.util.Arrays.asList("9"), session.display.rows);
-                    String beforePaste = session.checkpoint;
+                    CalculationSnapshot beforePaste = session.checkpoint;
                     instrumentation.runOnMainSync(
                             () -> {
                                 ClipboardManager clipboard =
@@ -136,7 +136,7 @@ public final class RecoveryAndClearTest {
                 } finally {
                     StackSelectionTest.finish(activity);
                     store.clear();
-                    store.cleanWorkFiles(null);
+                    store.removeLegacyWorkFiles();
                     corrupt.delete();
                 }
             }

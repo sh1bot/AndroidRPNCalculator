@@ -24,8 +24,6 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
-import java.io.File;
-import java.nio.file.Files;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -204,8 +202,7 @@ public final class StackSelectionTest {
                                 session.selectedRows);
                         assertFalse(((CheckBox) tagged(activity, "stack-checkbox:6")).isChecked());
                     });
-            RpnCalculator restored =
-                    RpnCalculator.load(Files.readAllBytes(new File(session.checkpoint).toPath()));
+            RpnCalculator restored = RpnCalculator.load(session.checkpoint.bytes);
             restored.key("UNDO");
             assertEquals(6, restored.values().size());
             key(activity, "BACK");

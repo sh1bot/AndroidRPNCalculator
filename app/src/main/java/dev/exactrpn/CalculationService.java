@@ -13,9 +13,7 @@ import android.os.RemoteException;
 
 import com.android.calculator2.UnifiedReal;
 
-import java.io.File;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -27,11 +25,9 @@ import java.util.concurrent.Executors;
 /** Arithmetic runs in :calculation, so Cancel can terminate even non-interruptible work. */
 public class CalculationService extends Service {
     static final int HELLO = 1, EVALUATE = 2;
-    private static final java.util.regex.Pattern WORKSPACE =
-            java.util.regex.Pattern.compile("[a-f0-9-]{36}");
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private RpnCalculator cached;
-    private String cachedPath, cachedStackId;
+    private String cachedId, cachedSession, cachedStackId;
     private final ValuePresentationCache texts = new ValuePresentationCache();
     private final java.util.Map<String, LocaleNumbers> profiles = new java.util.HashMap<>();
 
@@ -77,37 +73,27 @@ public class CalculationService extends Service {
 
     private void evaluate(Bundle request, Messenger client) {
         Bundle response = new Bundle();
-        File snapshot = null, presentation = null;
+        MemoryPayload payload = null;
         try {
             checkAccess();
-            File directory = workDirectory(request);
-            loadCheckpoint(request, response, directory);
+            loadCheckpoint(request, response);
+            Bundle display;
             if (Command.parse(request.getString("key")).kind == Command.Kind.COPY_ROWS) {
-                String text = copyRows(request);
-                checkAccess();
-                presentation = File.createTempFile("calculation-", ".copy", directory);
-                Files.write(
-                        presentation.toPath(),
-                        text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-                response.putString("copyFile", presentation.getAbsolutePath());
+                display = new Bundle();
+                display.putString("copyText", copyRows(request));
             } else {
                 Evaluation evaluation = new Evaluation(request);
-                checkAccess();
-                snapshot = File.createTempFile("calculation-", ".state", directory);
                 byte[] state = evaluation.candidate.save();
-                checkAccess();
-                Files.write(snapshot.toPath(), state);
-                Bundle display = evaluation.presentation(snapshot);
-                // Only paths cross Binder; large stacks must not hit Binder's transaction-size
-                // limit.
-                checkAccess();
-                presentation = File.createTempFile("calculation-", ".display", directory);
-                DisplayResult.write(presentation, display);
-                response.putString("presentation", presentation.getAbsolutePath());
-                cached = evaluation.candidate;
-                cachedPath = snapshot.getAbsolutePath();
+                display = evaluation.presentation();
+                String id = UUID.randomUUID().toString();
+                display.putString("checkpoint", id);
+                display.putByteArray("state", state);
+                cachedId = id;
                 cachedStackId = evaluation.stackId;
             }
+            checkAccess();
+            payload = MemoryPayload.create(DisplayResult.encode(display));
+            payload.put(response, "payload");
         } catch (OutOfMemoryError ex) {
             android.os.Process.killProcess(android.os.Process.myPid());
             return;
@@ -116,8 +102,6 @@ public class CalculationService extends Service {
             // Unexpected failures reload the last accepted checkpoint on the next request.
             cached = null;
             texts.clear();
-            if (snapshot != null) snapshot.delete();
-            if (presentation != null) presentation.delete();
             if (ex instanceof DeviceAccess.Locked) response.putBoolean("deviceLocked", true);
             else if (ex instanceof CalculationError) {
                 CalculationError failure = (CalculationError) ex;
@@ -132,6 +116,13 @@ public class CalculationService extends Service {
         try {
             client.send(result);
         } catch (RemoteException ignored) {
+        } finally {
+            MemoryPayload.discard(request, "input");
+            if (payload != null)
+                try {
+                    payload.close();
+                } catch (IOException ignored) {
+                }
         }
     }
 
@@ -146,26 +137,18 @@ public class CalculationService extends Service {
         return result.toString();
     }
 
-    private void loadCheckpoint(Bundle request, Bundle response, File directory)
-            throws IOException {
-        String input = request.getString("input");
-        if (input != null
-                && !new File(input)
-                        .getCanonicalFile()
-                        .getParentFile()
-                        .equals(directory.getCanonicalFile()))
-            throw new IOException("Checkpoint outside calculation workspace");
-        if (temporaryService()
-                && input != null
-                && !new File(input).getName().startsWith("calculation-"))
-            throw new IOException("Temporary sessions cannot restore saved calculations");
+    private void loadCheckpoint(Bundle request, Bundle response) throws IOException {
         checkAccess();
-        if (cached == null || !Objects.equals(input, cachedPath)) {
+        String input = request.getString("inputId");
+        String session = request.getString("sessionId");
+        if (cached == null
+                || !Objects.equals(input, cachedId)
+                || !Objects.equals(session, cachedSession)) {
             try {
                 cached =
                         input == null
                                 ? new RpnCalculator()
-                                : RpnCalculator.load(Files.readAllBytes(new File(input).toPath()));
+                                : RpnCalculator.load(MemoryPayload.take(request, "input"));
             } catch (IOException ex) {
                 response.putBoolean("invalidCheckpoint", true);
                 throw new IOException(
@@ -173,8 +156,10 @@ public class CalculationService extends Service {
             }
             if (input == null)
                 cached.setAngleUnit(RpnCalculator.AngleUnit.valueOf(request.getString("angle")));
-            cachedPath = input;
+            cachedId = input;
+            cachedSession = session;
             cachedStackId = UUID.randomUUID().toString();
+            texts.clear();
         }
     }
 
@@ -184,17 +169,6 @@ public class CalculationService extends Service {
 
     private void checkAccess() {
         if (!temporaryService()) DeviceAccess.requireUnlocked(this);
-    }
-
-    private File workDirectory(Bundle request) throws IOException {
-        if (!temporaryService()) return getNoBackupFilesDir();
-        String id = request.getString("workspace");
-        if (id == null || !WORKSPACE.matcher(id).matches())
-            throw new IOException("Invalid temporary workspace");
-        File directory = new File(getCacheDir(), "locked-calculations/" + id);
-        if (!directory.isDirectory() && !directory.mkdirs())
-            throw new IOException("Could not create temporary workspace");
-        return directory;
     }
 
     private final class Evaluation {
@@ -237,7 +211,7 @@ public class CalculationService extends Service {
             stackId = candidate.sameStack(before) ? cachedStackId : UUID.randomUUID().toString();
         }
 
-        Bundle presentation(File snapshot) {
+        Bundle presentation() {
             List<UnifiedReal> values = candidate.values();
             texts.retain(values);
             ArrayList<String> rows = new ArrayList<>(values.size());
@@ -263,7 +237,6 @@ public class CalculationService extends Service {
             display.putString("notation", notation.name());
             display.putInt("numberMode", numberMode.id);
             display.putInt("fractionMode", fractionMode.id);
-            display.putString("checkpoint", snapshot.getAbsolutePath());
             return display;
         }
     }

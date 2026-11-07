@@ -54,7 +54,7 @@ public final class TauPreferenceTest {
             instrumentation.runOnMainSync(
                     () -> {
                         Button constant = first.getWindow().getDecorView().findViewWithTag("π");
-                        String checkpoint = oldSession.checkpoint;
+                        CalculationSnapshot checkpoint = oldSession.checkpoint;
                         constant.performLongClick();
                         assertEquals(original ? "π" : "τ", constant.getText().toString());
                         assertEquals(!original, preferences.getBoolean("tauConstant", false));
