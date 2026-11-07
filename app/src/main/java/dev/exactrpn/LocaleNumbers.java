@@ -67,7 +67,13 @@ public final class LocaleNumbers {
             text.append("≈ ");
             number = number.substring(2);
         }
-        // The display's explicit near-zero annotation is not a numeric literal.
+        // The near-zero bound is an annotation, but its power of ten uses the same styling.
+        String bound = "0 (|x| < 1";
+        if (number.startsWith(bound + "e") && number.endsWith(")")) {
+            text.append(entry(bound));
+            appendExponent(text, number.substring(bound.length() + 1, number.length() - 1));
+            return text.append(")");
+        }
         if (number.contains("(")) return text.append(entry(number));
         int slash = number.indexOf('/');
         if (slash >= 0) {
@@ -112,6 +118,7 @@ public final class LocaleNumbers {
             return text;
         }
         int e = number.indexOf('e');
+        if (e < 0) e = number.indexOf('E');
         String mantissa = e < 0 ? number : number.substring(0, e);
         int dot = mantissa.indexOf('.');
         String whole = dot < 0 ? mantissa : mantissa.substring(0, dot);
@@ -126,8 +133,20 @@ public final class LocaleNumbers {
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             text.append(entry(mantissa.substring(dot + 1)));
         }
-        if (e >= 0) text.append("e").append(entry(number.substring(e + 1)));
+        if (e >= 0) appendExponent(text, number.substring(e + 1));
         return text;
+    }
+
+    private void appendExponent(SpannableStringBuilder text, String exponent) {
+        int start = text.length();
+        text.append("\u2009×").append(entry("10"));
+        text.setSpan(
+                new RelativeSizeSpan(.75f), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        start = text.length();
+        text.append(entry(exponent.replace('-', '−')));
+        text.setSpan(
+                new RelativeSizeSpan(.6f), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(new SuperscriptSpan(), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
     }
 
     /** Styling only: preserve characters, caret offsets, locale and validation colors. */

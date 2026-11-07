@@ -41,6 +41,43 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void scientificDisplayStylesPowersAndKeepsEntryAndCopyLiteral() {
+        for (Locale locale :
+                new Locale[] {Locale.US, Locale.GERMANY, Locale.forLanguageTag("ar-EG")}) {
+            LocaleNumbers numbers = new LocaleNumbers(locale, NumberMode.LOCALE);
+            for (String input : new String[] {"1.23e+15", "123.4e-12", "1.2E+30"}) {
+                android.text.Spanned styled = (android.text.Spanned) numbers.stack(input, 0);
+                int marker = Math.max(input.indexOf('e'), input.indexOf('E'));
+                assertEquals(
+                        numbers.entry(input.substring(0, marker))
+                                + "\u2009×"
+                                + numbers.entry("10")
+                                + numbers.entry(input.substring(marker + 1).replace('-', '−')),
+                        styled.toString());
+                android.text.style.SuperscriptSpan[] powers =
+                        styled.getSpans(
+                                0, styled.length(), android.text.style.SuperscriptSpan.class);
+                assertEquals(1, powers.length);
+                assertEquals(
+                        numbers.entry(input.substring(marker + 1).replace('-', '−')),
+                        styled.subSequence(
+                                        styled.getSpanStart(powers[0]),
+                                        styled.getSpanEnd(powers[0]))
+                                .toString());
+                assertEquals(numbers.entry(input), numbers.copy(input));
+                assertTrue(numbers.entry(input).contains(input.substring(marker, marker + 1)));
+            }
+            android.text.Spanned bound =
+                    (android.text.Spanned) numbers.stack("≈ 0 (|x| < 1e−1000)", 0);
+            assertEquals(
+                    1,
+                    bound.getSpans(0, bound.length(), android.text.style.SuperscriptSpan.class)
+                            .length);
+            assertTrue(bound.toString().endsWith(")"));
+        }
+    }
+
+    @Test
     public void mixedDisplayCopyAndFactorisationThroughRemoteProcess() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context);
