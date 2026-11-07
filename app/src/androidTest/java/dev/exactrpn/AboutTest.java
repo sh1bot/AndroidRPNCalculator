@@ -6,7 +6,6 @@ import static androidx.test.espresso.Espresso.pressBack;
 import static androidx.test.espresso.action.ViewActions.click;
 import static androidx.test.espresso.assertion.ViewAssertions.matches;
 import static androidx.test.espresso.matcher.RootMatchers.isPlatformPopup;
-import static androidx.test.espresso.matcher.ViewMatchers.withContentDescription;
 import static androidx.test.espresso.matcher.ViewMatchers.withSubstring;
 import static androidx.test.espresso.matcher.ViewMatchers.withTagValue;
 import static androidx.test.espresso.matcher.ViewMatchers.withText;
@@ -37,19 +36,16 @@ public final class AboutTest {
                                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         try {
             onView(withTagValue(is("overflow-menu"))).perform(click());
-            onView(withText("About")).inRoot(isPlatformPopup()).perform(click());
-            onView(withTagValue(is("about-repository")))
-                    .check(matches(withContentDescription(AboutDialog.REPOSITORY)));
-            String[] titles = {
-                "Source credits", "Apache License 2.0", "Constructive-real library notices"
-            };
-            String[] expected = {"Hans-J. Boehm", "TERMS AND CONDITIONS", "Silicon Graphics"};
-            for (int i = 0; i < titles.length; i++) {
-                assertTrue(AboutDialog.read(activity, AboutDialog.FILES[i]).contains(expected[i]));
-                onView(withText(titles[i])).perform(click());
-                onView(withTagValue(is("license-text"))).check(matches(withSubstring(expected[i])));
-                pressBack();
-            }
+            onView(withText("Help")).inRoot(isPlatformPopup()).perform(click());
+            onView(withTagValue(is("document-text")))
+                    .check(matches(withSubstring("Your first calculation")));
+            pressBack();
+            onView(withTagValue(is("overflow-menu"))).perform(click());
+            onView(withText("Licenses")).inRoot(isPlatformPopup()).perform(click());
+            onView(withTagValue(is("document-text")))
+                    .check(matches(withSubstring("TERMS AND CONDITIONS")));
+            assertTrue(AboutDialog.read(activity, "licenses.html.gz").contains("Hans-J. Boehm"));
+            assertTrue(AboutDialog.read(activity, "licenses.html.gz").contains("Silicon Graphics"));
             pressBack();
         } finally {
             StackSelectionTest.finish(activity);

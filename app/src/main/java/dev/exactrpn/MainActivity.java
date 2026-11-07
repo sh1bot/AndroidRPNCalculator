@@ -713,10 +713,24 @@ public class MainActivity extends Activity {
                     dismissErrorNotice();
                     android.widget.PopupMenu popup = new android.widget.PopupMenu(this, menu);
                     popup.getMenu()
-                            .add(R.string.about)
+                            .add(R.string.help)
                             .setOnMenuItemClickListener(
                                     item -> {
-                                        AboutDialog.show(this);
+                                        AboutDialog.show(this, true);
+                                        return true;
+                                    });
+                    popup.getMenu()
+                            .add(R.string.licenses)
+                            .setOnMenuItemClickListener(
+                                    item -> {
+                                        AboutDialog.show(this, false);
+                                        return true;
+                                    });
+                    popup.getMenu()
+                            .add(R.string.source_code)
+                            .setOnMenuItemClickListener(
+                                    item -> {
+                                        AboutDialog.source(this);
                                         return true;
                                     });
                     popup.setOnDismissListener(dismissed -> menu.setActivated(false));
