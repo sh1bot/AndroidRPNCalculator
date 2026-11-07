@@ -56,16 +56,19 @@ final class CommandTest {
         assertEquals("", calculator.entry());
         assertEquals(
                 java.util.Arrays.asList("1", "2", "3"),
-                calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+                calculator.formattedValues(
+                        ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
         calculator.key("ENTER");
         calculator.key("HOLD_DROP");
         assertEquals(
                 java.util.Arrays.asList("3", "1", "2"),
-                calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+                calculator.formattedValues(
+                        ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
         calculator.key("UNDO");
         assertEquals(
                 java.util.Arrays.asList("1", "2", "3"),
-                calculator.formattedValues(ValueFormatter.Notation.SCIENTIFIC));
+                calculator.formattedValues(
+                        ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
     }
 
     @Test

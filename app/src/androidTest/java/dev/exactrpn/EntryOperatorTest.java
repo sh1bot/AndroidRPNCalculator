@@ -48,6 +48,48 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void stopAndCloseFlushTheLatestEntryBeforeTheDebounceExpires() throws Exception {
+        android.content.Context context = instrumentation.getTargetContext();
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        store.clear();
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL);
+        session.attach(context);
+        boolean closed = false;
+        try {
+            key(session, "RESTORE");
+            key(session, "1");
+            key(session, "2");
+            session.background = true;
+            key(session, "CHECKPOINT");
+            RpnCalculator stopped =
+                    RpnCalculator.load(Files.readAllBytes(new File(store.checkpoint()).toPath()));
+            assertEquals("12", stopped.entry());
+            session.background = false;
+            key(session, "3");
+            session.close();
+            closed = true;
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+            RpnCalculator restored =
+                    RpnCalculator.load(Files.readAllBytes(new File(store.checkpoint()).toPath()));
+            assertEquals("123", restored.entry());
+            restored.key("UNDO");
+            assertEquals("12", restored.entry());
+        } finally {
+            if (!closed) {
+                session.close();
+                session.awaitClosed(15, TimeUnit.SECONDS);
+            }
+            store.clear();
+            store.cleanWorkFiles(null);
+        }
+    }
+
+    @Test
     public void styledExponentRemainsEditableAtOriginalCursorOffsets() throws Exception {
         MainActivity activity =
                 (MainActivity)
@@ -60,7 +102,7 @@ public final class EntryOperatorTest {
         View root = activity.getWindow().getDecorView();
         android.widget.EditText entry = root.findViewWithTag("number-entry");
         try {
-            key(session, "PASTE:1.23");
+            key(session, "PASTE_RAW:1.23");
             awaitUi(() -> entry.getText().toString().equals("1.23"));
             instrumentation.runOnMainSync(() -> root.findViewWithTag(".").performLongClick());
             awaitUi(() -> !session.busy && entry.getText().toString().equals("1.23e"));

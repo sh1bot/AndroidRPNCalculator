@@ -21,6 +21,7 @@ public final class LocaleNumbers {
     private final DecimalFormatSymbols symbols;
     private final int primary, secondary;
     private final boolean computer;
+    private final NumberText.Profile inputProfile;
 
     public LocaleNumbers(Locale locale) {
         this(locale, NumberMode.LOCALE);
@@ -41,6 +42,9 @@ public final class LocaleNumbers {
         format.setGroupingUsed(grouping && format.isGroupingUsed());
         primary = format.isGroupingUsed() ? format.getGroupingSize() : 0;
         secondary = format.getSecondaryGroupingSize();
+        inputProfile =
+                new NumberText.Profile(
+                        decimalSeparator(), symbols.getGroupingSeparator(), primary, secondary);
     }
 
     public char decimalSeparator() {
@@ -239,8 +243,7 @@ public final class LocaleNumbers {
     }
 
     public NumberText.Profile profile() {
-        return new NumberText.Profile(
-                decimalSeparator(), symbols.getGroupingSeparator(), primary, secondary);
+        return inputProfile;
     }
 
     public String copy(String canonical) {

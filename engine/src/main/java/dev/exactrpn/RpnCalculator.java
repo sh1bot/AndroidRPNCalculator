@@ -94,10 +94,14 @@ public final class RpnCalculator {
                 && s.start == selectionStart
                 && s.end == selectionEnd
                 && (!raw || sameProfile(s.profile, rawProfile))) return;
+        boolean discarded = !redo.isEmpty();
         redo.clear();
         undo.push(s);
-        if (undo.size() > 100) undo.removeLast();
-        pruneSavedValues();
+        if (undo.size() > 100) {
+            undo.removeLast();
+            discarded = true;
+        }
+        if (discarded) pruneSavedValues();
     }
 
     private static boolean sameProfile(NumberText.Profile a, NumberText.Profile b) {
@@ -168,10 +172,6 @@ public final class RpnCalculator {
 
     public List<UnifiedReal> values() {
         return Collections.unmodifiableList(new ArrayList<>(stack));
-    }
-
-    public List<String> formattedValues(ValueFormatter.Notation notation) {
-        return formattedValues(notation, FractionMode.DECIMAL);
     }
 
     public List<String> formattedValues(
@@ -301,10 +301,6 @@ public final class RpnCalculator {
             moveCursor(direction, key.startsWith("SELECT_"));
             return;
         }
-        if (key.startsWith("PASTE:")) {
-            paste(key.substring(6));
-            return;
-        }
         if (key.equals("ANGLE")) {
             angleUnit = AngleUnit.values()[(angleUnit.ordinal() + 1) % AngleUnit.values().length];
             return;
@@ -325,17 +321,16 @@ public final class RpnCalculator {
         }
         State before = new State(this);
         State committed = null;
+        boolean clearsEntry = key.equals("CE") || key.equals("CLEAR") || key.equals("CANCEL_ENTRY");
         try {
-            if (key.matches("[0-9.]")) {
+            if (isEntryKey(key)) {
                 editing = true;
                 if (key.equals(".")) {
                     if (raw) {
                         replaceSelection(Character.toString(inputProfile.decimal));
                         resolveExplicitDecimal();
                     } else {
-                        String remaining =
-                                entry.substring(0, Math.min(selectionStart, selectionEnd))
-                                        + entry.substring(Math.max(selectionStart, selectionEnd));
+                        String remaining = entryWithoutSelection();
                         if (remaining.contains(".")
                                 || remaining.contains("e")
                                 || remaining.contains("E")) return;
@@ -344,9 +339,7 @@ public final class RpnCalculator {
                 } else replaceSelection(key);
                 resolveRaw();
             } else if (key.equals("HOLD_DECIMAL")) {
-                String remaining =
-                        entry.substring(0, Math.min(selectionStart, selectionEnd))
-                                + entry.substring(Math.max(selectionStart, selectionEnd));
+                String remaining = entryWithoutSelection();
                 if (remaining.contains("e") || remaining.contains("E")) return;
                 replaceSelection("e");
                 resolveRaw();
@@ -371,7 +364,7 @@ public final class RpnCalculator {
                 entry = negative ? entry.substring(1) : "-" + entry;
                 select(selectionStart + (negative ? -1 : 1), selectionEnd + (negative ? -1 : 1));
                 resolveRaw();
-            } else if (key.equals("CE") || key.equals("CLEAR") || key.equals("CANCEL_ENTRY")) {
+            } else if (clearsEntry) {
                 if (key.equals("CLEAR")) stack.clear();
                 entry = "";
                 if (!key.equals("CE")) editing = false;
@@ -386,63 +379,58 @@ public final class RpnCalculator {
             } else {
                 commit();
                 committed = new State(this);
-                switch (key) {
-                    case "Factor":
-                        need(1);
-                        List<BigInteger> factors =
-                                ExactFunctions.factors(
-                                        ExactFunctions.integer(top(), "Factorisation"));
-                        stack.remove(stack.size() - 1);
-                        for (BigInteger factor : factors) {
-                            UnifiedReal value = new UnifiedReal(factor);
-                            stack.add(value);
-                            savedValues.put(value, SavedValue.of(value, "r", null, null));
-                        }
-                        break;
-                    case "DUP":
-                        need(1);
-                        stack.add(top());
-                        break;
-                    case "SWAP":
-                        need(2);
-                        Collections.swap(stack, stack.size() - 1, stack.size() - 2);
-                        break;
-                    case "ROLL_UP":
-                        if (stack.size() > 1) Collections.rotate(stack, -1);
-                        break;
-                    case "ROLL_DOWN":
-                        if (stack.size() > 1) Collections.rotate(stack, 1);
-                        break;
-                    default:
-                        applyOperation(key);
-                }
+                applyStackOrOperation(key);
                 if (!stack.isEmpty())
                     ValueFormatter.format(top(), true, ValueFormatter.Notation.SCIENTIFIC);
             }
-            if (before.editing
-                    && !editing
-                    && !key.equals("CE")
-                    && !key.equals("CLEAR")
-                    && !key.equals("CANCEL_ENTRY")) {
-                // Keep the complete entry for undoing the commit, but discard its intermediate
-                // edits.
-                while (!undo.isEmpty()
-                        && undo.peek().editing
-                        && sameStack(undo.peek().stack, before.stack)) undo.pop();
-            }
+            if (before.editing && !editing && !clearsEntry) collapseEntryEdits(before);
             remember(before);
         } catch (RuntimeException ex) {
             if (ex instanceof com.hp.creals.CR.AbortedException) committed = null;
             restore(committed == null ? before : committed);
             if (committed != null) {
-                if (before.editing) {
-                    while (!undo.isEmpty()
-                            && undo.peek().editing
-                            && sameStack(undo.peek().stack, before.stack)) undo.pop();
-                }
+                if (before.editing) collapseEntryEdits(before);
                 remember(before);
             }
+            pruneSavedValues(); // Discard a result whose deferred validation failed.
             throw ex;
+        }
+    }
+
+    private void collapseEntryEdits(State before) {
+        while (!undo.isEmpty() && undo.peek().editing && sameStack(undo.peek().stack, before.stack))
+            undo.pop();
+    }
+
+    private void applyStackOrOperation(String key) {
+        switch (key) {
+            case "Factor":
+                need(1);
+                List<BigInteger> factors =
+                        ExactFunctions.factors(ExactFunctions.integer(top(), "Factorisation"));
+                stack.remove(stack.size() - 1);
+                for (BigInteger factor : factors) {
+                    UnifiedReal value = new UnifiedReal(factor);
+                    stack.add(value);
+                    savedValues.put(value, SavedValue.of(value, "r", null, null));
+                }
+                break;
+            case "DUP":
+                need(1);
+                stack.add(top());
+                break;
+            case "SWAP":
+                need(2);
+                Collections.swap(stack, stack.size() - 1, stack.size() - 2);
+                break;
+            case "ROLL_UP":
+                if (stack.size() > 1) Collections.rotate(stack, -1);
+                break;
+            case "ROLL_DOWN":
+                if (stack.size() > 1) Collections.rotate(stack, 1);
+                break;
+            default:
+                applyOperation(key);
         }
     }
 
@@ -454,12 +442,7 @@ public final class RpnCalculator {
 
     /** Remove arbitrary rows as one undoable action, leaving unfinished entry untouched. */
     public void dropRows(int... indices) {
-        TreeSet<Integer> rows = new TreeSet<>();
-        for (int index : indices) {
-            if (index < 0 || index >= stack.size())
-                throw CalculationError.invalid(CalculationError.Code.ROW_MISSING);
-            rows.add(index);
-        }
+        TreeSet<Integer> rows = rowSet(indices);
         if (rows.isEmpty()) return;
         State before = new State(this);
         for (int index : rows.descendingSet()) stack.remove(index);
@@ -480,12 +463,7 @@ public final class RpnCalculator {
 
     /** Copy rows onto the stack in display order, preserving their exact values and entry. */
     public void pickRows(int... indices) {
-        TreeSet<Integer> rows = new TreeSet<>();
-        for (int index : indices) {
-            if (index < 0 || index >= stack.size())
-                throw CalculationError.invalid(CalculationError.Code.ROW_MISSING);
-            rows.add(index);
-        }
+        TreeSet<Integer> rows = rowSet(indices);
         if (rows.isEmpty()) return;
         State before = new State(this);
         List<UnifiedReal> picked = new ArrayList<>();
@@ -505,12 +483,7 @@ public final class RpnCalculator {
     }
 
     private void aggregateRows(Operation operation, int... indices) {
-        TreeSet<Integer> rows = new TreeSet<>();
-        for (int index : indices) {
-            if (index < 0 || index >= stack.size())
-                throw CalculationError.invalid(CalculationError.Code.ROW_MISSING);
-            rows.add(index);
-        }
+        TreeSet<Integer> rows = rowSet(indices);
         if (rows.isEmpty()) return;
         UnifiedReal sum = null;
         SavedValue expression = null;
@@ -528,6 +501,36 @@ public final class RpnCalculator {
         stack.add(sum);
         savedValues.put(sum, expression);
         remember(before);
+    }
+
+    private TreeSet<Integer> rowSet(int... indices) {
+        TreeSet<Integer> rows = new TreeSet<>();
+        for (int index : indices) {
+            if (index < 0 || index >= stack.size())
+                throw CalculationError.invalid(CalculationError.Code.ROW_MISSING);
+            rows.add(index);
+        }
+        return rows;
+    }
+
+    public List<UnifiedReal> selectedValues(int... indices) {
+        List<UnifiedReal> result = new ArrayList<>();
+        for (int index : rowSet(indices)) result.add(stack.get(index));
+        return result;
+    }
+
+    public boolean sameStack(List<UnifiedReal> values) {
+        return sameStack(stack, values);
+    }
+
+    public static boolean isEntryKey(String key) {
+        return key.length() == 1
+                && (key.charAt(0) == '.' || key.charAt(0) >= '0' && key.charAt(0) <= '9');
+    }
+
+    private String entryWithoutSelection() {
+        return entry.substring(0, Math.min(selectionStart, selectionEnd))
+                + entry.substring(Math.max(selectionStart, selectionEnd));
     }
 
     public boolean isEmpty() {
@@ -772,10 +775,5 @@ public final class RpnCalculator {
                 d.scale() < 0
                         ? new BoundedRational(n.multiply(BigInteger.TEN.pow(-d.scale())))
                         : new BoundedRational(n, BigInteger.TEN.pow(d.scale())));
-    }
-
-    public static String format(UnifiedReal value) {
-        if (value.exactlyDisplayable()) return value.toNiceString();
-        return "≈ " + value.toStringTruncated(24);
     }
 }

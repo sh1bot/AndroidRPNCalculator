@@ -3,7 +3,8 @@ package dev.exactrpn;
 
 import com.android.calculator2.UnifiedReal;
 
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 /** One definition of arithmetic, shared by live execution and saved expression replay. */
 public enum Operation {
@@ -30,56 +31,57 @@ public enum Operation {
     TEN_POWER("10ˣ", 1),
     LN("ln", 1),
     EXP("eˣ", 1),
-    SIN("sin", 1),
-    COS("cos", 1),
-    TAN("tan", 1),
-    ASIN("asin", 1),
-    ACOS("acos", 1),
-    ATAN("atan", 1);
+    SIN("sin", 1, true),
+    COS("cos", 1, true),
+    TAN("tan", 1, true),
+    ASIN("asin", 1, true),
+    ACOS("acos", 1, true),
+    ATAN("atan", 1, true);
 
     public final String key;
     public final int arity;
+    private final boolean angle;
+    private static final UnifiedReal DEGREES = new UnifiedReal(180),
+            GRADIANS = new UnifiedReal(200);
+    private static final Map<String, Operation> OPERATIONS = new HashMap<>();
+
+    static {
+        for (Operation operation : values()) OPERATIONS.put(operation.key, operation);
+        OPERATIONS.put("exp", EXP); // Historical saved expressions.
+    }
 
     Operation(String key, int arity) {
+        this(key, arity, false);
+    }
+
+    Operation(String key, int arity, boolean angle) {
         this.key = key;
         this.arity = arity;
+        this.angle = angle;
     }
 
     public static Operation find(String key) {
-        if (key.equals("exp")) return EXP; // Historical saved expressions.
-        return Arrays.stream(values()).filter(op -> op.key.equals(key)).findFirst().orElse(null);
+        return OPERATIONS.get(key);
     }
 
     public String savedName(RpnCalculator.AngleUnit unit) {
-        return isAngle() ? key + ":" + unit.name() : key;
+        return angle ? key + ":" + unit.name() : key;
     }
 
-    private boolean isAngle() {
-        switch (this) {
-            case SIN:
-            case COS:
-            case TAN:
-            case ASIN:
-            case ACOS:
-            case ATAN:
-                return true;
-            default:
-                return false;
-        }
+    private static UnifiedReal angleDivisor(RpnCalculator.AngleUnit unit) {
+        return unit == RpnCalculator.AngleUnit.DEG ? DEGREES : GRADIANS;
     }
 
     private static UnifiedReal radians(UnifiedReal value, RpnCalculator.AngleUnit unit) {
         return unit == RpnCalculator.AngleUnit.RAD
                 ? value
-                : value.multiply(UnifiedReal.PI)
-                        .divide(new UnifiedReal(unit == RpnCalculator.AngleUnit.DEG ? 180 : 200));
+                : value.multiply(UnifiedReal.PI).divide(angleDivisor(unit));
     }
 
     private static UnifiedReal fromRadians(UnifiedReal value, RpnCalculator.AngleUnit unit) {
         return unit == RpnCalculator.AngleUnit.RAD
                 ? value
-                : value.divide(UnifiedReal.PI)
-                        .multiply(new UnifiedReal(unit == RpnCalculator.AngleUnit.DEG ? 180 : 200));
+                : value.divide(UnifiedReal.PI).multiply(angleDivisor(unit));
     }
 
     public UnifiedReal evaluate(UnifiedReal a, UnifiedReal b, RpnCalculator.AngleUnit unit) {

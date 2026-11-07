@@ -120,7 +120,16 @@ public final class FunctionsTest {
                             .get(15, TimeUnit.SECONDS);
             assertEquals(2, mixed.getInt("fractionMode"));
             assertEquals("2 1/3", mixed.getStringArrayList("rows").get(0));
-            assertEquals("2 1/3", mixed.getStringArrayList("clipboard").get(0));
+            Bundle copied =
+                    worker.submit(
+                                    () ->
+                                            remote.evaluate(
+                                                    request(
+                                                            "COPY_ROWS:0",
+                                                            mixed.getString("checkpoint"),
+                                                            2)))
+                            .get(15, TimeUnit.SECONDS);
+            assertEquals("2 1/3", copied.getString("copyText"));
             android.text.Spanned styled =
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.DOT).stack("2 1/3", 0);

@@ -13,7 +13,6 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 
@@ -21,7 +20,11 @@ import java.util.concurrent.FutureTask;
 final class CalculatorSession {
     volatile String checkpoint;
     private RemoteCalculator remote;
-    private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final java.util.concurrent.ScheduledExecutorService worker =
+            Executors.newSingleThreadScheduledExecutor();
+    private java.util.concurrent.ScheduledFuture<?> pendingSave;
+    private volatile boolean closing;
+    private String persistedCheckpoint;
     volatile Display display;
     volatile String error = "";
     volatile long errorRevision;
@@ -31,10 +34,12 @@ final class CalculatorSession {
     private static final class PendingKey {
         final Command command;
         final long generation;
+        final java.util.function.Consumer<String> copy;
 
-        PendingKey(Command command, long generation) {
+        PendingKey(Command command, long generation, java.util.function.Consumer<String> copy) {
             this.command = command;
             this.generation = generation;
+            this.copy = copy;
         }
     }
 
@@ -109,13 +114,26 @@ final class CalculatorSession {
     }
 
     void enqueue(Command command) {
+        enqueue(command, null);
+    }
+
+    void copyRows(int[] rows, java.util.function.Consumer<String> copy) {
+        String indices =
+                java.util.Arrays.stream(rows)
+                        .mapToObj(Integer::toString)
+                        .collect(java.util.stream.Collectors.joining(","));
+        enqueue(Command.parse("COPY_ROWS:" + indices), copy);
+    }
+
+    private void enqueue(Command command, java.util.function.Consumer<String> copy) {
+        if (closing) return;
         if (!policy.temporary && DeviceAccess.locked(context)) {
             if (command.is(Command.RESTORE)) restorePending = true;
             return;
         }
         boolean start;
         synchronized (this) {
-            pending.addLast(new PendingKey(command, inputGeneration));
+            pending.addLast(new PendingKey(command, inputGeneration, copy));
             start = !busy;
             if (start) {
                 cancelRequested = false;
@@ -130,6 +148,7 @@ final class CalculatorSession {
         while (true) {
             Command key;
             long generation;
+            java.util.function.Consumer<String> copy;
             synchronized (this) {
                 if (cancelRequested) pending.clear();
                 if (pending.isEmpty()) {
@@ -138,15 +157,17 @@ final class CalculatorSession {
                     Thread.interrupted();
                     key = null;
                     generation = inputGeneration;
+                    copy = null;
                 } else {
                     PendingKey input = pending.removeFirst();
                     key = input.command;
                     generation = input.generation;
+                    copy = input.copy;
                     calculatingThread = Thread.currentThread();
                 }
             }
             if (key == null) {
-                persistSession(true, generation);
+                schedulePersistence(background, generation);
                 return;
             }
             try {
@@ -175,10 +196,17 @@ final class CalculatorSession {
                 request.putString("notation", notation.name());
                 request.putInt("numberMode", numberMode.id);
                 request.putInt("fractionMode", fractionMode.id);
+                if (key.kind == Command.Kind.KEY
+                        && (Operation.find(key.wire) != null || key.is("Factor")))
+                    schedulePersistence(true, generation);
                 Bundle result = remote.evaluate(request);
+                if (key.kind == Command.Kind.COPY_ROWS) {
+                    if (copy != null) handler.post(() -> copy.accept(result.getString("copyText")));
+                    continue;
+                }
                 Display nextDisplay = new Display(result);
                 publishResult(result, nextDisplay, key, generation);
-                persistSession(false, generation);
+                if (background || key.is(Command.CHECKPOINT)) schedulePersistence(true, generation);
             } catch (RuntimeException ex) {
                 if (ex instanceof DeviceAccess.Locked
                         || (!policy.temporary
@@ -273,6 +301,18 @@ final class CalculatorSession {
         }
     }
 
+    private void schedulePersistence(boolean immediate, long generation) {
+        if (closing) return;
+        if (pendingSave != null) pendingSave.cancel(false);
+        if (immediate || policy.temporary) persistSession(true, generation);
+        else
+            pendingSave =
+                    worker.schedule(
+                            () -> persistSession(true, generation),
+                            750,
+                            java.util.concurrent.TimeUnit.MILLISECONDS);
+    }
+
     private void persistSession(boolean idle, long generation) {
         // Temporary checkpoints are worker transport only, never a saved calculation.
         if (policy.temporary) {
@@ -289,7 +329,11 @@ final class CalculatorSession {
             if (idle && background && display.rows.isEmpty() && display.entry.isEmpty()) {
                 checkpoint = null;
                 store.clear();
-            } else if (checkpoint != null) store.save(checkpoint);
+                persistedCheckpoint = null;
+            } else if (checkpoint != null && !checkpoint.equals(persistedCheckpoint)) {
+                store.save(checkpoint);
+                persistedCheckpoint = checkpoint;
+            }
             store.cleanWorkFiles(checkpoint);
         } catch (java.io.IOException | RuntimeException ex) {
             android.util.Log.e("ExactRPN", "Could not save calculator", ex);
@@ -335,10 +379,12 @@ final class CalculatorSession {
     }
 
     void close() {
+        closing = true;
         cancel();
         remote.close();
         worker.submit(
                 () -> {
+                    if (pendingSave != null) pendingSave.cancel(false);
                     if (policy.temporary) {
                         store.cleanWorkFiles(null);
                         if (temporaryDirectory != null) temporaryDirectory.delete();

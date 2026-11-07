@@ -27,9 +27,20 @@ import java.util.concurrent.Executors;
 /** Arithmetic runs in :calculation, so Cancel can terminate even non-interruptible work. */
 public class CalculationService extends Service {
     static final int HELLO = 1, EVALUATE = 2;
+    private static final java.util.regex.Pattern WORKSPACE =
+            java.util.regex.Pattern.compile("[a-f0-9-]{36}");
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private RpnCalculator cached;
     private String cachedPath, cachedStackId;
+    private final ValuePresentationCache texts = new ValuePresentationCache();
+    private final java.util.Map<String, LocaleNumbers> profiles = new java.util.HashMap<>();
+
+    private LocaleNumbers profile(Locale locale, NumberMode mode) {
+        String key = locale.toLanguageTag() + ":" + mode.name();
+        if (profiles.size() > 12) profiles.clear();
+        return profiles.computeIfAbsent(key, ignored -> new LocaleNumbers(locale, mode));
+    }
+
     private final Messenger messenger =
             new Messenger(
                     new Handler(
@@ -64,13 +75,6 @@ public class CalculationService extends Service {
         super.onDestroy();
     }
 
-    private boolean sameStack(RpnCalculator a, RpnCalculator b) {
-        List<UnifiedReal> left = a.values(), right = b.values();
-        if (left.size() != right.size()) return false;
-        for (int i = 0; i < left.size(); i++) if (left.get(i) != right.get(i)) return false;
-        return true;
-    }
-
     private void evaluate(Bundle request, Messenger client) {
         Bundle response = new Bundle();
         File snapshot = null, presentation = null;
@@ -78,25 +82,40 @@ public class CalculationService extends Service {
             checkAccess();
             File directory = workDirectory(request);
             loadCheckpoint(request, response, directory);
-            Evaluation evaluation = new Evaluation(request);
-            checkAccess();
-            snapshot = File.createTempFile("calculation-", ".state", directory);
-            byte[] state = evaluation.candidate.save();
-            checkAccess();
-            Files.write(snapshot.toPath(), state);
-            Bundle display = evaluation.presentation(snapshot);
-            // Only paths cross Binder; large stacks must not hit Binder's transaction-size limit.
-            checkAccess();
-            presentation = File.createTempFile("calculation-", ".display", directory);
-            DisplayResult.write(presentation, display);
-            response.putString("presentation", presentation.getAbsolutePath());
-            cached = evaluation.candidate;
-            cachedPath = snapshot.getAbsolutePath();
-            cachedStackId = evaluation.stackId;
+            if (Command.parse(request.getString("key")).kind == Command.Kind.COPY_ROWS) {
+                String text = copyRows(request);
+                checkAccess();
+                presentation = File.createTempFile("calculation-", ".copy", directory);
+                Files.write(
+                        presentation.toPath(),
+                        text.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                response.putString("copyFile", presentation.getAbsolutePath());
+            } else {
+                Evaluation evaluation = new Evaluation(request);
+                checkAccess();
+                snapshot = File.createTempFile("calculation-", ".state", directory);
+                byte[] state = evaluation.candidate.save();
+                checkAccess();
+                Files.write(snapshot.toPath(), state);
+                Bundle display = evaluation.presentation(snapshot);
+                // Only paths cross Binder; large stacks must not hit Binder's transaction-size
+                // limit.
+                checkAccess();
+                presentation = File.createTempFile("calculation-", ".display", directory);
+                DisplayResult.write(presentation, display);
+                response.putString("presentation", presentation.getAbsolutePath());
+                cached = evaluation.candidate;
+                cachedPath = snapshot.getAbsolutePath();
+                cachedStackId = evaluation.stackId;
+            }
         } catch (OutOfMemoryError ex) {
             android.os.Process.killProcess(android.os.Process.myPid());
             return;
         } catch (IOException | RuntimeException | StackOverflowError ex) {
+            // In-place evaluation is safe only after its snapshot and display are accepted.
+            // Unexpected failures reload the last accepted checkpoint on the next request.
+            cached = null;
+            texts.clear();
             if (snapshot != null) snapshot.delete();
             if (presentation != null) presentation.delete();
             if (ex instanceof DeviceAccess.Locked) response.putBoolean("deviceLocked", true);
@@ -114,6 +133,17 @@ public class CalculationService extends Service {
             client.send(result);
         } catch (RemoteException ignored) {
         }
+    }
+
+    private String copyRows(Bundle request) {
+        Command command = Command.parse(request.getString("key"));
+        ValueFormatter.Notation notation =
+                ValueFormatter.Notation.valueOf(request.getString("notation"));
+        FractionMode fraction = FractionMode.fromId(request.getInt("fractionMode"));
+        java.util.StringJoiner result = new java.util.StringJoiner("\n");
+        for (UnifiedReal value : cached.selectedValues(command.rows()))
+            result.add(texts.clipboard(value, notation, fraction));
+        return result.toString();
     }
 
     private void loadCheckpoint(Bundle request, Bundle response, File directory)
@@ -159,7 +189,7 @@ public class CalculationService extends Service {
     private File workDirectory(Bundle request) throws IOException {
         if (!temporaryService()) return getNoBackupFilesDir();
         String id = request.getString("workspace");
-        if (id == null || !id.matches("[a-f0-9-]{36}"))
+        if (id == null || !WORKSPACE.matcher(id).matches())
             throw new IOException("Invalid temporary workspace");
         File directory = new File(getCacheDir(), "locked-calculations/" + id);
         if (!directory.isDirectory() && !directory.mkdirs())
@@ -177,13 +207,14 @@ public class CalculationService extends Service {
 
         Evaluation(Bundle request) {
             Command key = Command.parse(request.getString("key"));
-            candidate = cached.copy();
+            List<UnifiedReal> before = cached.values();
+            candidate = cached;
             Locale locale = Locale.forLanguageTag(request.getString("locale"));
             numberMode = NumberMode.fromId(request.getInt("numberMode"));
             fractionMode = FractionMode.fromId(request.getInt("fractionMode"));
             notation = ValueFormatter.Notation.valueOf(request.getString("notation"));
-            LocaleNumbers local = new LocaleNumbers(locale);
-            LocaleNumbers format = new LocaleNumbers(locale, numberMode);
+            LocaleNumbers local = profile(locale, NumberMode.LOCALE);
+            LocaleNumbers format = profile(locale, numberMode);
             candidate.setInputProfile(format.profile());
             if (key.is(Command.RESTORE) || key.is(Command.CHECKPOINT)) {
                 /* No arithmetic operation. */
@@ -203,22 +234,24 @@ public class CalculationService extends Service {
                     operationError = ErrorMessages.describe(CalculationService.this, ex);
                 }
             }
-            stackId = sameStack(cached, candidate) ? cachedStackId : UUID.randomUUID().toString();
+            stackId = candidate.sameStack(before) ? cachedStackId : UUID.randomUUID().toString();
         }
 
         Bundle presentation(File snapshot) {
-            ArrayList<String> rows =
-                    new ArrayList<>(candidate.formattedValues(notation, fractionMode));
-            ArrayList<String> copies = new ArrayList<>(), compact = new ArrayList<>();
-            for (UnifiedReal value : candidate.values()) {
-                copies.add(ValueFormatter.clipboard(value, notation, fractionMode));
-                compact.add(ValueFormatter.format(value, false, notation, fractionMode));
+            List<UnifiedReal> values = candidate.values();
+            texts.retain(values);
+            ArrayList<String> rows = new ArrayList<>(values.size());
+            ArrayList<String> compact = new ArrayList<>(values.size());
+            for (int i = 0; i < values.size(); i++) {
+                UnifiedReal value = values.get(i);
+                boolean newest = !candidate.isEditing() && i == values.size() - 1;
+                rows.add(texts.row(value, newest, notation, fractionMode));
+                compact.add(texts.row(value, false, notation, fractionMode));
             }
             Bundle display = new Bundle();
             display.putString("operationError", operationError);
             display.putString("stackId", stackId);
             display.putStringArrayList("rows", rows);
-            display.putStringArrayList("clipboard", copies);
             display.putStringArrayList("compactRows", compact);
             display.putString("entry", candidate.entry());
             display.putString("problem", candidate.entryProblem());

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+rm -rf engine/build/manual
 mkdir -p engine/build/manual engine/build/test-tools
 junit=engine/build/test-tools/junit-platform-console-standalone-1.11.4.jar
 if [[ ! -f "$junit" ]]; then
