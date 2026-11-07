@@ -7,7 +7,7 @@ import android.text.style.ReplacementSpan;
 
 /** Render the single editable e/E character as a small multiplication-by-ten marker. */
 final class ExponentMarkerSpan extends ReplacementSpan {
-    static final float MARKER_SCALE = .75f, INDEX_SCALE = .6f;
+    static final float MARKER_SCALE = .75f, INDEX_SCALE = .72f;
     private final String marker;
 
     ExponentMarkerSpan(String localizedTen) {
