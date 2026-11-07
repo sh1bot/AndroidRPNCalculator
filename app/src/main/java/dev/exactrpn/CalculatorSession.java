@@ -337,12 +337,13 @@ final class CalculatorSession {
     void close() {
         cancel();
         remote.close();
-        if (policy.temporary)
-            worker.submit(
-                    () -> {
+        worker.submit(
+                () -> {
+                    if (policy.temporary) {
                         store.cleanWorkFiles(null);
                         if (temporaryDirectory != null) temporaryDirectory.delete();
-                    });
+                    } else persistSession(true);
+                });
         worker.shutdown();
     }
 }
