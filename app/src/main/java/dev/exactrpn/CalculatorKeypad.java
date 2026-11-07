@@ -610,8 +610,11 @@ public final class CalculatorKeypad extends ViewGroup {
         String key = effectiveKey((String) button.getTag());
         int preferred = 16;
         if (key.matches("[0-9.]")) preferred = 26;
-        else if (key.matches("[+−×÷±]")) preferred = 26;
-        else if (key.equals("BACK") && button.getText().toString().equals("⌫")) preferred = 24;
+        else if (key.matches("[+−×÷±]")
+                || key.equals("CLEAR")
+                || key.equals("CE")
+                || key.equals("BACK")
+                || (key.equals("SWAP") && !selecting)) preferred = 26;
         else if (key.equals("π")
                 || key.equals("τ")
                 || key.equals("e")
@@ -653,6 +656,18 @@ public final class CalculatorKeypad extends ViewGroup {
                         Math.min(
                                 preferredPixels,
                                 Math.round(Math.min(width, height) * sizeFraction)));
+        // Drop is a vector rather than text; give it the same sp-aware size budget.
+        if (key.equals("BACK") && button.getForeground() != null) {
+            android.graphics.drawable.Drawable icon =
+                    getContext().getDrawable(R.drawable.ic_delete);
+            icon.setTint(colors.text);
+            int size = Math.min(maximum, Math.min(width, height));
+            int left = (width - size) / 2, top = (height - size) / 2;
+            button.setForeground(
+                    new android.graphics.drawable.InsetDrawable(
+                            icon, left, top, width - size - left, height - size - top));
+            button.setForegroundGravity(Gravity.FILL);
+        }
         if (button.getAutoSizeMaxTextSize() != maximum
                 || button.getAutoSizeMinTextSize() != minimum)
             button.setAutoSizeTextTypeUniformWithConfiguration(
