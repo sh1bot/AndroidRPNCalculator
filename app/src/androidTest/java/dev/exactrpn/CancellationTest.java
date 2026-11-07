@@ -38,6 +38,29 @@ public final class CancellationTest {
         return request;
     }
 
+    @Test(timeout = 90000)
+    public void idleWorkersCanBeOpenedAndClosedRepeatedly() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            for (int i = 0; i < 4; i++) {
+                RemoteCalculator remote = new RemoteCalculator(context);
+                try {
+                    Bundle result =
+                            worker.submit(() -> remote.evaluate(request("RESTORE", null)))
+                                    .get(20, TimeUnit.SECONDS);
+                    assertTrue(result.getStringArrayList("rows").isEmpty());
+                    new File(result.getString("checkpoint")).delete();
+                } finally {
+                    remote.close();
+                }
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+            }
+        } finally {
+            worker.shutdownNow();
+        }
+    }
+
     @Test
     public void cancelStopsWorkerAndPreservesCheckpoint() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();

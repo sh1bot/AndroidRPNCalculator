@@ -56,13 +56,8 @@ public class CalculationService extends Service {
         return messenger.getBinder();
     }
 
-    @Override
-    public boolean onUnbind(Intent intent) {
-        // Do not leave an abandoned arithmetic thread consuming CPU after its client disappears.
-        android.os.Process.killProcess(android.os.Process.myPid());
-        return false;
-    }
-
+    // Idle clients unbind normally. Killing an idle service on every close can trigger
+    // Android's crash/restart backoff; Cancel already kills a worker with unfinished work.
     @Override
     public void onDestroy() {
         worker.shutdownNow();
