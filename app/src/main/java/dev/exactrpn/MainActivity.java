@@ -683,6 +683,16 @@ public class MainActivity extends Activity {
         Button menu = new Button(this);
         menu.setTag("overflow-menu");
         styleModeButton(menu);
+        menu.setBackgroundTintList(null);
+        android.graphics.drawable.GradientDrawable mask =
+                new android.graphics.drawable.GradientDrawable();
+        mask.setShape(android.graphics.drawable.GradientDrawable.OVAL);
+        mask.setColor(Color.WHITE);
+        menu.setBackground(
+                new android.graphics.drawable.RippleDrawable(
+                        android.content.res.ColorStateList.valueOf(colors.ripple), null, mask));
+        menu.setStateListAnimator(null);
+        menu.setElevation(0);
         menu.setText("");
         menu.setContentDescription(getString(R.string.more_options));
         android.graphics.drawable.Drawable icon = getDrawable(R.drawable.ic_more);
