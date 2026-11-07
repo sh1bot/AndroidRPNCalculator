@@ -188,7 +188,12 @@ public final class FunctionsTest {
                             assertEquals("ROLL_UP", command.get());
                             swap.performClick();
                             assertEquals("SWAP", command.get());
+                            Button decimal = (Button) keypad.findViewWithTag(".");
+                            assertTrue(!decimal.isLongClickable());
                             keypad.setEditing(true);
+                            assertTrue(decimal.isLongClickable());
+                            decimal.performLongClick();
+                            assertEquals("HOLD_DECIMAL", command.get());
                             find(keypad, "⌫").performLongClick();
                             assertEquals("HOLD_DROP", command.get());
                             keypad.setInverse(false);

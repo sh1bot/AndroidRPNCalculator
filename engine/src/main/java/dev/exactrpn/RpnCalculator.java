@@ -289,6 +289,7 @@ public final class RpnCalculator {
     }
 
     public void key(String key) {
+        if (key.equals("HOLD_DECIMAL") && !editing) return;
         if (key.equals("SMART_CLEAR")) key = editing ? "CE" : "CLEAR";
         // Resolve against the calculation state, even when UI updates trail queued input.
         if (key.equals("HOLD_DROP")) key = editing ? "BACK" : "ROLL_DOWN";
@@ -341,6 +342,13 @@ public final class RpnCalculator {
                         replaceSelection(entry.isEmpty() || entry.equals("-") ? "0." : ".");
                     }
                 } else replaceSelection(key);
+                resolveRaw();
+            } else if (key.equals("HOLD_DECIMAL")) {
+                String remaining =
+                        entry.substring(0, Math.min(selectionStart, selectionEnd))
+                                + entry.substring(Math.max(selectionStart, selectionEnd));
+                if (remaining.contains("e") || remaining.contains("E")) return;
+                replaceSelection("e");
                 resolveRaw();
             } else if (key.equals("BACK") || key.equals("DROP") || key.equals("DELETE")) {
                 if (editing) {

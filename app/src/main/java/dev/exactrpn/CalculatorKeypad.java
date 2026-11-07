@@ -219,6 +219,16 @@ public final class CalculatorKeypad extends ViewGroup {
         this.editing = editing;
         for (Map.Entry<String, Button> item : numberButtons.entrySet()) {
             String digit = item.getKey();
+            if (digit.equals(".")) {
+                item.getValue().setLongClickable(editing);
+                item.getValue()
+                        .setContentDescription(
+                                getContext()
+                                        .getString(
+                                                editing
+                                                        ? R.string.decimal_exponent_description
+                                                        : R.string.decimal_separator));
+            }
             if (digit.matches("[0-9]"))
                 item.getValue()
                         .setContentDescription(
@@ -455,6 +465,12 @@ public final class CalculatorKeypad extends ViewGroup {
                         tau = !tau;
                         updateConstant();
                         saveTau.accept(tau);
+                        return true;
+                    });
+        if (key.equals("."))
+            b.setOnLongClickListener(
+                    v -> {
+                        command.accept("HOLD_DECIMAL");
                         return true;
                     });
         if (key.matches("[0-9]"))
