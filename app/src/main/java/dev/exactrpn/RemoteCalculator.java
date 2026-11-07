@@ -219,14 +219,20 @@ final class RemoteCalculator {
         pid = 0;
         remote = null;
         connection = null;
-        if (terminate && process != 0) android.os.Process.killProcess(process);
-        if (binding != null)
-            main.post(
-                    () -> {
+        if (binding == null && process == 0) return;
+        // Remove the binding before killing the process. Otherwise Android may schedule a
+        // crashed bound-service restart with backoff, delaying the next calculation.
+        Runnable release =
+                () -> {
+                    if (binding != null) {
                         try {
                             context.unbindService(binding);
                         } catch (IllegalArgumentException ignored) {
                         }
-                    });
+                    }
+                    if (terminate && process != 0) android.os.Process.killProcess(process);
+                };
+        if (Looper.myLooper() == main.getLooper()) release.run();
+        else main.post(release);
     }
 }
