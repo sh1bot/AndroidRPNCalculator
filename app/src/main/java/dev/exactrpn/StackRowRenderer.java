@@ -108,6 +108,7 @@ final class StackRowRenderer {
         int[] previousSize = {-1, -1};
         Runnable fit =
                 () -> {
+                    if (!value.isAttachedToWindow()) return;
                     int width = value.getWidth() - value.getPaddingLeft() - value.getPaddingRight();
                     int height =
                             viewport.getHeight()
@@ -135,18 +136,6 @@ final class StackRowRenderer {
                                     <= height;
                     for (int line = 0; fits && line < layout.getLineCount(); line++)
                         if (layout.getLineWidth(line) > width) fits = false;
-                    android.util.Log.i(
-                            "ViewportFit",
-                            "width="
-                                    + width
-                                    + " height="
-                                    + height
-                                    + " fullHeight="
-                                    + layout.getHeight()
-                                    + " lines="
-                                    + layout.getLineCount()
-                                    + " fits="
-                                    + fits);
                     CharSequence chosen = fits ? full : compact;
                     int size = 32;
                     if (!fits) {
@@ -163,6 +152,7 @@ final class StackRowRenderer {
                     if (!value.getText().toString().equals(chosen.toString()))
                         value.setText(chosen);
                     updateStackLabel(label, depth, fits ? fullNumber : compactNumber);
+                    value.requestLayout();
                     row.setContentDescription(
                             rowDescription(
                                     false,
@@ -170,7 +160,8 @@ final class StackRowRenderer {
                                     (fits ? fullNumber : compactNumber).startsWith("≈ "),
                                     chosen));
                 };
-        View.OnLayoutChangeListener resized = (v, l, t, r, b, ol, ot, or, ob) -> fit.run();
+        // Updating text inside onLayout can leave the row at its previous measured height.
+        View.OnLayoutChangeListener resized = (v, l, t, r, b, ol, ot, or, ob) -> value.post(fit);
         value.addOnLayoutChangeListener(resized);
         value.addOnAttachStateChangeListener(
                 new View.OnAttachStateChangeListener() {
