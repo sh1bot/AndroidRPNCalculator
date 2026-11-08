@@ -133,6 +133,20 @@ final class StackRowRenderer {
                     boolean fits =
                             layout.getHeight() + value.getPaddingTop() + value.getPaddingBottom()
                                     <= height;
+                    for (int line = 0; fits && line < layout.getLineCount(); line++)
+                        if (layout.getLineWidth(line) > width) fits = false;
+                    android.util.Log.i(
+                            "ViewportFit",
+                            "width="
+                                    + width
+                                    + " height="
+                                    + height
+                                    + " fullHeight="
+                                    + layout.getHeight()
+                                    + " lines="
+                                    + layout.getLineCount()
+                                    + " fits="
+                                    + fits);
                     CharSequence chosen = fits ? full : compact;
                     int size = 32;
                     if (!fits) {
