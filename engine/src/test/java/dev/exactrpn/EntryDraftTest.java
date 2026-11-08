@@ -8,15 +8,16 @@ import org.junit.jupiter.api.Test;
 final class EntryDraftTest {
     @Test
     void completedEntryKeepsBoundaryButDropsCharacterHistory() throws Exception {
-        RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
+        RpnCalculator engine = new RpnCalculator();
+        EntryEditor draft = new EntryEditor();
         draft.key("1");
         draft.key("2");
         draft.key("3");
-        engine.useEntryEditor(RpnCalculator.load(draft.entryForCommit().save()));
+        engine.useEntryEditor(EntryEditor.load(draft.entryForCommit().save()));
         engine.key("ENTER");
         assertEquals("123", engine.values().get(0).bigIntegerValue().toString());
         engine.key("UNDO");
-        RpnCalculator resumed = engine.detachEntryEditor();
+        EntryEditor resumed = engine.detachEntryEditor();
         assertEquals("123", resumed.entry());
         resumed.key("UNDO");
         assertFalse(resumed.isEditing());
@@ -30,8 +31,9 @@ final class EntryDraftTest {
     }
 
     @Test
-    void lifecycleEnvelopeRestoresDraftUndoRedoAndArithmeticIndependently() throws Exception {
-        RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
+    void lifecycleSnapshotRestoresDraftUndoRedoAndArithmeticIndependently() throws Exception {
+        RpnCalculator engine = new RpnCalculator();
+        EntryEditor draft = new EntryEditor();
         CalculatorTestSupport.paste(engine, "42");
         engine.key("ENTER");
         draft.key("1");
@@ -42,7 +44,7 @@ final class EntryDraftTest {
         RpnCalculator restored =
                 RpnCalculator.load(RpnCalculator.saveWithEntry(calculation, draft));
         assertEquals("12", restored.entry());
-        RpnCalculator editor = restored.detachEntryEditor();
+        EntryEditor editor = restored.detachEntryEditor();
         assertEquals(1, restored.values().size());
         assertEquals(2, editor.undoCount());
         editor.key("REDO");
@@ -58,12 +60,13 @@ final class EntryDraftTest {
 
     @Test
     void lifecycleRestoresRedoAfterUndoLeavesEntryMode() throws Exception {
-        RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
+        RpnCalculator engine = new RpnCalculator();
+        EntryEditor draft = new EntryEditor();
         draft.key("7");
         draft.key("UNDO");
         RpnCalculator restored =
                 RpnCalculator.load(RpnCalculator.saveWithEntry(engine.save(), draft));
-        RpnCalculator editor = restored.detachEntryEditor();
+        EntryEditor editor = restored.detachEntryEditor();
         assertFalse(editor.isEditing());
         editor.key("REDO");
         assertEquals("7", editor.entry());
@@ -71,20 +74,19 @@ final class EntryDraftTest {
     }
 
     @Test
-    void envelopeRejectsTruncationAndNestedEnvelopes() throws Exception {
+    void entrySectionRejectsTruncationAndSupportsReplacement() throws Exception {
         RpnCalculator engine = new RpnCalculator();
-        byte[] saved = RpnCalculator.saveWithEntry(engine.save(), engine);
+        byte[] saved = RpnCalculator.saveWithEntry(engine.save(), new EntryEditor());
         assertThrows(
                 java.io.IOException.class,
                 () -> RpnCalculator.load(java.util.Arrays.copyOf(saved, saved.length - 1)));
-        assertThrows(
-                java.io.IOException.class,
-                () -> RpnCalculator.load(RpnCalculator.saveWithEntry(saved, engine)));
+        assertNotNull(RpnCalculator.load(RpnCalculator.saveWithEntry(saved, new EntryEditor())));
     }
 
     @Test
     void completedDraftKeepsAFullHistoryWithinItsStorageLimit() throws Exception {
-        RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
+        RpnCalculator engine = new RpnCalculator();
+        EntryEditor draft = new EntryEditor();
         for (int i = 0; i < 110; i++) {
             CalculatorTestSupport.paste(engine, Integer.toString(i));
             engine.key("ENTER");
@@ -102,7 +104,8 @@ final class EntryDraftTest {
 
     @Test
     void aRestoredNewDraftCannotRedoTheAbandonedArithmeticBranch() throws Exception {
-        RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
+        RpnCalculator engine = new RpnCalculator();
+        EntryEditor draft = new EntryEditor();
         CalculatorTestSupport.paste(engine, "42");
         engine.key("ENTER");
         engine.key("UNDO");

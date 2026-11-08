@@ -4,10 +4,8 @@ package dev.exactrpn;
 import static org.junit.Assert.*;
 
 import android.content.Context;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.FileObserver;
-import android.os.Parcel;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -16,8 +14,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -41,76 +37,62 @@ public final class MemoryTransportTest {
         return observer;
     }
 
-    private Bundle request(String key, Bundle accepted) {
-        Bundle request = new Bundle();
-        request.putString("key", key);
-        request.putString("angle", "RAD");
-        request.putString("notation", "SCIENTIFIC");
-        request.putString("locale", "en-US");
+    private CalculationRequest request(String key, Bundle accepted) {
+        CalculationRequest request = new CalculationRequest(key);
+        request.angle = RpnCalculator.AngleUnit.RAD;
+        request.notation = ValueFormatter.Notation.SCIENTIFIC;
+        request.locale = "en-US";
         if (accepted != null) {
-            request.putByteArray("input", accepted.getByteArray("state"));
-            request.putString("inputId", accepted.getString("checkpoint"));
+            request.input = accepted.getByteArray("state");
+            request.inputId = accepted.getString("checkpoint");
         }
         return request;
     }
 
     @Test
-    public void snapshotsAndClipboardLargerThanBinderSurviveWorkerReplacementWithoutFiles()
-            throws Exception {
-        org.junit.Assume.assumeTrue(Build.VERSION.SDK_INT >= 27);
+    public void oversizedCopiesAndRequestsPreserveTheAcceptedCalculation() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context, true);
         ExecutorService worker = Executors.newSingleThreadExecutor();
-        AtomicInteger accesses = new AtomicInteger();
-        FileObserver saved = watch(context.getNoBackupFilesDir(), accesses);
-        FileObserver cache = watch(context.getCacheDir(), accesses);
         try {
-            RpnCalculator calculator = new RpnCalculator();
-            List<String> literals = new ArrayList<>();
-            int depth = 1100;
-            char[] digits = new char[990];
-            java.util.Arrays.fill(digits, '9');
-            String prefix = new String(digits);
-            for (int i = 0; i < depth; i++) {
-                String literal = prefix + String.format(java.util.Locale.ROOT, "%04d", i);
-                literals.add(literal);
-                CalculatorTestSupport.paste(calculator, literal);
-                calculator.key("ENTER");
+            Bundle accepted = null;
+            for (String key :
+                    new String[] {"RESTORE", "PASTE_RAW:65536", "10ˣ", "ENTER", "ENTER", "ENTER"}) {
+                CalculationRequest next = request(key, accepted);
+                accepted = worker.submit(() -> remote.evaluate(next)).get(30, TimeUnit.SECONDS);
             }
-            // Canonical entry fixtures use computer mode; match this request's locale before
-            // saving.
-            calculator.setInputProfile(new LocaleNumbers(java.util.Locale.US).profile());
-            calculator.clearUndo();
-            byte[] state = calculator.save();
-            assertTrue(state.length > 1024 * 1024);
-            Bundle seed = new Bundle();
-            seed.putByteArray("state", state);
-            Bundle initial =
-                    worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
-                            .get(45, TimeUnit.SECONDS);
-            assertEquals(depth, initial.getStringArrayList("rows").size());
-            assertArrayEquals(state, initial.getByteArray("state"));
-            String rows =
-                    java.util.stream.IntStream.range(0, depth)
-                            .mapToObj(Integer::toString)
-                            .collect(java.util.stream.Collectors.joining(","));
-            Bundle copied =
-                    worker.submit(() -> remote.evaluate(request("COPY_ROWS:" + rows, initial)))
-                            .get(30, TimeUnit.SECONDS);
-            assertEquals(String.join("\n", literals), copied.getString("copyText"));
+            CalculationRequest copy = request("COPY_ROWS:0,1,2,3", accepted);
+            expectTooLarge(worker, remote, copy);
+            CalculationRequest oversized = request("RESTORE", accepted);
+            oversized.entryDraft = new byte[CalculationLimits.TRANSFER_BYTES];
+            expectTooLarge(worker, remote, oversized);
+            CalculationRequest single = request("COPY_ROWS:0", accepted);
+            single.input = null;
+            Bundle copied = worker.submit(() -> remote.evaluate(single)).get(30, TimeUnit.SECONDS);
+            assertEquals(65537, copied.getString("copyText").length());
+            assertTrue(copied.getString("copyText").startsWith("1"));
             remote.cancel();
+            CalculationRequest restore = request("RESTORE", accepted);
             Bundle restored =
-                    worker.submit(() -> remote.evaluate(request("RESTORE", initial)))
-                            .get(30, TimeUnit.SECONDS);
-            assertArrayEquals(state, restored.getByteArray("state"));
-            assertEquals(initial.getStringArrayList("rows"), restored.getStringArrayList("rows"));
-            assertEquals(
-                    "Arithmetic and copy must never touch calculation files", 0, accesses.get());
+                    worker.submit(() -> remote.evaluate(restore)).get(30, TimeUnit.SECONDS);
+            assertEquals(accepted.getStringArrayList("rows"), restored.getStringArrayList("rows"));
         } finally {
             remote.close();
             worker.shutdownNow();
-            saved.stopWatching();
-            cache.stopWatching();
+        }
+    }
+
+    private void expectTooLarge(
+            ExecutorService worker, RemoteCalculator remote, CalculationRequest request)
+            throws Exception {
+        try {
+            worker.submit(() -> remote.evaluate(request)).get(30, TimeUnit.SECONDS);
+            fail("Oversized transfer succeeded");
+        } catch (java.util.concurrent.ExecutionException expected) {
+            assertTrue(expected.getCause() instanceof CalculationError);
+            assertEquals(
+                    CalculationError.Code.TRANSFER_TOO_LARGE,
+                    ((CalculationError) expected.getCause()).code());
         }
     }
 
@@ -128,8 +110,8 @@ public final class MemoryTransportTest {
             Bundle accepted =
                     worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
                             .get(20, TimeUnit.SECONDS);
-            Bundle invalid = request("RESTORE", accepted);
-            invalid.putString("notation", "invalid");
+            CalculationRequest invalid = request("RESTORE", accepted);
+            invalid.entryDraft = new byte[] {0};
             try {
                 worker.submit(() -> remote.evaluate(invalid)).get(15, TimeUnit.SECONDS);
                 fail("Invalid request unexpectedly succeeded");
@@ -171,8 +153,8 @@ public final class MemoryTransportTest {
                 var field = RemoteCalculator.class.getDeclaredField("remoteSnapshotId");
                 field.setAccessible(true);
                 assertEquals(accepted.getString("checkpoint"), field.get(remote));
-                Bundle next = request("COPY_ROWS:0", accepted);
-                next.remove("input");
+                CalculationRequest next = request("COPY_ROWS:0", accepted);
+                next.input = null;
                 Bundle copied =
                         worker.submit(() -> remote.evaluate(next)).get(15, TimeUnit.SECONDS);
                 assertEquals("45", copied.getString("copyText"));
@@ -184,38 +166,53 @@ public final class MemoryTransportTest {
     }
 
     @Test
-    public void smallPayloadsUseBinderAndLargeOnesRequireSharedMemory() throws Exception {
-        for (int length :
-                new int[] {0, MemoryPayload.INLINE_LIMIT - 1, MemoryPayload.INLINE_LIMIT}) {
-            byte[] bytes = new byte[length];
-            new java.util.Random(42).nextBytes(bytes);
-            if (length >= MemoryPayload.INLINE_LIMIT && Build.VERSION.SDK_INT < 27) {
-                try {
-                    MemoryPayload.create(bytes);
-                    fail("Android 8.0 must reject transfers requiring shared memory");
-                } catch (java.io.IOException expected) {
-                    assertTrue(expected.getMessage().contains("Android 8.1"));
-                }
-                continue;
+    public void requestCodecRoundTripsModesAndRejectsMalformedData() throws Exception {
+        CalculationRequest request = new CalculationRequest("PASTE_RAW:1,234\n5.6");
+        request.locale = "de-DE";
+        request.angle = RpnCalculator.AngleUnit.GRAD;
+        request.notation = ValueFormatter.Notation.ENGINEERING;
+        request.numberMode = NumberMode.UNGROUPED;
+        request.fractionMode = FractionMode.IMPROPER;
+        request.entryBranch = true;
+        request.entryDraft = new byte[] {1, 2, 3};
+        byte[] encoded = request.encode("session", "checkpoint", true);
+        CalculationRequest decoded = CalculationRequest.decode(encoded);
+        assertEquals(request.key, decoded.key);
+        assertEquals(request.locale, decoded.locale);
+        assertEquals(request.angle, decoded.angle);
+        assertEquals(request.notation, decoded.notation);
+        assertEquals(request.numberMode, decoded.numberMode);
+        assertEquals(request.fractionMode, decoded.fractionMode);
+        assertArrayEquals(request.entryDraft, decoded.entryDraft);
+        assertTrue(decoded.entryBranch);
+        assertEquals("session", decoded.sessionId);
+        assertEquals("checkpoint", decoded.inputId);
+        for (byte[] invalid :
+                new byte[][] {
+                    java.util.Arrays.copyOf(encoded, encoded.length - 1),
+                    java.util.Arrays.copyOf(encoded, encoded.length + 1)
+                }) {
+            try {
+                CalculationRequest.decode(invalid);
+                fail("Malformed request accepted");
+            } catch (java.io.IOException expected) {
             }
-            try (MemoryPayload payload = MemoryPayload.create(bytes)) {
-                Bundle sent = new Bundle();
-                payload.put(sent, "data");
-                assertEquals(
-                        length < MemoryPayload.INLINE_LIMIT, sent.get("data") instanceof byte[]);
-                Parcel parcel = Parcel.obtain();
-                try {
-                    parcel.writeBundle(sent);
-                    parcel.setDataPosition(0);
-                    Bundle received = parcel.readBundle(MemoryPayload.class.getClassLoader());
-                    assertArrayEquals(bytes, MemoryPayload.take(received, "data"));
-                    assertFalse(received.containsKey("data"));
-                } finally {
-                    parcel.recycle();
-                }
-                MemoryPayload.discard(sent, "data");
-                assertTrue(sent.isEmpty());
-            }
+        }
+        encoded[encoded.length - 1] = (byte) 255;
+        try {
+            CalculationRequest.decode(encoded);
+            fail("Invalid mode accepted");
+        } catch (java.io.IOException expected) {
+        }
+        assertEquals(
+                CalculationLimits.TRANSFER_BYTES,
+                Transfer.require(new byte[CalculationLimits.TRANSFER_BYTES]).length);
+        try {
+            Transfer.require(new byte[CalculationLimits.TRANSFER_BYTES + 1]);
+            fail("Oversized payload accepted");
+        } catch (IllegalArgumentException expected) {
+            assertEquals(
+                    CalculationError.Code.TRANSFER_TOO_LARGE, ((CalculationError) expected).code());
         }
     }
 }

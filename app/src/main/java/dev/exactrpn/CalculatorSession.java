@@ -24,7 +24,7 @@ final class CalculatorSession {
     private volatile boolean closing;
     private String persistedCheckpoint;
     // This calculator is an entry editor only: its stack and expression map stay empty.
-    private RpnCalculator editor;
+    private EntryEditor editor;
     private Display arithmeticDisplay;
     private long editRevision;
     private boolean editorDirty, localBranch;
@@ -171,7 +171,7 @@ final class CalculatorSession {
     }
 
     private boolean editLocally(Command key, long generation) {
-        if (editor == null) editor = new RpnCalculator();
+        if (editor == null) editor = new EntryEditor();
         boolean editing = editor.isEditing();
         String wire = key.wire;
         boolean local =
@@ -306,13 +306,12 @@ final class CalculatorSession {
         }
     }
 
-    private Bundle request(Command key) {
-        Bundle request = new Bundle();
+    private CalculationRequest request(Command key) {
+        CalculationRequest request = new CalculationRequest(key.wire);
         if (!key.is(Command.RESTORE) && !displayOnly(key) && key.kind != Command.Kind.COPY_ROWS) {
-            request.putByteArray("entryDraft", onMain(this::completedDraft));
-            request.putBoolean("entryBranch", localBranch);
+            request.entryDraft = onMain(this::completedDraft);
+            request.entryBranch = localBranch;
         }
-        request.putString("key", key.wire);
         CalculationSnapshot input = checkpoint;
         if (key.is(Command.RESTORE) && !policy.temporary) {
             try {
@@ -327,11 +326,11 @@ final class CalculatorSession {
             }
         }
         if (input != null) input.input(request);
-        request.putString("locale", localeTag);
-        request.putString("angle", display.angleUnit.name());
-        request.putString("notation", notation.name());
-        request.putInt("numberMode", numberMode.id);
-        request.putInt("fractionMode", fractionMode.id);
+        request.locale = localeTag;
+        request.angle = display.angleUnit;
+        request.notation = notation;
+        request.numberMode = numberMode;
+        request.fractionMode = fractionMode;
         return request;
     }
 
@@ -354,6 +353,10 @@ final class CalculatorSession {
     }
 
     private void handleFailure(Command key, long generation, RuntimeException ex) {
+        boolean oversized =
+                ex instanceof CalculationError
+                        && ((CalculationError) ex).code()
+                                == CalculationError.Code.TRANSFER_TOO_LARGE;
         if (ex instanceof DeviceAccess.Locked
                 || (!policy.temporary
                         && (DeviceAccess.locked(context)
@@ -368,14 +371,15 @@ final class CalculatorSession {
                 if (!policy.temporary
                         && (ex instanceof RemoteCalculator.InvalidCheckpoint
                                 || cancelRequested
-                                || ex instanceof com.hp.creals.CR.AbortedException))
+                                || ex instanceof com.hp.creals.CR.AbortedException
+                                || oversized))
                     endRestore(ex instanceof RemoteCalculator.InvalidCheckpoint);
             }
             setError(
                     generation,
                     cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
                             ? context.getString(R.string.calculation_cancelled)
-                            : key.is(Command.RESTORE)
+                            : key.is(Command.RESTORE) && !oversized
                                     ? context.getString(R.string.restore_failed)
                                     : context.getString(
                                             R.string.error_prefix,
@@ -422,7 +426,7 @@ final class CalculatorSession {
                                                                 == editor.selectionEnd());
                         if (!keepEdits) {
                             try {
-                                editor = RpnCalculator.load(result.getByteArray("entryState"));
+                                editor = EntryEditor.load(result.getByteArray("entryState"));
                             } catch (java.io.IOException ex) {
                                 throw new IllegalStateException("Invalid entry response", ex);
                             }

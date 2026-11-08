@@ -28,14 +28,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class FunctionsTest {
-    private Bundle request(String key, byte[] input, int fractionMode) {
-        Bundle request = new Bundle();
-        request.putString("key", key);
-        request.putByteArray("input", input);
-        request.putString("angle", "RAD");
-        request.putString("notation", "SCIENTIFIC");
-        request.putString("locale", "en-US");
-        request.putInt("fractionMode", fractionMode);
+    private CalculationRequest request(String key, byte[] input, int fractionMode) {
+        CalculationRequest request = new CalculationRequest(key);
+        request.input = input;
+        request.angle = RpnCalculator.AngleUnit.RAD;
+        request.notation = ValueFormatter.Notation.SCIENTIFIC;
+        request.locale = "en-US";
+        request.fractionMode = FractionMode.fromId(fractionMode);
         return request;
     }
 

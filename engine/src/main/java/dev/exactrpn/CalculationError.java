@@ -20,6 +20,7 @@ public interface CalculationError {
         INVALID_NUMBER,
         INVALID_PASTE_LINE,
         UNDEFINED_RESULT,
+        TRANSFER_TOO_LARGE,
         INTERNAL
     }
 

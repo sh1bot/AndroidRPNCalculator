@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import static dev.exactrpn.Transfer.readText;
+import static dev.exactrpn.Transfer.writeText;
+
 import android.os.Bundle;
 
 import java.io.ByteArrayInputStream;
@@ -8,7 +11,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
 /** Explicit, transient display protocol; contains no Parcelable or Java object serialization. */
@@ -27,7 +29,7 @@ final class DisplayResult {
             out.writeBoolean(copy);
             if (copy) {
                 writeText(out, result.getString("copyText"));
-                return bytes.toByteArray();
+                return Transfer.require(bytes.toByteArray());
             }
             byte[] state = result.getByteArray("state");
             out.writeInt(state.length);
@@ -45,11 +47,12 @@ final class DisplayResult {
             out.writeBoolean(result.getBoolean("editing"));
             out.writeBoolean(result.getBoolean("raw"));
         }
-        return bytes.toByteArray();
+        return Transfer.require(bytes.toByteArray());
     }
 
     static Bundle decode(byte[] bytes) throws IOException {
-        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
+        try (DataInputStream in =
+                new DataInputStream(new ByteArrayInputStream(Transfer.require(bytes)))) {
             if (in.readInt() != 0x44525034) throw new IOException("Unknown display protocol");
             Bundle result = new Bundle();
             if (in.readBoolean()) {
@@ -70,7 +73,7 @@ final class DisplayResult {
             for (String key : TEXT) result.putString(key, readText(in));
             for (String key : LISTS) {
                 int count = in.readInt();
-                if (count < 0 || count > 1000000)
+                if (count < 0 || count > in.available() / 4)
                     throw new IOException("Invalid display row count");
                 ArrayList<String> list = new ArrayList<>();
                 for (int i = 0; i < count; i++) list.add(readText(in));
@@ -82,20 +85,5 @@ final class DisplayResult {
             if (in.read() != -1) throw new IOException("Trailing display data");
             return result;
         }
-    }
-
-    private static void writeText(DataOutputStream out, String value) throws IOException {
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        out.writeInt(bytes.length);
-        out.write(bytes);
-    }
-
-    private static String readText(DataInputStream in) throws IOException {
-        int length = in.readInt();
-        if (length < 0 || length > 64 * 1024 * 1024 || length > in.available())
-            throw new IOException("Invalid display string length");
-        byte[] bytes = new byte[length];
-        in.readFully(bytes);
-        return new String(bytes, StandardCharsets.UTF_8);
     }
 }

@@ -49,7 +49,7 @@ final class Display {
         end = result.getInt("end");
     }
 
-    Display(Display stack, RpnCalculator editor) {
+    Display(Display stack, EntryEditor editor) {
         fullRows = stack.fullRows;
         compactRows = stack.compactRows;
         stackId = stack.stackId;

@@ -46,6 +46,8 @@ Tap anywhere on a stack row to select it. Checkboxes appear, and tapping a row t
 
 In selection mode Enter becomes Pick, AC selects all rows, and ⎌ clears the selection. Trash drops selected values, + becomes Σ (sum), and × becomes Π (product). Pick, sum and product append results without removing the originals. Unary functions replace each selected value in place as one undoable action; if any result fails, none are changed. Factorise, Swap and the other binary operations are unavailable while selecting.
 
+Large calculations or copied text can exceed the app’s 256 KiB data limit. The action then reports an error and preserves the previous calculation. Reducing the stack or copying fewer rows may help.
+
 ## Keyboard
 
 Digits and the decimal separator enter numbers. `+ - * /` operate. Enter/Space commits or duplicates; Backspace/Delete edits or drops. Left/Right and Home/End move the cursor; Shift selects text. Escape cancels a calculation or entry.

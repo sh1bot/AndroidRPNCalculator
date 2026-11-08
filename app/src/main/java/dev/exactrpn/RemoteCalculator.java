@@ -53,7 +53,6 @@ final class RemoteCalculator {
                             message -> {
                                 synchronized (this) {
                                     if (message.arg2 != generation) {
-                                        MemoryPayload.discard(message.getData(), "payload");
                                         return true;
                                     }
                                     if (message.what == CalculationService.HELLO) {
@@ -65,8 +64,6 @@ final class RemoteCalculator {
                                         pending.complete(message.getData());
                                         pending = null;
                                         pendingRequest = null;
-                                    } else if (message.what == CalculationService.EVALUATE) {
-                                        MemoryPayload.discard(message.getData(), "payload");
                                     }
                                 }
                                 return true;
@@ -81,46 +78,38 @@ final class RemoteCalculator {
         this.temporary = temporary;
     }
 
-    Bundle evaluate(Bundle request) {
+    Bundle evaluate(CalculationRequest request) {
         if (!temporary) DeviceAccess.requireUnlocked(context);
-        Object state = request.get("input");
-        if (state != null && !(state instanceof byte[]))
-            throw new UserFailure("Expected an in-memory calculation snapshot");
         CompletableFuture<Bundle> future = new CompletableFuture<>();
-        Bundle outgoing = new Bundle(request);
-        byte[] input = outgoing.getByteArray("input");
-        outgoing.remove("input");
-        String inputId = outgoing.getString("inputId");
-        if (input != null && inputId == null) {
+        String inputId = request.inputId;
+        if (request.input != null && inputId == null)
             inputId = java.util.UUID.randomUUID().toString();
-            outgoing.putString("inputId", inputId);
-        }
         int epoch;
         boolean reuse;
         synchronized (this) {
             epoch = generation;
             reuse = inputId != null && inputId.equals(remoteSnapshotId);
         }
+        Bundle outgoing = new Bundle();
+        try {
+            outgoing.putByteArray("payload", request.encode(sessionId, inputId, !reuse));
+        } catch (IOException ex) {
+            throw new UserFailure(context.getString(R.string.result_unreadable), ex);
+        }
         boolean cacheIntact = false;
-        try (MemoryPayload payload = input != null && !reuse ? MemoryPayload.create(input) : null) {
-            if (payload != null) payload.put(outgoing, "input");
+        try {
             synchronized (this) {
                 if (closed || epoch != generation || Thread.currentThread().isInterrupted())
                     throw new com.hp.creals.CR.AbortedException();
                 pending = future;
                 pendingRequest = outgoing;
-                pendingRequest.putString("sessionId", sessionId);
-                pendingRequest.putInt("requestId", ++nextRequest);
+                ++nextRequest;
                 if (remote != null && pid != 0) sendPending();
                 else if (connection == null) bind();
             }
             Bundle response = future.get();
-            try {
-                cacheIntact = response.getBoolean("cacheIntact");
-                return readResponse(response, epoch);
-            } finally {
-                MemoryPayload.discard(response, "payload");
-            }
+            cacheIntact = response.getBoolean("cacheIntact");
+            return readResponse(response, epoch);
         } catch (InterruptedException ex) {
             cancel();
             Thread.currentThread().interrupt();
@@ -140,6 +129,8 @@ final class RemoteCalculator {
         if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
         if (response.getBoolean("invalidCheckpoint"))
             throw new InvalidCheckpoint(response.getString("error"));
+        if (CalculationError.Code.TRANSFER_TOO_LARGE.name().equals(response.getString("errorCode")))
+            throw CalculationError.invalid(CalculationError.Code.TRANSFER_TOO_LARGE);
         if (response.containsKey("errorCode"))
             throw new UserFailure(
                     ErrorMessages.fromCode(
@@ -147,7 +138,7 @@ final class RemoteCalculator {
                             CalculationError.Code.valueOf(response.getString("errorCode")),
                             response.getInt("errorArgument")));
         if (response.containsKey("error")) throw new UserFailure(response.getString("error"));
-        Bundle result = DisplayResult.decode(MemoryPayload.take(response, "payload"));
+        Bundle result = DisplayResult.decode(response.getByteArray("payload"));
         synchronized (this) {
             if (closed || epoch != generation) throw new com.hp.creals.CR.AbortedException();
             if (result.containsKey("state")) remoteSnapshotId = result.getString("checkpoint");
@@ -162,7 +153,8 @@ final class RemoteCalculator {
     private void sendPending() {
         Message message = Message.obtain(null, CalculationService.EVALUATE);
         message.replyTo = replies;
-        pendingRequest.putInt("generation", generation);
+        message.arg1 = nextRequest;
+        message.arg2 = generation;
         message.setData(pendingRequest);
         try {
             remote.send(message);

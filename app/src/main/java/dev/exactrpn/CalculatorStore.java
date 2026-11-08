@@ -52,62 +52,28 @@ final class CalculatorStore {
         }
     }
 
-    /** Two interrupted attempts at the same snapshot are enough; preserve it for recovery. */
+    /** Mutations reset this counter; two interrupted starts preserve the file for recovery. */
     byte[] beginRestore() throws IOException {
         if (checkpoint() == null) {
             finishRestore();
             return null;
         }
-        byte[] fingerprint;
-        try {
-            checkSize(file.getBaseFile().length());
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            try (FileInputStream in = file.openRead()) {
-                byte[] buffer = new byte[8192];
-                int count;
-                while ((count = in.read(buffer)) != -1) {
-                    if (Thread.currentThread().isInterrupted())
-                        throw new com.hp.creals.CR.AbortedException();
-                    digest.update(buffer, 0, count);
-                }
-            }
-            fingerprint = digest.digest();
-        } catch (java.security.NoSuchAlgorithmException impossible) {
-            throw new AssertionError(impossible);
-        }
         int attempts = 0;
         try {
-            byte[] previous = restoreAttempt.readFully();
-            if (previous.length == 33
-                    && previous[32] > 0
-                    && previous[32] <= 2
-                    && java.util.Arrays.equals(fingerprint, java.util.Arrays.copyOf(previous, 32)))
-                attempts = previous[32] & 255;
+            byte[] record = restoreAttempt.readFully();
+            if (record.length == 1 && record[0] >= 0 && record[0] <= 2) attempts = record[0];
         } catch (IOException absentOrDamaged) {
-            // A missing/damaged attempt record must not prevent recovery of a valid calculation.
         }
         if (attempts >= 2) {
             quarantine();
             throw new IOException("Saved calculation repeatedly failed to restore");
         }
-        checkAccess();
-        FileOutputStream out = restoreAttempt.startWrite();
-        try {
-            out.write(fingerprint);
-            out.write(attempts + 1);
-            checkAccess();
-            restoreAttempt.finishWrite(out);
-        } catch (IOException | RuntimeException ex) {
-            restoreAttempt.failWrite(out);
-            throw ex;
-        }
-        // Record the attempt before allocating the snapshot: an OOM here must count too.
+        write(restoreAttempt, new byte[] {(byte) (attempts + 1)});
         return load();
     }
 
-    private static void checkSize(long length) throws IOException {
-        if (length > MemoryPayload.MAX_LENGTH)
-            throw new IOException("Saved calculation is too large");
+    private static void checkSize(long length) {
+        CalculationLimits.require(length, CalculationLimits.SAVED_BYTES);
     }
 
     void finishRestore() {
@@ -116,15 +82,20 @@ final class CalculatorStore {
     }
 
     void save(byte[] bytes) throws IOException {
+        checkSize(bytes.length);
+        write(file, bytes);
+        finishRestore();
+    }
+
+    private void write(AtomicFile target, byte[] bytes) throws IOException {
         checkAccess();
-        FileOutputStream out = file.startWrite();
+        FileOutputStream out = target.startWrite();
         try {
             out.write(bytes);
             checkAccess();
-            file.finishWrite(out);
-            finishRestore();
+            target.finishWrite(out);
         } catch (IOException | RuntimeException ex) {
-            file.failWrite(out);
+            target.failWrite(out);
             throw ex;
         }
     }

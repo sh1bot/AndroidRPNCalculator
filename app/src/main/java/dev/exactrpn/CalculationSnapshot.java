@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-import android.os.Bundle;
 
 /** Immutable accepted state; independent of the arithmetic process and its next operation. */
 final class CalculationSnapshot {
@@ -15,8 +14,8 @@ final class CalculationSnapshot {
         this.empty = empty;
     }
 
-    void input(Bundle request) {
-        request.putString("inputId", id);
-        request.putByteArray("input", bytes);
+    void input(CalculationRequest request) {
+        request.inputId = id;
+        request.input = bytes;
     }
 }

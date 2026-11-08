@@ -23,13 +23,11 @@ import java.util.TreeSet;
 
 /** Exact stack values plus a cursor-editable, transactional number entry. */
 public final class RpnCalculator {
-    public static final int MAX_ENTRY_LENGTH = 4096;
+    public static final int MAX_ENTRY_LENGTH = EntryEditor.MAX_ENTRY_LENGTH;
     public static final int MAX_PASTE_LENGTH = 65536;
     private List<UnifiedReal> stack = new ArrayList<>();
-    private String entry = "";
-    private boolean editing, raw;
-    private RpnCalculator restoredEditor;
-    private int selectionStart, selectionEnd;
+    private final EntryEditor editor = new EntryEditor(false);
+    private EntryEditor restoredEditor;
 
     public enum AngleUnit {
         RAD,
@@ -38,8 +36,6 @@ public final class RpnCalculator {
     }
 
     private AngleUnit angleUnit = AngleUnit.RAD;
-    private NumberText.Profile inputProfile = new NumberText.Profile('.', ',', 3, 3);
-    private NumberText.Profile rawProfile = inputProfile;
     private final IdentityHashMap<UnifiedReal, SavedValue> savedValues = new IdentityHashMap<>();
     private final Set<UnifiedReal> pendingValues =
             Collections.newSetFromMap(new IdentityHashMap<>());
@@ -130,58 +126,26 @@ public final class RpnCalculator {
 
     private static final class State {
         final List<UnifiedReal> stack;
-        final String entry;
-        final boolean editing, raw;
-        final int start, end;
-        final NumberText.Profile profile;
+        final EntryEditor.State entry;
 
-        State(
-                List<UnifiedReal> stack,
-                String entry,
-                boolean editing,
-                boolean raw,
-                int start,
-                int end,
-                NumberText.Profile profile) {
+        State(List<UnifiedReal> stack, EntryEditor.State entry) {
             this.stack = stack;
             this.entry = entry;
-            this.editing = editing;
-            this.raw = raw;
-            this.start = start;
-            this.end = end;
-            this.profile = profile;
         }
 
         State(RpnCalculator c) {
-            stack = new ArrayList<>(c.stack);
-            entry = c.entry;
-            editing = c.editing;
-            raw = c.raw;
-            start = c.selectionStart;
-            end = c.selectionEnd;
-            profile = c.rawProfile;
+            this(new ArrayList<>(c.stack), new EntryEditor.State(c.editor));
         }
     }
 
-    private void restore(State s) {
-        stack = new ArrayList<>(s.stack);
-        entry = s.entry;
-        editing = s.editing;
-        raw = s.raw;
-        selectionStart = s.start;
-        selectionEnd = s.end;
-        rawProfile = s.profile;
+    private void restore(State state) {
+        stack = new ArrayList<>(state.stack);
+        editor.restore(state.entry);
         syncCurrentValues();
     }
 
     private void remember(State s) {
-        if (sameStack(s.stack, stack)
-                && s.entry.equals(entry)
-                && s.editing == editing
-                && s.raw == raw
-                && s.start == selectionStart
-                && s.end == selectionEnd
-                && (!raw || sameProfile(s.profile, rawProfile))) {
+        if (sameStack(s.stack, stack) && s.entry.same(editor)) {
             discardPendingValues();
             return;
         }
@@ -192,178 +156,197 @@ public final class RpnCalculator {
         discardPendingValues();
     }
 
-    private static boolean sameProfile(NumberText.Profile a, NumberText.Profile b) {
-        return a.decimal == b.decimal
-                && a.grouping == b.grouping
-                && a.primary == b.primary
-                && a.secondary == b.secondary;
-    }
-
-    /** Entry-only editor: no arithmetic values or expression graph crosses into the UI. */
-    public RpnCalculator detachEntryEditor() {
+    public EntryEditor detachEntryEditor() {
         if (restoredEditor != null) {
-            RpnCalculator editor = restoredEditor;
+            EntryEditor result = restoredEditor;
             restoredEditor = null;
-            for (int i = 0; i < editor.undo.size(); i++) undo.removeFirst();
-            for (int i = 0; i < editor.redo.size(); i++) redo.removeFirst();
-            return editor;
+            for (int i = 0; i < result.undo.size(); i++) undo.removeFirst();
+            for (int i = 0; i < result.redo.size(); i++) redo.removeFirst();
+            if (result.undoCount() == 0 && result.redoCount() == 0 && editor.editing) {
+                moveEntryHistory(undo, result.undo);
+                moveEntryHistory(redo, result.redo);
+            }
+            return result;
         }
-        RpnCalculator editor = new RpnCalculator();
-        editor.inputProfile = inputProfile;
-        editor.restore(entryState(new State(this), Collections.emptyList()));
-        if (editing) {
-            moveEntryHistory(undo, editor.undo);
-            moveEntryHistory(redo, editor.redo);
+        EntryEditor result = new EntryEditor();
+        result.inputProfile = editor.inputProfile;
+        result.restore(new EntryEditor.State(editor));
+        if (editor.editing) {
+            moveEntryHistory(undo, result.undo);
+            moveEntryHistory(redo, result.redo);
         }
-        return editor;
+        return result;
     }
 
-    private void moveEntryHistory(Deque<State> source, Deque<State> target) {
+    private void moveEntryHistory(Deque<State> source, Deque<EntryEditor.State> target) {
         while (!source.isEmpty() && sameStack(source.peek().stack, stack)) {
             State state = source.pop();
-            target.addLast(entryState(state, Collections.emptyList()));
-            if (!state.editing) break;
+            target.addLast(state.entry);
+            if (!state.entry.editing) break;
         }
     }
 
-    private static State entryState(State entry, List<UnifiedReal> stack) {
-        return new State(
-                new ArrayList<>(stack),
-                entry.entry,
-                entry.editing,
-                entry.raw,
-                entry.start,
-                entry.end,
-                entry.profile);
+    private static State entryState(EntryEditor.State entry, List<UnifiedReal> stack) {
+        return new State(new ArrayList<>(stack), entry);
     }
 
-    /** Completed entry and its pre-edit boundary, without per-character undo history. */
-    public RpnCalculator entryForCommit() {
-        RpnCalculator editor = new RpnCalculator();
-        editor.inputProfile = inputProfile;
-        editor.restore(entryState(new State(this), Collections.emptyList()));
-        for (State state : undo) {
-            if (!state.editing) {
-                editor.undo.push(entryState(state, Collections.emptyList()));
-                break;
-            }
-        }
-        return editor;
-    }
-
-    /** Install a completed UI draft without retaining its individual edits. */
-    public void useEntryEditor(RpnCalculator editor) {
-        if (!editor.stack.isEmpty())
-            throw new IllegalArgumentException("Entry contains stack values");
-        if (editor.editing) {
-            for (State state : editor.undo) {
+    public void useEntryEditor(EntryEditor draft) {
+        if (draft.editing) {
+            for (EntryEditor.State state : draft.undo)
                 if (!state.editing) {
                     if (undo.isEmpty()
-                            || undo.peek().editing
+                            || undo.peek().entry.editing
                             || !sameStack(undo.peek().stack, stack))
                         undo.push(entryState(state, stack));
                     break;
                 }
-            }
             if (undo.size() + redo.size() > 100) {
                 if (undo.size() > 1) undo.removeLast();
                 else redo.removeLast();
             }
         }
-        restore(entryState(new State(editor), stack));
+        editor.inputProfile = draft.inputProfile;
+        editor.restore(new EntryEditor.State(draft));
     }
 
-    /** Persist a UI draft beside an already encoded arithmetic snapshot; no graph decoding. */
-    public static byte[] saveWithEntry(byte[] calculation, RpnCalculator editor)
-            throws IOException {
-        return saveWithEntry(calculation, editor, false);
+    /** Replace the entry section without decoding the arithmetic graph or nesting snapshots. */
+    public static byte[] saveWithEntry(byte[] calculation, EntryEditor draft) throws IOException {
+        return saveWithEntry(calculation, draft, false);
     }
 
-    public static byte[] saveWithEntry(byte[] calculation, RpnCalculator editor, boolean newBranch)
+    public static byte[] saveWithEntry(byte[] calculation, EntryEditor draft, boolean newBranch)
             throws IOException {
-        byte[] draft = editor.save();
+        DataInputStream in = new DataInputStream(new ByteArrayInputStream(calculation));
+        if (in.readInt() != 0x52504e35)
+            throw new IOException("Unsupported snapshot for entry replacement");
+        int length = in.readInt();
+        if (length < 0 || length > calculation.length - 13)
+            throw new IOException("Invalid arithmetic section");
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e34);
-        out.writeInt(calculation.length);
-        out.write(calculation);
-        out.writeInt(draft.length);
-        out.write(draft);
+        out.write(calculation, 0, 8 + length);
+        byte[] entry = draft.save(CalculationLimits.SAVED_BYTES - 13 - length);
+        out.writeInt(entry.length);
+        out.write(entry);
         out.writeBoolean(newBranch);
         return bytes.toByteArray();
     }
 
-    private static RpnCalculator loadWithEntry(DataInputStream in, int version) throws IOException {
+    private RpnCalculator restoreEntry(EntryEditor draft, boolean newBranch) {
+        if (newBranch) discardRedo();
+        editor.inputProfile = draft.inputProfile;
+        editor.restore(new EntryEditor.State(draft));
+        while (undo.size() + redo.size() + draft.undoCount() + draft.redoCount() > 100) {
+            if (!undo.isEmpty()) undo.removeLast();
+            else redo.removeLast();
+        }
+        List<EntryEditor.State> edits = new ArrayList<>(draft.undo);
+        for (int i = edits.size() - 1; i >= 0; i--) undo.push(entryState(edits.get(i), stack));
+        edits = new ArrayList<>(draft.redo);
+        for (int i = edits.size() - 1; i >= 0; i--) redo.addFirst(entryState(edits.get(i), stack));
+        restoredEditor = draft;
+        return this;
+    }
+
+    // Read the already-shipped draft envelopes; new saves use only version 5.
+    private static RpnCalculator loadLegacyEntry(DataInputStream in, int version)
+            throws IOException {
         byte[] calculation = readSection(in), draft = readSection(in);
-        boolean newBranch = version == 0x52504e34 && in.readBoolean();
+        boolean branch = version == 0x52504e34 && in.readBoolean();
         if (in.available() != 0) throw new IOException("Trailing saved state data");
-        // Sections are ordinary snapshots, never nested envelopes.
-        int baseVersion = new DataInputStream(new ByteArrayInputStream(calculation)).readInt();
-        int draftVersion = new DataInputStream(new ByteArrayInputStream(draft)).readInt();
-        if (baseVersion == 0x52504e33
-                || baseVersion == 0x52504e34
-                || draftVersion == 0x52504e33
-                || draftVersion == 0x52504e34) throw new IOException("Nested entry snapshot");
-        RpnCalculator calculator = load(calculation), editor = load(draft);
-        if (newBranch) calculator.discardRedo();
-        if (!editor.stack.isEmpty()) throw new IOException("Entry contains stack values");
-        calculator.restore(entryState(new State(editor), calculator.stack));
-        for (State state : editor.undo) {
-            if (!state.stack.isEmpty()) throw new IOException("Invalid entry history");
+        int cv = new DataInputStream(new ByteArrayInputStream(calculation)).readInt();
+        int dv = new DataInputStream(new ByteArrayInputStream(draft)).readInt();
+        if (cv != 0x52504e31 && cv != 0x52504e32 || dv != 0x52504e31 && dv != 0x52504e32)
+            throw new IOException("Invalid legacy entry sections");
+        RpnCalculator old = load(draft);
+        if (!old.stack.isEmpty()) throw new IOException("Invalid legacy entry values");
+        EntryEditor entry = new EntryEditor();
+        entry.inputProfile = old.editor.inputProfile;
+        entry.restore(new EntryEditor.State(old.editor));
+        for (State state : old.undo) {
+            if (!state.stack.isEmpty()) throw new IOException("Invalid legacy entry history");
+            entry.undo.addLast(state.entry);
         }
-        for (State state : editor.redo) {
-            if (!state.stack.isEmpty()) throw new IOException("Invalid entry history");
+        for (State state : old.redo) {
+            if (!state.stack.isEmpty()) throw new IOException("Invalid legacy entry history");
+            entry.redo.addLast(state.entry);
         }
-        while (calculator.undo.size()
-                        + calculator.redo.size()
-                        + editor.undo.size()
-                        + editor.redo.size()
-                > 100) {
-            if (!calculator.undo.isEmpty()) calculator.undo.removeLast();
-            else calculator.redo.removeLast();
-        }
-        // The worker detached these edits when publishing the arithmetic snapshot.
-        List<State> edits = new ArrayList<>(editor.undo);
-        for (int i = edits.size() - 1; i >= 0; i--)
-            calculator.undo.push(entryState(edits.get(i), calculator.stack));
-        edits = new ArrayList<>(editor.redo);
-        for (int i = edits.size() - 1; i >= 0; i--)
-            calculator.redo.addFirst(entryState(edits.get(i), calculator.stack));
-        calculator.restoredEditor = editor;
-        return calculator;
+        return load(calculation).restoreEntry(entry, branch);
     }
 
     private static byte[] readSection(DataInputStream in) throws IOException {
         int length = in.readInt();
         if (length < 0 || length > in.available()) throw new IOException("Invalid snapshot length");
-        byte[] section = new byte[length];
-        in.readFully(section);
-        return section;
+        byte[] bytes = new byte[length];
+        in.readFully(bytes);
+        return bytes;
     }
 
     public String entry() {
-        return entry;
+        return editor.entry();
     }
 
     public boolean isEditing() {
-        return editing;
+        return editor.isEditing();
     }
 
     public boolean rawEntry() {
-        return raw;
+        return editor.rawEntry();
     }
 
     public int selectionStart() {
-        return selectionStart;
+        return editor.selectionStart();
     }
 
     public int selectionEnd() {
-        return selectionEnd;
+        return editor.selectionEnd();
     }
 
     public void select(int start, int end) {
-        selectionStart = Math.max(0, Math.min(entry.length(), start));
-        selectionEnd = Math.max(0, Math.min(entry.length(), end));
+        editor.select(start, end);
+    }
+
+    public void moveCursor(String direction, boolean extend) {
+        editor.moveCursor(direction, extend);
+    }
+
+    public void setInputProfile(NumberText.Profile profile) {
+        editor.setInputProfile(profile);
+    }
+
+    public String entryProblem() {
+        return editor.entryProblem();
+    }
+
+    public static boolean isEntryKey(String key) {
+        return EntryEditor.isEntryKey(key);
+    }
+
+    public void pasteText(String text, NumberText.Profile locale) {
+        State before = new State(this);
+        editor.pasteText(text, locale);
+        remember(before);
+    }
+
+    public void editText(
+            String text,
+            int start,
+            int end,
+            boolean raw,
+            boolean decimal,
+            NumberText.Profile profile) {
+        State before = new State(this);
+        editor.editText(text, start, end, raw, decimal, profile);
+        remember(before);
+    }
+
+    private boolean applyEntryKey(String key, boolean clearsEntry) {
+        if (!editor.editing && (key.equals("BACK") || key.equals("DROP") || key.equals("DELETE"))) {
+            if (!stack.isEmpty()) stack.remove(stack.size() - 1);
+            return true;
+        }
+        if (key.equals("CLEAR")) stack.clear();
+        return editor.applyEntryKey(key, clearsEntry);
     }
 
     public AngleUnit angleUnit() {
@@ -372,21 +355,6 @@ public final class RpnCalculator {
 
     public void setAngleUnit(AngleUnit unit) {
         angleUnit = Objects.requireNonNull(unit);
-    }
-
-    public void setInputProfile(NumberText.Profile profile) {
-        inputProfile = Objects.requireNonNull(profile);
-    }
-
-    public String entryProblem() {
-        if (!editing || entry.isEmpty()) return "";
-        if (raw) return NumberText.analyze(entry, rawProfile).ambiguous() ? "Ambiguous" : "Invalid";
-        try {
-            parse(entry);
-            return "";
-        } catch (IllegalArgumentException ex) {
-            return "Invalid";
-        }
     }
 
     public List<UnifiedReal> values() {
@@ -410,7 +378,7 @@ public final class RpnCalculator {
             String line = lines[i].trim();
             if (line.isEmpty()) continue;
             try {
-                checkLength(line);
+                EntryEditor.checkLength(line);
                 values.add(parseClipboardLine(line, locale));
             } catch (IllegalArgumentException | ArithmeticException ex) {
                 throw CalculationError.invalid(CalculationError.Code.INVALID_PASTE_LINE, i + 1);
@@ -428,7 +396,7 @@ public final class RpnCalculator {
             stack.add(value);
             saveValue(value, SavedValue.of(value, "r", null, null));
         }
-        if (before.editing) collapseEntryEdits(before);
+        if (before.entry.editing) collapseEntryEdits(before);
         remember(before);
     }
 
@@ -446,98 +414,12 @@ public final class RpnCalculator {
         return text.startsWith("-") ? whole.negate().add(part).negate() : whole.add(part);
     }
 
-    public void pasteText(String text, NumberText.Profile locale) {
-        checkLength(text);
-        State before = new State(this);
-        entry = text;
-        editing = true;
-        raw = true;
-        rawProfile = locale;
-        select(entry.length(), entry.length());
-        resolveRaw();
-        remember(before);
-    }
-
-    public void editText(
-            String text,
-            int start,
-            int end,
-            boolean rawText,
-            boolean explicitDecimal,
-            NumberText.Profile profile) {
-        checkLength(text);
-        State before = new State(this);
-        entry = text;
-        editing = true;
-        raw = rawText;
-        inputProfile = profile;
-        if (!rawText) rawProfile = profile;
-        select(start, end);
-        if (raw && explicitDecimal) resolveExplicitDecimal();
-        resolveRaw();
-        remember(before);
-    }
-
-    private void checkLength(String text) {
-        if (text == null || text.length() > MAX_ENTRY_LENGTH)
-            throw CalculationError.invalid(CalculationError.Code.ENTRY_TOO_LONG, MAX_ENTRY_LENGTH);
-    }
-
-    private void resolveRaw() {
-        if (entry.isEmpty()) {
-            raw = false;
-            return;
-        }
-        if (!raw) return;
-        NumberText.Analysis a = NumberText.analyze(entry, rawProfile);
-        if (a.valid() && !a.ambiguous()) {
-            entry = a.canonical();
-            raw = false;
-            select(selectionStart, selectionEnd);
-        }
-    }
-
-    private void resolveExplicitDecimal() {
-        try {
-            entry = NumberText.selected(entry, inputProfile);
-            raw = false;
-            select(selectionStart, selectionEnd);
-        } catch (IllegalArgumentException ignored) {
-        }
-    }
-
-    private void replaceSelection(String text) {
-        int start = Math.min(selectionStart, selectionEnd),
-                end = Math.max(selectionStart, selectionEnd);
-        String result = entry.substring(0, start) + text + entry.substring(end);
-        checkLength(result);
-        entry = result;
-        select(start + text.length(), start + text.length());
-    }
-
-    public void moveCursor(String direction, boolean extend) {
-        if (!editing) return;
-        int caret = selectionEnd, target = caret;
-        if (direction.equals("HOME")) target = 0;
-        else if (direction.equals("END")) target = entry.length();
-        else if (direction.equals("LEFT")) {
-            if (!extend && selectionStart != selectionEnd)
-                target = Math.min(selectionStart, selectionEnd);
-            else if (caret > 0) target = entry.offsetByCodePoints(caret, -1);
-        } else if (direction.equals("RIGHT")) {
-            if (!extend && selectionStart != selectionEnd)
-                target = Math.max(selectionStart, selectionEnd);
-            else if (caret < entry.length()) target = entry.offsetByCodePoints(caret, 1);
-        }
-        select(extend ? selectionStart : target, target);
-    }
-
     public void key(String key) {
         restoredEditor = null;
-        if (key.equals("HOLD_DECIMAL") && !editing) return;
-        if (key.equals("SMART_CLEAR")) key = editing ? "CE" : "CLEAR";
+        if (key.equals("HOLD_DECIMAL") && !editor.editing) return;
+        if (key.equals("SMART_CLEAR")) key = editor.editing ? "CE" : "CLEAR";
         // Resolve against the calculation state, even when UI updates trail queued input.
-        if (key.equals("HOLD_DROP")) key = editing ? "BACK" : "ROLL_DOWN";
+        if (key.equals("HOLD_DROP")) key = editor.editing ? "BACK" : "ROLL_DOWN";
         String direction = key.startsWith("SELECT_") ? key.substring(7) : key;
         if (direction.equals("LEFT")
                 || direction.equals("RIGHT")
@@ -573,7 +455,7 @@ public final class RpnCalculator {
             if (applyEntryKey(key, clearsEntry)) {
                 // Entry changes share the transaction and undo policy below.
             } else if (key.equals(Command.ENTER)) {
-                if (editing) commit();
+                if (editor.editing) commit();
                 else {
                     need(1);
                     stack.add(top());
@@ -585,13 +467,13 @@ public final class RpnCalculator {
                 if (!stack.isEmpty())
                     ValueFormatter.format(top(), true, ValueFormatter.Notation.SCIENTIFIC);
             }
-            if (before.editing && !editing && !clearsEntry) collapseEntryEdits(before);
+            if (before.entry.editing && !editor.editing && !clearsEntry) collapseEntryEdits(before);
             remember(before);
         } catch (RuntimeException ex) {
             if (ex instanceof com.hp.creals.CR.AbortedException) committed = null;
             restore(committed == null ? before : committed);
             if (committed != null) {
-                if (before.editing) collapseEntryEdits(before);
+                if (before.entry.editing) collapseEntryEdits(before);
                 remember(before);
             }
             pruneSavedValues(); // Discard a result whose deferred validation failed.
@@ -599,61 +481,10 @@ public final class RpnCalculator {
         }
     }
 
-    private boolean applyEntryKey(String key, boolean clearsEntry) {
-        if (isEntryKey(key)) {
-            editing = true;
-            if (key.equals(".")) {
-                if (raw) {
-                    replaceSelection(Character.toString(inputProfile.decimal));
-                    resolveExplicitDecimal();
-                } else {
-                    String remaining = entryWithoutSelection();
-                    if (remaining.contains(".")
-                            || remaining.contains("e")
-                            || remaining.contains("E")) return true;
-                    replaceSelection(entry.isEmpty() || entry.equals("-") ? "0." : ".");
-                }
-            } else replaceSelection(key);
-            resolveRaw();
-        } else if (key.equals("HOLD_DECIMAL")) {
-            String remaining = entryWithoutSelection();
-            if (remaining.contains("e") || remaining.contains("E")) return true;
-            replaceSelection("e");
-            resolveRaw();
-        } else if (key.equals("BACK") || key.equals("DROP") || key.equals("DELETE")) {
-            if (editing) {
-                if (selectionStart != selectionEnd) replaceSelection("");
-                else if (key.equals("DELETE")) {
-                    if (selectionStart < entry.length()) {
-                        int start = selectionStart;
-                        select(start, entry.offsetByCodePoints(start, 1));
-                        replaceSelection("");
-                    }
-                } else if (selectionStart > 0) {
-                    int end = selectionStart;
-                    select(entry.offsetByCodePoints(end, -1), end);
-                    replaceSelection("");
-                }
-                resolveRaw();
-            } else if (!stack.isEmpty()) stack.remove(stack.size() - 1);
-        } else if (key.equals("±") && editing) {
-            boolean negative = entry.startsWith("-") || entry.startsWith("−");
-            entry = negative ? entry.substring(1) : "-" + entry;
-            select(selectionStart + (negative ? -1 : 1), selectionEnd + (negative ? -1 : 1));
-            resolveRaw();
-        } else if (clearsEntry) {
-            if (key.equals("CLEAR")) stack.clear();
-            entry = "";
-            if (!key.equals("CE")) editing = false;
-            raw = false;
-            select(0, 0);
-        } else return false;
-        return true;
-    }
-
     private void collapseEntryEdits(State before) {
-        while (!undo.isEmpty() && undo.peek().editing && sameStack(undo.peek().stack, before.stack))
-            undo.pop();
+        while (!undo.isEmpty()
+                && undo.peek().entry.editing
+                && sameStack(undo.peek().stack, before.stack)) undo.pop();
     }
 
     private void applyStackOrOperation(String key) {
@@ -706,7 +537,7 @@ public final class RpnCalculator {
     /** Long-press digits pick a one-based stack level; entry mode keeps their digit function. */
     public void holdDigit(String digit) {
         if (!digit.matches("[0-9]")) throw new IllegalArgumentException("Invalid digit shortcut");
-        if (editing) {
+        if (editor.editing) {
             key(digit);
             return;
         }
@@ -807,18 +638,8 @@ public final class RpnCalculator {
         return sameStack(stack, values);
     }
 
-    public static boolean isEntryKey(String key) {
-        return key.length() == 1
-                && (key.charAt(0) == '.' || key.charAt(0) >= '0' && key.charAt(0) <= '9');
-    }
-
-    private String entryWithoutSelection() {
-        return entry.substring(0, Math.min(selectionStart, selectionEnd))
-                + entry.substring(Math.max(selectionStart, selectionEnd));
-    }
-
     public boolean isEmpty() {
-        return stack.isEmpty() && entry.isEmpty();
+        return stack.isEmpty() && editor.entry.isEmpty();
     }
 
     public int undoCount() {
@@ -845,18 +666,27 @@ public final class RpnCalculator {
         pendingValues.clear();
     }
 
-    /**
-     * At most 100 undo steps, with a 1 MiB storage budget including the active state. Large active
-     * calculations are kept intact; only the oldest undo steps are evicted.
-     */
+    /** Evict old undo states to fit the transfer budget; never truncate an arithmetic value. */
     public byte[] save() throws IOException {
-        byte[] result = encode();
-        while (result.length > 1024 * 1024 && (!undo.isEmpty() || !redo.isEmpty())) {
+        byte[] body = encode();
+        byte[] currentEntry = editor.save();
+        while (body.length + currentEntry.length + 13 > CalculationLimits.ARITHMETIC_BYTES
+                && (!undo.isEmpty() || !redo.isEmpty())) {
             if (!undo.isEmpty()) undo.removeLast();
             else redo.removeLast();
-            result = encode();
+            body = encode();
         }
-        return result;
+        CalculationLimits.require(
+                body.length + currentEntry.length + 13, CalculationLimits.ARITHMETIC_BYTES);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeInt(0x52504e35);
+        out.writeInt(body.length);
+        out.write(body);
+        out.writeInt(currentEntry.length);
+        out.write(currentEntry);
+        out.writeBoolean(false);
+        return bytes.toByteArray();
     }
 
     private byte[] encode() throws IOException {
@@ -893,9 +723,7 @@ public final class RpnCalculator {
             }
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e32);
         out.writeUTF(angleUnit.name());
-        writeProfile(out, inputProfile);
         out.writeInt(nodes.size());
         for (SavedValue node : nodes) {
             out.writeUTF(node.op);
@@ -906,15 +734,12 @@ public final class RpnCalculator {
         out.writeInt(undo.size());
         out.writeInt(redo.size());
         out.writeInt(states.size());
-        for (State state : states) {
+        for (int index = 0; index < states.size(); index++) {
+            State state = states.get(index);
             out.writeInt(state.stack.size());
             for (UnifiedReal value : state.stack) out.writeInt(ids.get(savedValues.get(value)));
-            out.writeUTF(state.entry);
-            out.writeBoolean(state.editing);
-            out.writeBoolean(state.raw);
-            out.writeInt(state.start);
-            out.writeInt(state.end);
-            writeProfile(out, state.profile);
+            if (index == 0) continue;
+            EntryEditor.writeState(out, state.entry);
         }
         out.flush();
         return bytes.toByteArray();
@@ -924,68 +749,17 @@ public final class RpnCalculator {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
             int version = in.readInt();
-            if (version == 0x52504e33 || version == 0x52504e34) return loadWithEntry(in, version);
+            if (version == 0x52504e33 || version == 0x52504e34) return loadLegacyEntry(in, version);
+            if (version == 0x52504e35) {
+                byte[] body = readSection(in), entry = readSection(in);
+                boolean branch = in.readBoolean();
+                if (in.available() != 0) throw new IOException("Trailing saved state data");
+                return readMath(new DataInputStream(new ByteArrayInputStream(body)), version)
+                        .restoreEntry(EntryEditor.load(entry), branch);
+            }
             if (version != 0x52504e31 && version != 0x52504e32)
                 throw new IOException("Unknown saved state version");
-            RpnCalculator c = new RpnCalculator();
-            c.angleUnit = AngleUnit.valueOf(in.readUTF());
-            c.inputProfile = readProfile(in);
-            int count = readCount(in, 1000000);
-            List<SavedValue> nodes = new ArrayList<>();
-            List<UnifiedReal> values = new ArrayList<>();
-            for (int i = 0; i < count; i++) {
-                if (Thread.currentThread().isInterrupted())
-                    throw new com.hp.creals.CR.AbortedException();
-                String op = in.readUTF(), literal = in.readUTF();
-                int left = in.readInt(), right = in.readInt();
-                if (left < -1 || right < -1 || left >= i || right >= i)
-                    throw new IOException("Invalid expression reference");
-                SavedValue node =
-                        new SavedValue(
-                                op,
-                                literal,
-                                left < 0 ? null : nodes.get(left),
-                                right < 0 ? null : nodes.get(right));
-                UnifiedReal value =
-                        node.evaluate(
-                                left < 0 ? null : values.get(left),
-                                right < 0 ? null : values.get(right));
-                nodes.add(node);
-                values.add(value);
-                c.savedValues.put(value, node);
-            }
-            int undos = version == 0x52504e32 ? readCount(in, 100) : -1;
-            int redos = version == 0x52504e32 ? readCount(in, 100) : 0;
-            int states = readCount(in, 101);
-            if (undos < 0) undos = states - 1;
-            if (states != 1 + undos + redos) throw new IOException("Invalid undo/redo history");
-            if (states == 0) throw new IOException("Missing current state");
-            for (int i = 0; i < states; i++) {
-                int size = readCount(in, 1000000);
-                List<UnifiedReal> stack = new ArrayList<>();
-                for (int j = 0; j < size; j++) {
-                    int id = in.readInt();
-                    if (id < 0 || id >= count) throw new IOException("Invalid stack reference");
-                    stack.add(values.get(id));
-                }
-                String entry = in.readUTF();
-                c.checkLength(entry);
-                boolean editing = in.readBoolean(), raw = in.readBoolean();
-                int start = in.readInt(), end = in.readInt();
-                if (start < 0
-                        || end < 0
-                        || start > entry.length()
-                        || end > entry.length()
-                        || (!editing && !entry.isEmpty()))
-                    throw new IOException("Invalid entry state");
-                State state = new State(stack, entry, editing, raw, start, end, readProfile(in));
-                if (i == 0) c.restore(state);
-                else if (i <= undos) c.undo.addLast(state);
-                else c.redo.addLast(state);
-            }
-            if (in.available() != 0) throw new IOException("Trailing saved state data");
-            c.pruneSavedValues();
-            return c;
+            return readMath(in, version);
         } catch (com.hp.creals.CR.AbortedException ex) {
             throw ex;
         } catch (RuntimeException ex) {
@@ -993,22 +767,66 @@ public final class RpnCalculator {
         }
     }
 
+    private static RpnCalculator readMath(DataInputStream in, int version) throws IOException {
+        RpnCalculator c = new RpnCalculator();
+        c.angleUnit = AngleUnit.valueOf(in.readUTF());
+        if (version != 0x52504e35) c.editor.inputProfile = EntryEditor.readProfile(in);
+        int count = readCount(in, 1000000);
+        List<SavedValue> nodes = new ArrayList<>();
+        List<UnifiedReal> values = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            if (Thread.currentThread().isInterrupted())
+                throw new com.hp.creals.CR.AbortedException();
+            String op = in.readUTF(), literal = in.readUTF();
+            int left = in.readInt(), right = in.readInt();
+            if (left < -1 || right < -1 || left >= i || right >= i)
+                throw new IOException("Invalid expression reference");
+            SavedValue node =
+                    new SavedValue(
+                            op,
+                            literal,
+                            left < 0 ? null : nodes.get(left),
+                            right < 0 ? null : nodes.get(right));
+            UnifiedReal value =
+                    node.evaluate(
+                            left < 0 ? null : values.get(left),
+                            right < 0 ? null : values.get(right));
+            nodes.add(node);
+            values.add(value);
+            c.savedValues.put(value, node);
+        }
+        int undos = version != 0x52504e31 ? readCount(in, 100) : -1;
+        int redos = version != 0x52504e31 ? readCount(in, 100) : 0;
+        int states = readCount(in, 101);
+        if (undos < 0) undos = states - 1;
+        if (states != 1 + undos + redos) throw new IOException("Invalid undo/redo history");
+        if (states == 0) throw new IOException("Missing current state");
+        for (int i = 0; i < states; i++) {
+            int size = readCount(in, 1000000);
+            List<UnifiedReal> stack = new ArrayList<>();
+            for (int j = 0; j < size; j++) {
+                int id = in.readInt();
+                if (id < 0 || id >= count) throw new IOException("Invalid stack reference");
+                stack.add(values.get(id));
+            }
+            if (i == 0 && version == 0x52504e35) {
+                c.restore(new State(stack, new EntryEditor.State(c.editor)));
+                continue;
+            }
+            State state = new State(stack, EntryEditor.readState(in));
+            if (i == 0) c.restore(state);
+            else if (i <= undos) c.undo.addLast(state);
+            else c.redo.addLast(state);
+        }
+        if (in.available() != 0) throw new IOException("Trailing saved state data");
+        c.pruneSavedValues();
+        return c;
+    }
+
     private static int readCount(DataInputStream in, int maximum) throws IOException {
         int count = in.readInt();
         if (count < 0 || count > maximum) throw new IOException("Invalid saved state size");
         return count;
-    }
-
-    private static void writeProfile(DataOutputStream out, NumberText.Profile p)
-            throws IOException {
-        out.writeChar(p.decimal);
-        out.writeChar(p.grouping);
-        out.writeInt(p.primary);
-        out.writeInt(p.secondary);
-    }
-
-    private static NumberText.Profile readProfile(DataInputStream in) throws IOException {
-        return new NumberText.Profile(in.readChar(), in.readChar(), in.readInt(), in.readInt());
     }
 
     private UnifiedReal top() {
@@ -1021,16 +839,18 @@ public final class RpnCalculator {
     }
 
     private void commit() {
-        resolveRaw();
-        if (raw) NumberText.analyze(entry, rawProfile).canonical(); // Throws instead of guessing.
-        if (!entry.isEmpty()) {
-            UnifiedReal value = parse(entry);
+        editor.resolveRaw();
+        if (editor.raw)
+            NumberText.analyze(editor.entry, editor.rawProfile)
+                    .canonical(); // Throws instead of guessing.
+        if (!editor.entry.isEmpty()) {
+            UnifiedReal value = parse(editor.entry);
             stack.add(value);
             saveValue(value, SavedValue.of(value, "r", null, null));
         }
-        entry = "";
-        editing = false;
-        raw = false;
+        editor.entry = "";
+        editor.editing = false;
+        editor.raw = false;
         select(0, 0);
     }
 

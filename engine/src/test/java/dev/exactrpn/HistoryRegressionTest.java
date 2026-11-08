@@ -85,7 +85,8 @@ final class HistoryRegressionTest extends RegressionSupport {
             bounded.pasteText(longRaw + (i % 10), new NumberText.Profile('.', ',', 3, 3));
         byte[] boundedBytes = bounded.save();
         assertTrue(
-                boundedBytes.length <= 1024 * 1024 && bounded.undoCount() < 100,
+                boundedBytes.length <= CalculationLimits.ARITHMETIC_BYTES
+                        && bounded.undoCount() < 100,
                 "saved undo history respects byte budget");
         assertEquals(
                 longRaw + "9",

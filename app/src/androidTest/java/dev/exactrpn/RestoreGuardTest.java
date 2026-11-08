@@ -55,7 +55,7 @@ public final class RestoreGuardTest {
     }
 
     @Test
-    public void successfulOrCancelledRestoresAndChangedFilesResetTheGuard() throws Exception {
+    public void successfulOrCancelledRestoresAndSavesResetTheGuard() throws Exception {
         File directory = directory();
         try {
             CalculatorStore store = new CalculatorStore(directory);
@@ -69,7 +69,7 @@ public final class RestoreGuardTest {
             store.beginRestore();
             calculator.key("7");
             byte[] changed = calculator.save();
-            Files.write(new File(directory, "calculator-state.bin").toPath(), changed);
+            store.save(changed);
             assertArrayEquals(changed, store.beginRestore());
             store.finishRestore();
             assertArrayEquals(changed, store.beginRestore());
@@ -86,13 +86,15 @@ public final class RestoreGuardTest {
         try {
             File saved = new File(directory, "calculator-state.bin");
             try (java.io.RandomAccessFile file = new java.io.RandomAccessFile(saved, "rw")) {
-                file.setLength((long) MemoryPayload.MAX_LENGTH + 1);
+                file.setLength((long) CalculationLimits.SAVED_BYTES + 1);
             }
             try {
                 new CalculatorStore(directory).beginRestore();
                 fail("Oversized snapshot unexpectedly loaded");
-            } catch (java.io.IOException expected) {
-                assertTrue(expected.getMessage().contains("too large"));
+            } catch (IllegalArgumentException expected) {
+                assertEquals(
+                        CalculationError.Code.TRANSFER_TOO_LARGE,
+                        ((CalculationError) expected).code());
             }
         } finally {
             remove(directory);

@@ -8,35 +8,35 @@ import java.util.Map;
 
 /** One definition of arithmetic, shared by live execution and saved expression replay. */
 public enum Operation {
-    PI("π", 0),
-    TAU("τ", 0),
-    E("e", 0),
-    PHI("φ", 0),
-    ADD("+", 2),
-    SUBTRACT("−", 2),
-    MULTIPLY("×", 2),
-    DIVIDE("÷", 2),
-    POWER("xʸ", 2),
-    ROOT("root", 2),
-    REMAINDER("rem", 2),
-    MODULO("mod", 2),
-    NEGATE("±", 1),
-    SQRT("√", 1),
-    SQUARE("x²", 1),
-    FACTORIAL("!", 1),
-    RECIPROCAL("1/x", 1),
-    FLOOR("floor", 1),
-    CEIL("ceil", 1),
-    LOG10("log10", 1),
-    TEN_POWER("10ˣ", 1),
-    LN("ln", 1),
-    EXP("eˣ", 1),
-    SIN("sin", 1, true),
-    COS("cos", 1, true),
-    TAN("tan", 1, true),
-    ASIN("asin", 1, true),
-    ACOS("acos", 1, true),
-    ATAN("atan", 1, true);
+    PI(CalculatorKey.PI, 0),
+    TAU(CalculatorKey.TAU, 0),
+    E(CalculatorKey.E, 0),
+    PHI(CalculatorKey.PHI, 0),
+    ADD(CalculatorKey.ADD, 2),
+    SUBTRACT(CalculatorKey.SUBTRACT, 2),
+    MULTIPLY(CalculatorKey.MULTIPLY, 2),
+    DIVIDE(CalculatorKey.DIVIDE, 2),
+    POWER(CalculatorKey.POWER, 2),
+    ROOT(CalculatorKey.ROOT, 2),
+    REMAINDER(CalculatorKey.REMAINDER, 2),
+    MODULO(CalculatorKey.MODULO, 2),
+    NEGATE(CalculatorKey.NEGATE, 1),
+    SQRT(CalculatorKey.SQRT, 1),
+    SQUARE(CalculatorKey.SQUARE, 1),
+    FACTORIAL(CalculatorKey.FACTORIAL, 1),
+    RECIPROCAL(CalculatorKey.RECIPROCAL, 1),
+    FLOOR(CalculatorKey.FLOOR, 1),
+    CEIL(CalculatorKey.CEIL, 1),
+    LOG10(CalculatorKey.LOG10, 1),
+    TEN_POWER(CalculatorKey.TEN_POWER, 1),
+    LN(CalculatorKey.LN, 1),
+    EXP(CalculatorKey.EXP, 1),
+    SIN(CalculatorKey.SIN, 1, true),
+    COS(CalculatorKey.COS, 1, true),
+    TAN(CalculatorKey.TAN, 1, true),
+    ASIN(CalculatorKey.ASIN, 1, true),
+    ACOS(CalculatorKey.ACOS, 1, true),
+    ATAN(CalculatorKey.ATAN, 1, true);
 
     public final String key;
     public final int arity;
@@ -50,12 +50,12 @@ public enum Operation {
         OPERATIONS.put("exp", EXP); // Historical saved expressions.
     }
 
-    Operation(String key, int arity) {
+    Operation(CalculatorKey key, int arity) {
         this(key, arity, false);
     }
 
-    Operation(String key, int arity, boolean angle) {
-        this.key = key;
+    Operation(CalculatorKey key, int arity, boolean angle) {
+        this.key = key.wire;
         this.arity = arity;
         this.angle = angle;
     }

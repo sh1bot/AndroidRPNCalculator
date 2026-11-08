@@ -18,7 +18,6 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,30 +63,70 @@ public final class CalculatorKeypad extends ViewGroup {
         colors = new ThemeColors(context);
         numbers = new LocaleNumbers(context.getResources().getConfiguration().getLocales().get(0));
         controls = new LinearLayout(context);
-        controls.addView(
-                button(Command.UNDO, getContext().getString(R.string.undo)),
-                new LinearLayout.LayoutParams(0, dp(44), 1));
-        functions = button("FUNCTIONS", "f()");
-        complements = button("COMPLEMENTS", "f⁻¹()");
+        controls.addView(button(CalculatorKey.UNDO), new LinearLayout.LayoutParams(0, dp(44), 1));
+        functions = button(CalculatorKey.FUNCTIONS);
+        complements = button(CalculatorKey.COMPLEMENTS);
         functions.setOnClickListener(v -> togglePanel(false));
         complements.setOnClickListener(v -> togglePanel(true));
         controls.addView(functions, new LinearLayout.LayoutParams(0, dp(44), 2));
         controls.addView(complements, new LinearLayout.LayoutParams(0, dp(44), 2));
         addView(controls);
         addRows(
-                new String[][] {
-                    {"sin", "cos", "tan", "1/x", "!"},
-                    {"ln", "log10", "√", "floor", "Factor"},
-                    {"π", "e", "φ", "xʸ", "rem"}
+                new CalculatorKey[][] {
+                    {
+                        CalculatorKey.SIN,
+                        CalculatorKey.COS,
+                        CalculatorKey.TAN,
+                        CalculatorKey.RECIPROCAL,
+                        CalculatorKey.FACTORIAL
+                    },
+                    {
+                        CalculatorKey.LN,
+                        CalculatorKey.LOG10,
+                        CalculatorKey.SQRT,
+                        CalculatorKey.FLOOR,
+                        CalculatorKey.FACTOR
+                    },
+                    {
+                        CalculatorKey.PI,
+                        CalculatorKey.E,
+                        CalculatorKey.PHI,
+                        CalculatorKey.POWER,
+                        CalculatorKey.REMAINDER
+                    }
                 },
                 scientificRows);
-        addRows(new String[][] {{"CLEAR", "BACK", "SWAP", "÷"}}, primaryRows);
         addRows(
-                new String[][] {
-                    {"7", "8", "9", "×"},
-                    {"4", "5", "6", "−"},
-                    {"1", "2", "3", "+"},
-                    {".", "0", "±", Command.ENTER}
+                new CalculatorKey[][] {
+                    {
+                        CalculatorKey.CLEAR,
+                        CalculatorKey.BACK,
+                        CalculatorKey.SWAP,
+                        CalculatorKey.DIVIDE
+                    }
+                },
+                primaryRows);
+        addRows(
+                new CalculatorKey[][] {
+                    {
+                        CalculatorKey.SEVEN,
+                        CalculatorKey.EIGHT,
+                        CalculatorKey.NINE,
+                        CalculatorKey.MULTIPLY
+                    },
+                    {
+                        CalculatorKey.FOUR,
+                        CalculatorKey.FIVE,
+                        CalculatorKey.SIX,
+                        CalculatorKey.SUBTRACT
+                    },
+                    {CalculatorKey.ONE, CalculatorKey.TWO, CalculatorKey.THREE, CalculatorKey.ADD},
+                    {
+                        CalculatorKey.DECIMAL,
+                        CalculatorKey.ZERO,
+                        CalculatorKey.NEGATE,
+                        CalculatorKey.ENTER
+                    }
                 },
                 primaryRows);
         setEditing(false);
@@ -95,75 +134,24 @@ public final class CalculatorKeypad extends ViewGroup {
         updateExpansion();
     }
 
-    private String effectiveKey(String key) {
-        if (key.equals("π") && tau) return "τ";
-        if (!inverse) return key;
-        switch (key) {
-            case "sin":
-                return "asin";
-            case "cos":
-                return "acos";
-            case "tan":
-                return "atan";
-            case "ln":
-                return "eˣ";
-            case "√":
-                return "x²";
-            case "xʸ":
-                return "root";
-            case "rem":
-                return "mod";
-            case "floor":
-                return "ceil";
-            case "log10":
-                return "10ˣ";
-            default:
-                return key;
-        }
+    private String effectiveKey(String wire) {
+        CalculatorKey key = CalculatorKey.find(wire);
+        if (key == CalculatorKey.PI && tau) return CalculatorKey.TAU.wire;
+        return inverse && key != null && key.inverse() != null ? key.inverse().wire : wire;
     }
 
-    private CharSequence functionLabel(String key) {
-        switch (key) {
-            case Command.INVERSE:
-                return "INV";
-            case "xʸ":
-                return "yˣ";
-            case "root":
-                return "ˣ√y";
-            case "!":
-                return "x!";
-            case "log10":
-                SpannableString logarithm = new SpannableString("log10");
-                logarithm.setSpan(
-                        new RelativeSizeSpan(.7f), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                logarithm.setSpan(new SubscriptSpan(), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                return logarithm;
-            case "floor":
-                return "⌊x⌋";
-            case "ceil":
-                return "⌈x⌉";
-            default:
-                return key;
+    private CharSequence functionLabel(String wire) {
+        CalculatorKey key = CalculatorKey.find(wire);
+        if (key == null) return wire;
+        int resource = KeyResources.resource(key.labelText);
+        if (resource != 0) return getContext().getString(resource);
+        if (key == CalculatorKey.LOG10) {
+            SpannableString logarithm = new SpannableString(key.label);
+            logarithm.setSpan(new RelativeSizeSpan(.7f), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            logarithm.setSpan(new SubscriptSpan(), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            return logarithm;
         }
-    }
-
-    private String functionDescription(String key) {
-        switch (key) {
-            case "floor":
-                return getContext().getString(R.string.floor_description);
-            case "ceil":
-                return getContext().getString(R.string.ceil_description);
-            case "log10":
-                return getContext().getString(R.string.log10_description);
-            case "10ˣ":
-                return getContext().getString(R.string.ten_power_description);
-            case "mod":
-                return getContext().getString(R.string.modulo_description);
-            case "rem":
-                return getContext().getString(R.string.remainder_description);
-            default:
-                return key;
-        }
+        return key.label;
     }
 
     public void setInverse(boolean active) {
@@ -179,7 +167,7 @@ public final class CalculatorKeypad extends ViewGroup {
                                     .getString(active ? R.string.inverse_on : R.string.inverse_off)
                             : effective.equals("root")
                                     ? getContext().getString(R.string.root_description)
-                                    : functionDescription(effective));
+                                    : keyDescription(effective));
             if (key.equals(Command.INVERSE)) {
                 button.setTextColor(active ? colors.accent : colors.text);
                 if (Build.VERSION.SDK_INT >= 30)
@@ -362,12 +350,13 @@ public final class CalculatorKeypad extends ViewGroup {
         return Math.round(n * getResources().getDisplayMetrics().density);
     }
 
-    private Button button(String key, CharSequence label) {
+    private Button button(CalculatorKey definition) {
+        String key = definition.wire;
         Button button = new Button(getContext());
         button.setAllCaps(false);
         button.setTag(key);
         registerButton(key, button);
-        labelButton(key, label, button);
+        labelButton(key, button);
         styleKey(key, button);
         button.setContentDescription(keyDescription(key));
         button.setOnClickListener(
@@ -390,35 +379,22 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.equals(Command.UNDO)) undoButton = b;
         if (key.equals(Command.ENTER)) enterButton = b;
         if (key.equals("π")) piButton = b;
-        if (Arrays.asList(
-                        Command.INVERSE,
-                        "sin",
-                        "cos",
-                        "tan",
-                        "ln",
-                        "√",
-                        "xʸ",
-                        "log10",
-                        "rem",
-                        "floor")
-                .contains(key)) inverseButtons.put(key, b);
+        CalculatorKey definition = CalculatorKey.find(key);
+        if (definition.inverse() != null || definition == CalculatorKey.INVERSE)
+            inverseButtons.put(key, b);
     }
 
-    private void labelButton(String key, CharSequence label, Button b) {
-        if (key.equals("xʸ")
-                || key.equals(Command.INVERSE)
-                || key.equals("!")
-                || key.equals("log10")
-                || key.equals("floor")) label = functionLabel(key);
-        if (key.equals("Factor")) label = getContext().getString(R.string.factor);
-        if (key.equals("1/x")) {
-            SpannableString fraction = new SpannableString("1/x");
+    private void labelButton(String key, Button button) {
+        CharSequence label = functionLabel(key);
+        if (key.equals(CalculatorKey.RECIPROCAL.wire)) {
+            SpannableString fraction = new SpannableString(label);
             fraction.setSpan(new ReciprocalSpan(), 0, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            b.setText(fraction);
-        } else b.setText(RpnCalculator.isEntryKey(key) ? numbers.entry(label.toString()) : label);
+            button.setText(fraction);
+        } else
+            button.setText(RpnCalculator.isEntryKey(key) ? numbers.entry(label.toString()) : label);
         if (RpnCalculator.isEntryKey(key)) {
-            b.setFontFeatureSettings("tnum");
-            numberButtons.put(key, b);
+            button.setFontFeatureSettings("tnum");
+            numberButtons.put(key, button);
         }
     }
 
@@ -447,32 +423,10 @@ public final class CalculatorKeypad extends ViewGroup {
         b.setBackground(new RippleDrawable(ColorStateList.valueOf(colors.ripple), shape, null));
     }
 
-    private String keyDescription(String key) {
-        int resource =
-                switch (key) {
-                    case "SWAP" -> R.string.swap_description;
-                    case Command.INVERSE -> R.string.inverse_off;
-                    case "!" -> R.string.factorial_description;
-                    case "Factor" -> R.string.factor_description;
-                    case "floor" -> R.string.floor_description;
-                    case "log10" -> R.string.log10_description;
-                    case "φ" -> R.string.phi_description;
-                    case "mod" -> R.string.modulo_description;
-                    case "rem" -> R.string.remainder_description;
-                    case Command.UNDO -> R.string.undo_description;
-                    case Command.ENTER -> R.string.enter_description;
-                    case "." -> R.string.decimal_separator;
-                    case "BACK" -> R.string.backspace;
-                    case "CLEAR" -> R.string.clear_stack;
-                    case "CE" -> R.string.clear_entry;
-                    case "xʸ" -> R.string.power_description;
-                    case "eˣ" -> R.string.exp_description;
-                    case "e" -> R.string.e_description;
-                    case "π" -> R.string.pi_description;
-                    case "1/x" -> R.string.reciprocal_description;
-                    default -> 0;
-                };
-        return resource == 0 ? key : getContext().getString(resource);
+    private String keyDescription(String wire) {
+        CalculatorKey key = CalculatorKey.find(wire);
+        int resource = key == null ? 0 : KeyResources.resource(key.description);
+        return resource == 0 ? wire : getContext().getString(resource);
     }
 
     private boolean longPress(String key) {
@@ -504,30 +458,13 @@ public final class CalculatorKeypad extends ViewGroup {
         return true;
     }
 
-    private void addRows(String[][] keys, List<LinearLayout> rows) {
-        for (String[] entries : keys) {
+    private void addRows(CalculatorKey[][] keys, List<LinearLayout> rows) {
+        for (CalculatorKey[] entries : keys) {
             LinearLayout row = new LinearLayout(getContext());
-            for (String key : entries) {
-                String label =
-                        key.equals("BACK")
-                                ? "⌫"
-                                : key.equals("CLEAR")
-                                        ? getContext().getString(R.string.clear)
-                                        : key.equals(Command.UNDO)
-                                                ? getContext().getString(R.string.undo)
-                                                : key.equals("SWAP")
-                                                        ? getContext().getString(R.string.swap)
-                                                        : key.equals(Command.ENTER)
-                                                                ? getContext()
-                                                                        .getString(R.string.enter)
-                                                                : key.equals("DUP")
-                                                                        ? getContext()
-                                                                                .getString(
-                                                                                        R.string
-                                                                                                .duplicate)
-                                                                        : key;
+            for (CalculatorKey definition : entries) {
+                String key = definition.wire;
                 FrameLayout cell = new FrameLayout(getContext());
-                Button b = button(key, label);
+                Button b = button(definition);
                 if (key.equals("BACK")) deleteButton = b;
                 cell.addView(b, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
                 row.addView(cell, new LinearLayout.LayoutParams(0, -1, 1));
@@ -595,17 +532,9 @@ public final class CalculatorKeypad extends ViewGroup {
         button.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, indicator, null);
     }
 
-    private int preferredLabelSize(String key) {
-        if (RpnCalculator.isEntryKey(key)) return 26;
-        return switch (key) {
-            case "+", "−", "×", "÷", "±", "CLEAR", "CE", "BACK" -> 26;
-            case "SWAP" -> selecting ? 16 : 26;
-            case "π", "τ", "e", "φ", "√" -> 24;
-            case "1/x", "eˣ", "xʸ", "root", "x²", "!", "floor", "ceil", "10ˣ" -> 22;
-            case "sin", "cos", "tan", "ln", "log10", "asin", "acos", "atan", "rem", "mod" -> 20;
-            case Command.ENTER -> 18;
-            default -> 16;
-        };
+    private int preferredLabelSize(String wire) {
+        CalculatorKey key = CalculatorKey.find(wire);
+        return key == null || key == CalculatorKey.SWAP && selecting ? 16 : key.preferredSp;
     }
 
     private void fitDeleteIcon(Button button, int width, int height, int maximum) {

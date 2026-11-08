@@ -40,7 +40,6 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Arrays;
-import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -187,18 +186,13 @@ public final class LockScreenTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         RemoteCalculator remote = new RemoteCalculator(context, true);
         try {
-            Bundle request = new Bundle();
-            request.putString("workspace", UUID.randomUUID().toString());
-            request.putString("key", "RESTORE");
-            request.putString("input", saved);
-            request.putString("locale", "en-US");
-            request.putString("angle", "RAD");
-            request.putString("notation", "SCIENTIFIC");
+            CalculationRequest request = new CalculationRequest("RESTORE");
+            request.input = saved.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             try {
                 worker.submit(() -> remote.evaluate(request)).get(15, TimeUnit.SECONDS);
                 fail("Saved checkpoint accepted by temporary worker");
             } catch (java.util.concurrent.ExecutionException ex) {
-                assertTrue(ex.getCause() instanceof RemoteCalculator.UserFailure);
+                assertTrue(ex.getCause() instanceof RemoteCalculator.InvalidCheckpoint);
             }
             assertEquals(0, accesses.get());
         } finally {
