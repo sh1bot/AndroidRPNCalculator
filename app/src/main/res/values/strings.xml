@@ -45,8 +45,8 @@
     <string name="invalid_status">INVALID</string>
     <string name="select">Select</string>
     <string name="stack_empty">Stack is empty</string>
-    <string name="stack_label_approximate">Stack %1$s, approximate value; long press to select</string>
-    <string name="stack_label">Stack %1$s; long press to select</string>
+    <string name="stack_label_approximate">Stack %1$s, approximate value; tap to select; long press to copy</string>
+    <string name="stack_label">Stack %1$s; tap to select; long press to copy</string>
     <string name="select_level">Select stack level %1$d</string>
     <string name="clear" translatable="false">AC</string>
     <string name="clear_entry">Clear entry</string>
@@ -134,4 +134,5 @@
     <string name="licenses">Licenses</string>
     <string name="source_code">Source code</string>
     <string name="error_invalid_paste_line">Cannot paste: line %1$d is invalid, ambiguous, or too large. Nothing was added.</string>
+    <string name="selection_operation_unavailable">This operation is unavailable while rows are selected</string>
 </resources>

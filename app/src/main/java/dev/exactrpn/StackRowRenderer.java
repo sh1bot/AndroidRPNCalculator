@@ -17,6 +17,8 @@ final class StackRowRenderer {
         boolean toggle(int index, Display display);
 
         void tap(int index, Display display);
+
+        void copy(int index, Display display);
     }
 
     private final Context context;
@@ -123,6 +125,11 @@ final class StackRowRenderer {
                                 new int[] {colors.accent, colors.muted}));
                 selected.setChecked(selectedRows.contains(i));
                 selected.setContentDescription(context.getString(R.string.select_level, depth));
+                selected.setOnLongClickListener(
+                        v -> {
+                            actions.copy(index, display);
+                            return true;
+                        });
                 selected.setOnClickListener(
                         v -> {
                             if (!actions.toggle(index, display))
@@ -135,7 +142,12 @@ final class StackRowRenderer {
             label.setSingleLine(true);
             updateStackLabel(label, depth, display.rows.get(i));
             label.setTag("stack-label:" + i);
-            if (!display.editing) label.setOnClickListener(v -> actions.toggle(index, display));
+            if (!display.editing) label.setOnClickListener(v -> actions.tap(index, display));
+            label.setOnLongClickListener(
+                    v -> {
+                        actions.copy(index, display);
+                        return true;
+                    });
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setTextColor(colors.muted);
             row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
@@ -184,7 +196,7 @@ final class StackRowRenderer {
                             updateStackLabel(label, depth, fits ? fullNumber : compactNumber);
                             row.setContentDescription(
                                     rowDescription(
-                                            selectedRows.isEmpty(),
+                                            display.editing,
                                             depth,
                                             !fits && compactNumber.startsWith("≈ "),
                                             chosen));
@@ -198,9 +210,19 @@ final class StackRowRenderer {
             value.setTag("stack-value:" + i);
             value.setOnClickListener(v -> actions.tap(index, display));
             row.setOnClickListener(v -> actions.tap(index, display));
+            value.setOnLongClickListener(
+                    v -> {
+                        actions.copy(index, display);
+                        return true;
+                    });
+            row.setOnLongClickListener(
+                    v -> {
+                        actions.copy(index, display);
+                        return true;
+                    });
             row.setContentDescription(
                     rowDescription(
-                            selectedRows.isEmpty(),
+                            display.editing,
                             depth,
                             display.rows.get(i).startsWith("≈ "),
                             value.getText()));
