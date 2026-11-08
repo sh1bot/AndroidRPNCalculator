@@ -6,107 +6,70 @@ import java.util.Map;
 
 /** Key identity and presentation metadata shared by arithmetic, hardware input and Android. */
 public enum CalculatorKey {
-    PI("π", null, 24, Text.PI_DESCRIPTION, null, "p", 0),
-    TAU("τ", null, 24, Text.TAU_TOGGLE_DESCRIPTION, null, "", 0),
-    E("e", null, 24, Text.E_DESCRIPTION, null, "e", 0),
-    PHI("φ", null, 24, Text.PHI_DESCRIPTION, null, "", 0),
-    ADD("+", null, 26, Text.NONE, null, "+", 0, 157),
-    SUBTRACT("−", null, 26, Text.NONE, null, "-−", 0, 156),
-    MULTIPLY("×", null, 26, Text.NONE, null, "*×", 0, 155),
-    DIVIDE("÷", null, 26, Text.NONE, null, "/÷", 0, 154),
-    POWER("xʸ", "yˣ", 22, Text.POWER_DESCRIPTION, "ROOT", "^", 0),
-    ROOT("root", "ˣ√y", 22, Text.ROOT_DESCRIPTION, null, "", 0),
-    REMAINDER("rem", null, 20, Text.REMAINDER_DESCRIPTION, "MODULO", "%", 0),
-    MODULO("mod", null, 20, Text.MODULO_DESCRIPTION, null, "", 0),
-    NEGATE("±", null, 26, Text.NONE, null, "", 0, 139),
-    SQRT("√", null, 24, Text.NONE, "SQUARE", "r", 0),
-    SQUARE("x²", null, 22, Text.NONE, null, "", 0),
-    FACTORIAL("!", "x!", 22, Text.FACTORIAL_DESCRIPTION, null, "!", 0),
-    RECIPROCAL("1/x", null, 22, Text.RECIPROCAL_DESCRIPTION, null, "i", 0),
-    FLOOR("floor", "⌊x⌋", 22, Text.FLOOR_DESCRIPTION, "CEIL", "", 0),
-    CEIL("ceil", "⌈x⌉", 22, Text.CEIL_DESCRIPTION, null, "", 0),
-    LOG10("log10", null, 20, Text.LOG10_DESCRIPTION, "TEN_POWER", "", 0),
-    TEN_POWER("10ˣ", null, 22, Text.TEN_POWER_DESCRIPTION, null, "", 0),
-    LN("ln", null, 20, Text.NONE, "EXP", "l", 0),
-    EXP("eˣ", null, 20, Text.EXP_DESCRIPTION, null, "E", 0),
-    SIN("sin", null, 20, Text.NONE, "ASIN", "s", 0),
-    COS("cos", null, 20, Text.NONE, "ACOS", "c", 0),
-    TAN("tan", null, 20, Text.NONE, "ATAN", "t", 0),
-    ASIN("asin", null, 20, Text.NONE, null, "", 0),
-    ACOS("acos", null, 20, Text.NONE, null, "", 0),
-    ATAN("atan", null, 20, Text.NONE, null, "", 0),
-    UNDO(Command.UNDO, Text.UNDO, 16, Text.UNDO_DESCRIPTION, null, "", 54),
-    REDO(Command.REDO, null, 16, Text.NONE, null, "", 53),
-    ENTER(Command.ENTER, Text.ENTER, 18, Text.ENTER_DESCRIPTION, null, "", 0, 66, 160, 62),
-    CLEAR("CLEAR", Text.CLEAR, 26, Text.CLEAR_STACK, null, "", 0),
-    CE("CE", "CE", 26, Text.CLEAR_ENTRY, null, "", 0),
-    BACK("BACK", "⌫", 26, Text.BACKSPACE, null, "", 0, 67),
-    DELETE("DELETE", null, 26, Text.BACKSPACE, null, "", 0, 112),
-    DROP("DROP", null, 26, Text.DROP_ROLL_DESCRIPTION, null, "", 0),
-    SWAP("SWAP", Text.SWAP, 26, Text.SWAP_DESCRIPTION, null, "", 47),
-    DUP("DUP", Text.DUPLICATE, 16, Text.NONE, null, "", 32),
-    SMART_CLEAR("SMART_CLEAR", null, 26, Text.CLEAR_ENTRY, null, "", 40),
-    PASTE(Command.PASTE, null, 18, Text.NONE, null, "", 50),
-    LEFT("LEFT", null, 16, Text.NONE, null, "", 0, 21),
-    RIGHT("RIGHT", null, 16, Text.NONE, null, "", 0, 22),
-    HOME("HOME", null, 16, Text.NONE, null, "", 122, 122),
-    END("END", null, 16, Text.NONE, null, "", 123, 123),
-    ESCAPE("ESCAPE", null, 16, Text.NONE, null, "", 0, 111),
-    DECIMAL(".", null, 26, Text.DECIMAL_SEPARATOR, null, ".", 0, 158),
-    FACTOR("Factor", Text.FACTOR, 16, Text.FACTOR_DESCRIPTION, null, "f", 0),
-    INVERSE(Command.INVERSE, "INV", 16, Text.INVERSE_OFF, null, "", 0),
-    FUNCTIONS("FUNCTIONS", "f()", 16, Text.NONE, null, "", 0),
-    COMPLEMENTS("COMPLEMENTS", "f⁻¹()", 16, Text.NONE, null, "", 0),
-    ROLL_UP("ROLL_UP", null, 16, Text.NONE, null, "", 0),
-    ROLL_DOWN("ROLL_DOWN", null, 16, Text.NONE, null, "", 0),
-    ZERO("0", null, 26, Text.NONE, null, "", 0, 144),
-    ONE("1", null, 26, Text.NONE, null, "", 0, 145),
-    TWO("2", null, 26, Text.NONE, null, "", 0, 146),
-    THREE("3", null, 26, Text.NONE, null, "", 0, 147),
-    FOUR("4", null, 26, Text.NONE, null, "", 0, 148),
-    FIVE("5", null, 26, Text.NONE, null, "", 0, 149),
-    SIX("6", null, 26, Text.NONE, null, "", 0, 150),
-    SEVEN("7", null, 26, Text.NONE, null, "", 0, 151),
-    EIGHT("8", null, 26, Text.NONE, null, "", 0, 152),
-    NINE("9", null, 26, Text.NONE, null, "", 0, 153);
-
-    public enum Text {
-        NONE,
-        BACKSPACE,
-        CEIL_DESCRIPTION,
-        CLEAR,
-        CLEAR_ENTRY,
-        CLEAR_STACK,
-        DECIMAL_SEPARATOR,
-        DROP_ROLL_DESCRIPTION,
-        DUPLICATE,
-        E_DESCRIPTION,
-        ENTER,
-        ENTER_DESCRIPTION,
-        EXP_DESCRIPTION,
-        FACTOR,
-        FACTOR_DESCRIPTION,
-        FACTORIAL_DESCRIPTION,
-        FLOOR_DESCRIPTION,
-        INVERSE_OFF,
-        LOG10_DESCRIPTION,
-        MODULO_DESCRIPTION,
-        PHI_DESCRIPTION,
-        PI_DESCRIPTION,
-        POWER_DESCRIPTION,
-        RECIPROCAL_DESCRIPTION,
-        REMAINDER_DESCRIPTION,
-        ROOT_DESCRIPTION,
-        SWAP,
-        SWAP_DESCRIPTION,
-        TAU_TOGGLE_DESCRIPTION,
-        TEN_POWER_DESCRIPTION,
-        UNDO,
-        UNDO_DESCRIPTION
-    }
-
+    PI,
+    TAU,
+    E,
+    PHI,
+    ADD,
+    SUBTRACT,
+    MULTIPLY,
+    DIVIDE,
+    POWER,
+    ROOT,
+    REMAINDER,
+    MODULO,
+    NEGATE,
+    SQRT,
+    SQUARE,
+    FACTORIAL,
+    RECIPROCAL,
+    FLOOR,
+    CEIL,
+    LOG10,
+    TEN_POWER,
+    LN,
+    EXP,
+    SIN,
+    COS,
+    TAN,
+    ASIN,
+    ACOS,
+    ATAN,
+    UNDO,
+    REDO,
+    ENTER,
+    CLEAR,
+    CE,
+    BACK,
+    DELETE,
+    DROP,
+    SWAP,
+    DUP,
+    SMART_CLEAR,
+    PASTE,
+    LEFT,
+    RIGHT,
+    HOME,
+    END,
+    ESCAPE,
+    DECIMAL,
+    FACTOR,
+    INVERSE,
+    FUNCTIONS,
+    COMPLEMENTS,
+    ROLL_UP,
+    ROLL_DOWN,
+    ZERO,
+    ONE,
+    TWO,
+    THREE,
+    FOUR,
+    FIVE,
+    SIX,
+    SEVEN,
+    EIGHT,
+    NINE;
     public final String wire, label;
-    public final Text labelText, description;
     public final int preferredSp;
     private final String inverseName, unicode;
     private final int ctrl;
@@ -126,28 +89,99 @@ public enum CalculatorKey {
         }
     }
 
-    CalculatorKey(
-            String wire,
-            Object label,
-            int size,
-            Text description,
-            String inverse,
-            String unicode,
-            int ctrl,
-            int... codes) {
-        this.wire = wire;
-        this.label = label instanceof String ? (String) label : wire;
-        this.labelText = label instanceof Text ? (Text) label : Text.NONE;
-        this.description = description;
-        preferredSp = size;
-        inverseName = inverse;
-        this.unicode = unicode;
-        this.ctrl = ctrl;
-        this.codes = codes;
+    CalculatorKey() {
+        String[] row = Data.ROWS[ordinal()].split("\\|", -1);
+        if (!name().equals(row[0])) throw new IllegalStateException("Key table order");
+        wire = field(row, 1, name());
+        label = field(row, 2, wire);
+        preferredSp = Integer.parseInt(field(row, 3, "26"));
+        inverseName = field(row, 4, "");
+        unicode = field(row, 5, "");
+        ctrl = Integer.parseInt(field(row, 6, "0"));
+        String hardware = field(row, 7, "");
+        String[] keys = hardware.isEmpty() ? new String[0] : hardware.split(",");
+        codes = new int[keys.length];
+        for (int i = 0; i < keys.length; i++) codes[i] = Integer.parseInt(keys[i]);
+    }
+
+    private static String field(String[] row, int index, String fallback) {
+        return index < row.length && !row[index].isEmpty() ? row[index] : fallback;
+    }
+
+    // ID | wire (defaults to ID) | label | size (26sp) | inverse | characters | Ctrl | key codes.
+    // IDs make row order explicit and checked; trailing defaults are omitted.
+    private static final class Data {
+        static final String[] ROWS =
+                """
+                PI|π||24||p
+                TAU|τ||24
+                E|e||24||e
+                PHI|φ||24
+                ADD|+||||+||157
+                SUBTRACT|−||||-−||156
+                MULTIPLY|×||||*×||155
+                DIVIDE|÷||||/÷||154
+                POWER|xʸ|yˣ|22|ROOT|^
+                ROOT|root|ˣ√y|22
+                REMAINDER|rem||20|MODULO|%
+                MODULO|mod||20
+                NEGATE|±||||||139
+                SQRT|√||24|SQUARE|r
+                SQUARE|x²||22
+                FACTORIAL|!|x!|22||!
+                RECIPROCAL|1/x||22||i
+                FLOOR|floor|⌊x⌋|22|CEIL
+                CEIL|ceil|⌈x⌉|22
+                LOG10|log10||20|TEN_POWER
+                TEN_POWER|10ˣ||22
+                LN|ln||20|EXP|l
+                EXP|eˣ||20||E
+                SIN|sin||20|ASIN|s
+                COS|cos||20|ACOS|c
+                TAN|tan||20|ATAN|t
+                ASIN|asin||20
+                ACOS|acos||20
+                ATAN|atan||20
+                UNDO|||16|||54
+                REDO|||16|||53
+                ENTER|||18||||66,160,62
+                CLEAR
+                CE
+                BACK||⌫|||||67
+                DELETE|||||||112
+                DROP
+                SWAP||||||47
+                DUP|||16|||32
+                SMART_CLEAR||||||40
+                PASTE|||18|||50
+                LEFT|||16||||21
+                RIGHT|||16||||22
+                HOME|||16|||122|122
+                END|||16|||123|123
+                ESCAPE|||16||||111
+                DECIMAL|.||||.||158
+                FACTOR|Factor||16||f
+                INVERSE||INV|16
+                FUNCTIONS||f()|16
+                COMPLEMENTS||f⁻¹()|16
+                ROLL_UP|||16
+                ROLL_DOWN|||16
+                ZERO|0||||||144
+                ONE|1||||||145
+                TWO|2||||||146
+                THREE|3||||||147
+                FOUR|4||||||148
+                FIVE|5||||||149
+                SIX|6||||||150
+                SEVEN|7||||||151
+                EIGHT|8||||||152
+                NINE|9||||||153
+                """
+                        .split("\n");
     }
 
     public CalculatorKey inverse() {
-        return inverseName == null ? null : valueOf(inverseName);
+        return inverseName.isEmpty() ? null : valueOf(inverseName);
     }
 
     public static CalculatorKey find(String wire) {
