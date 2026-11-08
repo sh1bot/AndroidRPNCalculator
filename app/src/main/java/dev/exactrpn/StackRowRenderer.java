@@ -113,9 +113,11 @@ final class StackRowRenderer {
                                     - viewport.getPaddingTop()
                                     - viewport.getPaddingBottom();
                     if (width <= 0 || height <= 0) return;
+                    android.text.TextPaint measure = new android.text.TextPaint(value.getPaint());
+                    measure.setTextSize(sp(32));
                     android.text.StaticLayout layout =
                             android.text.StaticLayout.Builder.obtain(
-                                            full, 0, full.length(), value.getPaint(), width)
+                                            full, 0, full.length(), measure, width)
                                     .setIncludePad(value.getIncludeFontPadding())
                                     .setBreakStrategy(value.getBreakStrategy())
                                     .setHyphenationFrequency(value.getHyphenationFrequency())
@@ -127,7 +129,15 @@ final class StackRowRenderer {
                             layout.getHeight() + value.getPaddingTop() + value.getPaddingBottom()
                                     <= height;
                     CharSequence chosen = fits ? full : compact;
-
+                    int size = 32;
+                    if (!fits) {
+                        for (; size > 22; size--) {
+                            measure.setTextSize(sp(size));
+                            if (android.text.Layout.getDesiredWidth(compact, measure) <= width)
+                                break;
+                        }
+                    }
+                    if (value.getTextSize() != sp(size)) value.setTextSize(size);
                     value.setEllipsize(fits ? null : android.text.TextUtils.TruncateAt.END);
                     int lines = fits ? layout.getLineCount() : 1;
                     if (value.getMaxLines() != lines) value.setMaxLines(lines);
