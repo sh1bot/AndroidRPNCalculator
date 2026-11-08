@@ -63,6 +63,8 @@ jobs:
           api-level: ${{ matrix.api }}
           arch: x86_64
           target: ${{ matrix.target }}
+          # Android 8 System UI assumes a navigation bar when a lock-screen app opens.
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -prop qemu.hw.mainkeys=0
           disable-animations: true
           script: |
             adb shell input keyevent KEYCODE_WAKEUP
