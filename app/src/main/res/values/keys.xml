@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Entries follow CalculatorKey order. Empty entries use the key wire. -->
-    <string-array name="key_descriptions">
+    <string-array name="key_descriptions" translatable="false">
         <item>@string/pi_description</item> <!-- PI -->
         <item>@string/tau_toggle_description</item> <!-- TAU -->
         <item>@string/e_description</item> <!-- E -->
