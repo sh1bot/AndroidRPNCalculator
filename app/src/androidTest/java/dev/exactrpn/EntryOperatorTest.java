@@ -102,6 +102,10 @@ public final class EntryOperatorTest {
             key(session, "UNDO");
             assertEquals("12.3", session.display.entry);
             assertTrue(session.display.rows.isEmpty());
+            key(session, "REDO");
+            assertFalse(session.display.editing);
+            assertEquals(Arrays.asList("12.3"), session.display.rows);
+            key(session, "UNDO");
             key(session, "UNDO");
             assertFalse(session.display.editing);
             assertTrue(session.display.rows.isEmpty());
@@ -180,6 +184,27 @@ public final class EntryOperatorTest {
             assertEquals("123", restored.entry());
             restored.key("UNDO");
             assertEquals("12", restored.entry());
+            CalculatorSession resumed =
+                    new CalculatorSession(
+                            ValueFormatter.Notation.SCIENTIFIC,
+                            RpnCalculator.AngleUnit.RAD,
+                            NumberMode.DOT,
+                            FractionMode.DECIMAL);
+            resumed.attach(context);
+            try {
+                key(resumed, "RESTORE");
+                assertEquals("123", resumed.display.entry);
+                CalculationSnapshot arithmetic = resumed.checkpoint;
+                key(resumed, "UNDO");
+                assertEquals("12", resumed.display.entry);
+                assertSame(arithmetic, resumed.checkpoint);
+                key(resumed, "REDO");
+                assertEquals("123", resumed.display.entry);
+                assertSame(arithmetic, resumed.checkpoint);
+            } finally {
+                resumed.close();
+                assertTrue(resumed.awaitClosed(15, TimeUnit.SECONDS));
+            }
         } finally {
             if (!closed) {
                 session.close();

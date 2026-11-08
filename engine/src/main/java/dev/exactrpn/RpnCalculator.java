@@ -190,8 +190,9 @@ public final class RpnCalculator {
                     break;
                 }
             }
-            if (undo.size() > 100) {
-                undo.removeLast();
+            if (undo.size() + redo.size() > 100) {
+                if (undo.size() > 1) undo.removeLast();
+                else redo.removeLast();
                 pruneSavedValues();
             }
         }
@@ -201,25 +202,36 @@ public final class RpnCalculator {
     /** Persist a UI draft beside an already encoded arithmetic snapshot; no graph decoding. */
     public static byte[] saveWithEntry(byte[] calculation, RpnCalculator editor)
             throws IOException {
+        return saveWithEntry(calculation, editor, false);
+    }
+
+    public static byte[] saveWithEntry(byte[] calculation, RpnCalculator editor, boolean newBranch)
+            throws IOException {
         byte[] draft = editor.save();
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e33);
+        out.writeInt(0x52504e34);
         out.writeInt(calculation.length);
         out.write(calculation);
         out.writeInt(draft.length);
         out.write(draft);
+        out.writeBoolean(newBranch);
         return bytes.toByteArray();
     }
 
-    private static RpnCalculator loadWithEntry(DataInputStream in) throws IOException {
+    private static RpnCalculator loadWithEntry(DataInputStream in, int version) throws IOException {
         byte[] calculation = readSection(in), draft = readSection(in);
+        boolean newBranch = version == 0x52504e34 && in.readBoolean();
         if (in.available() != 0) throw new IOException("Trailing saved state data");
         // Sections are ordinary snapshots, never nested envelopes.
-        if (new DataInputStream(new ByteArrayInputStream(calculation)).readInt() == 0x52504e33
-                || new DataInputStream(new ByteArrayInputStream(draft)).readInt() == 0x52504e33)
-            throw new IOException("Nested entry snapshot");
+        int baseVersion = new DataInputStream(new ByteArrayInputStream(calculation)).readInt();
+        int draftVersion = new DataInputStream(new ByteArrayInputStream(draft)).readInt();
+        if (baseVersion == 0x52504e33
+                || baseVersion == 0x52504e34
+                || draftVersion == 0x52504e33
+                || draftVersion == 0x52504e34) throw new IOException("Nested entry snapshot");
         RpnCalculator calculator = load(calculation), editor = load(draft);
+        if (newBranch) calculator.discardRedo();
         if (!editor.stack.isEmpty()) throw new IOException("Entry contains stack values");
         calculator.restore(entryState(new State(editor), calculator.stack));
         for (State state : editor.undo) {
@@ -761,6 +773,12 @@ public final class RpnCalculator {
         return redo.size();
     }
 
+    public void discardRedo() {
+        if (redo.isEmpty()) return;
+        redo.clear();
+        pruneSavedValues();
+    }
+
     public void clearUndo() {
         undo.clear();
         redo.clear();
@@ -855,7 +873,7 @@ public final class RpnCalculator {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
             int version = in.readInt();
-            if (version == 0x52504e33) return loadWithEntry(in);
+            if (version == 0x52504e33 || version == 0x52504e34) return loadWithEntry(in, version);
             if (version != 0x52504e31 && version != 0x52504e32)
                 throw new IOException("Unknown saved state version");
             RpnCalculator c = new RpnCalculator();
