@@ -28,13 +28,12 @@ import java.util.concurrent.TimeUnit;
 
 @RunWith(AndroidJUnit4.class)
 public final class CancellationTest {
-    private Bundle request(String key, byte[] input) {
-        Bundle request = new Bundle();
-        request.putString("key", key);
-        request.putByteArray("input", input);
-        request.putString("angle", "RAD");
-        request.putString("notation", "SCIENTIFIC");
-        request.putString("locale", "en-US");
+    private CalculationRequest request(String key, byte[] input) {
+        CalculationRequest request = new CalculationRequest(key);
+        request.input = input;
+        request.angle = RpnCalculator.AngleUnit.RAD;
+        request.notation = ValueFormatter.Notation.SCIENTIFIC;
+        request.locale = "en-US";
         return request;
     }
 

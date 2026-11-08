@@ -51,9 +51,10 @@ public class CalculationService extends Service {
                                     } catch (RemoteException ignored) {
                                     }
                                 } else if (message.what == EVALUATE) {
-                                    Bundle request = new Bundle(message.getData());
+                                    byte[] request = message.getData().getByteArray("payload");
                                     Messenger reply = message.replyTo;
-                                    worker.execute(() -> evaluate(request, reply));
+                                    int id = message.arg1, generation = message.arg2;
+                                    worker.execute(() -> evaluate(request, id, generation, reply));
                                 }
                                 return true;
                             }));
@@ -71,13 +72,13 @@ public class CalculationService extends Service {
         super.onDestroy();
     }
 
-    private void evaluate(Bundle request, Messenger client) {
+    private void evaluate(byte[] encoded, int requestId, int generation, Messenger client) {
         Bundle response = new Bundle();
-        MemoryPayload payload = null;
         boolean readOnly = true;
         try {
             checkAccess();
-            Command command = Command.parse(request.getString("key"));
+            CalculationRequest request = CalculationRequest.decode(encoded);
+            Command command = request.command();
             readOnly = false;
             loadCheckpoint(request, response);
             readOnly = command.kind == Command.Kind.COPY_ROWS;
@@ -89,8 +90,7 @@ public class CalculationService extends Service {
                 display = arithmeticResult(request);
             }
             checkAccess();
-            payload = MemoryPayload.create(DisplayResult.encode(display));
-            payload.put(response, "payload");
+            response.putByteArray("payload", DisplayResult.encode(display));
         } catch (OutOfMemoryError ex) {
             android.os.Process.killProcess(android.os.Process.myPid());
             return;
@@ -110,50 +110,45 @@ public class CalculationService extends Service {
             } else response.putString("error", ErrorMessages.describe(this, ex));
         }
         Message result = Message.obtain(null, EVALUATE);
-        result.arg1 = request.getInt("requestId");
-        result.arg2 = request.getInt("generation");
+        result.arg1 = requestId;
+        result.arg2 = generation;
         result.setData(response);
         try {
             client.send(result);
         } catch (RemoteException ignored) {
-        } finally {
-            MemoryPayload.discard(request, "input");
-            if (payload != null)
-                try {
-                    payload.close();
-                } catch (IOException ignored) {
-                }
         }
     }
 
-    private Bundle arithmeticResult(Bundle request) throws IOException {
+    private Bundle arithmeticResult(CalculationRequest request) throws IOException {
         Evaluation evaluation = new Evaluation(request);
-        byte[] entryState = evaluation.candidate.detachEntryEditor().save();
+        EntryEditor entry = evaluation.candidate.detachEntryEditor();
         byte[] state = evaluation.candidate.save();
         Bundle display = evaluation.presentation();
         String id = UUID.randomUUID().toString();
         display.putString("checkpoint", id);
         display.putByteArray("state", state);
-        display.putByteArray("entryState", entryState);
+        display.putByteArray("entryState", new byte[0]);
+        int fixedSize = DisplayResult.encode(display).length;
+        display.putByteArray(
+                "entryState", entry.save(CalculationLimits.TRANSFER_BYTES - fixedSize));
         cachedId = id;
         cachedStackId = evaluation.stackId;
         return display;
     }
 
-    private String copyRows(Bundle request, Command command) {
-        ValueFormatter.Notation notation =
-                ValueFormatter.Notation.valueOf(request.getString("notation"));
-        FractionMode fraction = FractionMode.fromId(request.getInt("fractionMode"));
+    private String copyRows(CalculationRequest request, Command command) {
+        ValueFormatter.Notation notation = request.notation;
+        FractionMode fraction = request.fractionMode;
         java.util.StringJoiner result = new java.util.StringJoiner("\n");
         for (UnifiedReal value : cached.selectedValues(command.rows()))
             result.add(texts.clipboard(value, notation, fraction));
         return result.toString();
     }
 
-    private void loadCheckpoint(Bundle request, Bundle response) throws IOException {
+    private void loadCheckpoint(CalculationRequest request, Bundle response) throws IOException {
         checkAccess();
-        String input = request.getString("inputId");
-        String session = request.getString("sessionId");
+        String input = request.inputId;
+        String session = request.sessionId;
         if (cached == null
                 || !Objects.equals(input, cachedId)
                 || !Objects.equals(session, cachedSession)) {
@@ -161,14 +156,13 @@ public class CalculationService extends Service {
                 cached =
                         input == null
                                 ? new RpnCalculator()
-                                : RpnCalculator.load(MemoryPayload.take(request, "input"));
+                                : RpnCalculator.load(Transfer.require(request.input));
             } catch (IOException ex) {
                 response.putBoolean("invalidCheckpoint", true);
                 throw new IOException(
                         "Saved calculation is damaged or from an unsupported version", ex);
             }
-            if (input == null)
-                cached.setAngleUnit(RpnCalculator.AngleUnit.valueOf(request.getString("angle")));
+            if (input == null) cached.setAngleUnit(request.angle);
             cachedId = input;
             cachedSession = session;
             cachedStackId = UUID.randomUUID().toString();
@@ -192,23 +186,23 @@ public class CalculationService extends Service {
         FractionMode fractionMode;
         String operationError = "";
 
-        Evaluation(Bundle request) {
-            Command key = Command.parse(request.getString("key"));
+        Evaluation(CalculationRequest request) {
+            Command key = request.command();
             List<UnifiedReal> before = cached.values();
             candidate = cached;
-            byte[] draft = request.getByteArray("entryDraft");
-            if (request.getBoolean("entryBranch")) candidate.discardRedo();
+            byte[] draft = request.entryDraft;
+            if (request.entryBranch) candidate.discardRedo();
             if (draft != null) {
                 try {
-                    candidate.useEntryEditor(RpnCalculator.load(draft));
+                    candidate.useEntryEditor(EntryEditor.load(draft));
                 } catch (IOException ex) {
                     throw new IllegalArgumentException("Invalid entry draft", ex);
                 }
             }
-            Locale locale = Locale.forLanguageTag(request.getString("locale"));
-            numberMode = NumberMode.fromId(request.getInt("numberMode"));
-            fractionMode = FractionMode.fromId(request.getInt("fractionMode"));
-            notation = ValueFormatter.Notation.valueOf(request.getString("notation"));
+            Locale locale = Locale.forLanguageTag(request.locale);
+            numberMode = request.numberMode;
+            fractionMode = request.fractionMode;
+            notation = request.notation;
             LocaleNumbers local = profile(locale, NumberMode.LOCALE);
             LocaleNumbers format = profile(locale, numberMode);
             candidate.setInputProfile(format.profile());

@@ -139,6 +139,18 @@ public final class Command {
         return kind == Kind.EDIT || kind == Kind.SELECT;
     }
 
+    public void apply(EntryEditor editor, NumberText.Profile locale, NumberText.Profile format) {
+        switch (kind) {
+            case EDIT -> editor.editText(text, start, end, raw, explicitDecimal, format);
+            case SELECT -> editor.select(start, end);
+            case PASTE_RAW -> editor.pasteClipboard(text, locale);
+            case HOLD_DIGIT -> editor.key(text);
+            default -> {
+                if (!editor.key(wire)) throw new IllegalArgumentException("Not an entry command");
+            }
+        }
+    }
+
     public void apply(
             RpnCalculator calculator, NumberText.Profile locale, NumberText.Profile format) {
         switch (kind) {

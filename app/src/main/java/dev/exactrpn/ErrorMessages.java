@@ -72,6 +72,9 @@ final class ErrorMessages {
             case UNDEFINED_RESULT:
                 id = R.string.error_undefined_result;
                 break;
+            case TRANSFER_TOO_LARGE:
+                id = R.string.error_transfer_too_large;
+                break;
             case INTERNAL:
                 id = R.string.error_internal;
                 break;

@@ -135,4 +135,5 @@
     <string name="source_code">Source code</string>
     <string name="error_invalid_paste_line">Cannot paste: line %1$d is invalid, ambiguous, or too large. Nothing was added.</string>
     <string name="selection_operation_unavailable">This operation is unavailable while rows are selected</string>
+    <string name="error_transfer_too_large">Calculation or clipboard text is too large.</string>
 </resources>
