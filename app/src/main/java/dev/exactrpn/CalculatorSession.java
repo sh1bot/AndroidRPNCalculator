@@ -44,7 +44,7 @@ final class CalculatorSession {
 
     private final Deque<PendingKey> pending = new ArrayDeque<>();
     final SortedSet<Integer> selectedRows = new TreeSet<>();
-    volatile boolean busy, cancelRequested, background;
+    volatile boolean busy, cancelRequested, background, operationPending;
     private CalculatorStore store;
     final SessionPolicy policy;
     private volatile boolean restorePending;
@@ -130,6 +130,11 @@ final class CalculatorSession {
         boolean start;
         synchronized (this) {
             pending.addLast(new PendingKey(command, inputGeneration, copy));
+            if (Operation.find(command.wire) != null
+                    || command.is("Factor")
+                    || command.kind == Command.Kind.UNARY_ROWS
+                    || command.kind == Command.Kind.SUM_ROWS
+                    || command.kind == Command.Kind.PRODUCT_ROWS) operationPending = true;
             start = !busy;
             if (start) {
                 cancelRequested = false;
@@ -150,6 +155,7 @@ final class CalculatorSession {
                 if (pending.isEmpty()) {
                     calculatingThread = null;
                     busy = false;
+                    operationPending = false;
                     Thread.interrupted();
                     key = null;
                     generation = inputGeneration;

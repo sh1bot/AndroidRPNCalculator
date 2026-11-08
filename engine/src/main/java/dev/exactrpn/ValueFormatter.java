@@ -19,6 +19,8 @@ public final class ValueFormatter {
     }
 
     private static final int DIGITS = 12;
+    private static final int MAX_INLINE_DIGITS = 1000;
+    private static final BigInteger INLINE_LIMIT = BigInteger.TEN.pow(MAX_INLINE_DIGITS);
     private static final int COPY_DIGITS = 40;
 
     private ValueFormatter() {}
@@ -26,7 +28,7 @@ public final class ValueFormatter {
     public static String format(UnifiedReal value, boolean newest, Notation notation) {
         BigInteger integer = value.bigIntegerValue();
         if (integer != null) {
-            if (newest) return integer.toString();
+            if (newest && integer.abs().compareTo(INLINE_LIMIT) < 0) return integer.toString();
             BigDecimal rounded =
                     new BigDecimal(integer).round(new MathContext(DIGITS, RoundingMode.HALF_EVEN));
             return (rounded.compareTo(new BigDecimal(integer)) == 0 ? "" : "≈ ")
@@ -34,7 +36,7 @@ public final class ValueFormatter {
         }
         if (newest) {
             String exact = terminatingDecimal(value);
-            if (exact != null) return exact;
+            if (exact != null && exact.length() <= MAX_INLINE_DIGITS) return exact;
         }
         // Bounded zero detection avoids an undecidable comparison with exact zero.
         StringFloatRep rep = value.crValue().toStringFloatRep(DIGITS + 8, 10, -1000);
@@ -50,8 +52,12 @@ public final class ValueFormatter {
             UnifiedReal value, boolean newest, Notation notation, FractionMode fractionMode) {
         if (fractionMode != FractionMode.DECIMAL) {
             BoundedRational rational = value.boundedRationalValue();
-            if (rational != null && value.bigIntegerValue() == null)
-                return fraction(rational, fractionMode == FractionMode.MIXED);
+            if (rational != null && value.bigIntegerValue() == null) {
+                BigInteger[] parts = ExactFunctions.parts(value);
+                if (parts[0].abs().compareTo(INLINE_LIMIT) < 0
+                        && parts[1].abs().compareTo(INLINE_LIMIT) < 0)
+                    return fraction(rational, fractionMode == FractionMode.MIXED);
+            }
         }
         return format(value, newest, notation);
     }
@@ -93,11 +99,12 @@ public final class ValueFormatter {
     private static String terminatingDecimal(UnifiedReal value) {
         BoundedRational rational = value.boundedRationalValue();
         int places = BoundedRational.digitsRequired(rational);
-        return places <= 1000
-                ? new BigDecimal(rational.toStringTruncated(places))
+        if (places > 1000) return null;
+        String text =
+                new BigDecimal(rational.toStringTruncated(places))
                         .stripTrailingZeros()
-                        .toPlainString()
-                : null;
+                        .toPlainString();
+        return text;
     }
 
     private static BigDecimal rounded(StringFloatRep rep, int digits) {

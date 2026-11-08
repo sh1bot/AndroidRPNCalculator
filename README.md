@@ -40,7 +40,7 @@ The constants are π, e and φ (the exact golden ratio). Long-press π/τ to swi
 
 #### Display modes
 
-**RAD/DEG/GRAD** selects radians, degrees or gradians. **SCI/ENG** selects scientific or engineering notation. **DEC/FRAC/IMPR** selects decimals, mixed fractions or improper fractions. Irrational values remain decimal. Exact integers at X can use the full display; older stack values use compact notation. Display modes never replace the stored exact value.
+**RAD/DEG/GRAD** selects radians, degrees or gradians. **SCI/ENG** selects scientific or engineering notation. **DEC/FRAC/IMPR** selects decimals, mixed fractions or improper fractions. Irrational values remain decimal. Exact integers at X can use the full display; excessively long results use compact notation while retaining their exact value for arithmetic and copying; older stack values use compact notation. Display modes never replace the stored exact value.
 
 **LOC/DOT/NONE** selects phone-locale formatting, decimal dot with thin-space grouping, or the locale decimal without grouping. Scientific notation is drawn as ×10 with a raised exponent.
 
