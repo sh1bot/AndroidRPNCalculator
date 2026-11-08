@@ -27,6 +27,8 @@ public final class AboutTest {
     @Test
     public void menuShowsOfflineCreditsAndLicensesWithRepositoryLink() throws Exception {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
+        LockScreenTest.shell("input keyevent KEYCODE_WAKEUP");
+        LockScreenTest.shell("wm dismiss-keyguard");
         MainActivity activity =
                 (MainActivity)
                         instrumentation.startActivitySync(
@@ -47,6 +49,9 @@ public final class AboutTest {
             assertTrue(AboutDialog.read(activity, "licenses.html").contains("Hans-J. Boehm"));
             assertTrue(AboutDialog.read(activity, "licenses.html").contains("Silicon Graphics"));
             pressBack();
+        } catch (Throwable failure) {
+            android.util.Log.e("MenuTest", LockScreenTest.shell("dumpsys window windows"));
+            throw failure;
         } finally {
             StackSelectionTest.finish(activity);
         }
