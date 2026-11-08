@@ -220,7 +220,12 @@ public class CalculationService extends Service {
                 UnifiedReal value = values.get(i);
                 boolean newest = !candidate.isEditing() && i == values.size() - 1;
                 rows.add(texts.row(value, newest, notation, fractionMode));
-                compact.add(texts.row(value, false, notation, fractionMode));
+                compact.add(
+                        texts.row(
+                                value,
+                                false,
+                                notation,
+                                newest ? FractionMode.DECIMAL : fractionMode));
             }
             Bundle display = new Bundle();
             display.putString("operationError", operationError);
