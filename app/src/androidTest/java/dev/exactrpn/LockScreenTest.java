@@ -65,10 +65,12 @@ public final class LockScreenTest {
         fail("Timed out waiting for lock-screen test at " + new Throwable().getStackTrace()[1]);
     }
 
-    private String shell(String command) throws Exception {
+    static String shell(String command) throws Exception {
         try (InputStream input =
                 new ParcelFileDescriptor.AutoCloseInputStream(
-                        instrumentation.getUiAutomation().executeShellCommand(command))) {
+                        InstrumentationRegistry.getInstrumentation()
+                                .getUiAutomation()
+                                .executeShellCommand(command))) {
             ByteArrayOutputStream out = new ByteArrayOutputStream();
             byte[] bytes = new byte[4096];
             int count;
@@ -222,12 +224,20 @@ public final class LockScreenTest {
         boolean credential = false;
         String lockDelay = shell("settings get secure lock_screen_lock_after_timeout").trim();
         try {
+            shell("locksettings set-disabled false");
             shell("locksettings set-pin 1234");
             credential = true;
             await(manager::isDeviceSecure);
             shell("settings put secure lock_screen_lock_after_timeout 0");
             shell("input keyevent KEYCODE_SLEEP");
-            await(manager::isDeviceLocked);
+            try {
+                await(manager::isDeviceLocked);
+            } catch (AssertionError failure) {
+                android.util.Log.e("LockTest", shell("dumpsys window policy"));
+                android.util.Log.e("LockTest", shell("dumpsys trust"));
+                android.util.Log.e("LockTest", shell("dumpsys power"));
+                throw failure;
+            }
             shell("input keyevent KEYCODE_WAKEUP");
             activity = open(context);
             CalculatorSession session = StackSelectionTest.session(activity);
