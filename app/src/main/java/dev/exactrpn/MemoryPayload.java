@@ -3,7 +3,6 @@ package dev.exactrpn;
 
 import android.os.Build;
 import android.os.Bundle;
-import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
 import android.os.SharedMemory;
 import android.system.ErrnoException;
@@ -13,79 +12,67 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-/** Descriptor-only Binder transfer. Payload bytes never go through the filesystem. */
+/** Small transfers use Binder directly; larger ones use read-only shared memory. */
 final class MemoryPayload implements AutoCloseable {
+    static final int INLINE_LIMIT = 256 * 1024;
     private static final int LIMIT = 128 * 1024 * 1024;
     private final Parcelable handle;
-    private final Closeable owner;
+    private final byte[] bytes;
     private final int length;
 
-    private MemoryPayload(Parcelable handle, Closeable owner, int length) {
+    private MemoryPayload(byte[] bytes, Parcelable handle, int length) {
         this.handle = handle;
-        this.owner = owner;
+        this.bytes = bytes;
         this.length = length;
     }
 
     static MemoryPayload create(byte[] bytes) throws IOException {
         if (bytes.length > LIMIT) throw new IOException("Calculation transfer is too large");
-        return Build.VERSION.SDK_INT >= 27 ? Api27.create(bytes) : pipe(bytes);
-    }
-
-    // Android 8.0 has no SharedMemory API. Pipes are anonymous kernel buffers too.
-    static MemoryPayload pipe(byte[] bytes) throws IOException {
-        ParcelFileDescriptor[] ends = ParcelFileDescriptor.createPipe();
-        Thread writer =
-                new Thread(
-                        () -> {
-                            try (ParcelFileDescriptor.AutoCloseOutputStream out =
-                                    new ParcelFileDescriptor.AutoCloseOutputStream(ends[1])) {
-                                out.write(bytes);
-                            } catch (IOException ignored) {
-                                // The receiver may have cancelled and closed its end.
-                            }
-                        },
-                        "calculation-transfer");
-        writer.setDaemon(true);
-        writer.start();
-        return new MemoryPayload(ends[0], ends[0], bytes.length);
+        if (bytes.length < INLINE_LIMIT) return new MemoryPayload(bytes, null, bytes.length);
+        if (Build.VERSION.SDK_INT < 27)
+            throw new IOException("Large calculation transfers require Android 8.1 or newer");
+        return Api27.create(bytes);
     }
 
     void put(Bundle bundle, String key) {
-        bundle.putParcelable(key, handle);
-        bundle.putInt(key + "Length", length);
+        if (bytes != null) bundle.putByteArray(key, bytes);
+        else {
+            bundle.putParcelable(key, handle);
+            bundle.putInt(key + "Length", length);
+        }
     }
 
     static byte[] take(Bundle bundle, String key) throws IOException {
-        Parcelable handle = bundle.getParcelable(key);
+        Object data = bundle.get(key);
         bundle.remove(key);
         int length = bundle.getInt(key + "Length", -1);
         bundle.remove(key + "Length");
-        if (handle == null) throw new IOException("Missing calculation transfer");
         try {
-            if (length < 0 || length > LIMIT)
-                throw new IOException("Invalid calculation transfer size");
-            if (Build.VERSION.SDK_INT >= 27 && Api27.isMemory(handle))
-                return Api27.read(handle, length);
-            if (!(handle instanceof ParcelFileDescriptor))
-                throw new IOException("Invalid calculation transfer");
-            try (ParcelFileDescriptor.AutoCloseInputStream in =
-                    new ParcelFileDescriptor.AutoCloseInputStream((ParcelFileDescriptor) handle)) {
-                byte[] bytes = new byte[length];
-                new java.io.DataInputStream(in).readFully(bytes);
+            if (data instanceof byte[]) {
+                byte[] bytes = (byte[]) data;
+                if (bytes.length > LIMIT)
+                    throw new IOException("Invalid calculation transfer size");
                 return bytes;
             }
+            if (data == null) throw new IOException("Missing calculation transfer");
+            if (length < 0 || length > LIMIT)
+                throw new IOException("Invalid calculation transfer size");
+            if (Build.VERSION.SDK_INT >= 27 && Api27.isMemory(data))
+                return Api27.read((Parcelable) data, length);
+            throw new IOException("Invalid calculation transfer");
         } finally {
-            closeHandle(handle);
+            closeHandle(data);
         }
     }
 
     static void discard(Bundle bundle, String key) {
-        Parcelable handle = bundle.getParcelable(key);
+        Object data = bundle.get(key);
         bundle.remove(key);
-        closeHandle(handle);
+        bundle.remove(key + "Length");
+        closeHandle(data);
     }
 
-    private static void closeHandle(Parcelable handle) {
+    private static void closeHandle(Object handle) {
         if (handle instanceof Closeable) {
             try {
                 ((Closeable) handle).close();
@@ -96,7 +83,7 @@ final class MemoryPayload implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
-        owner.close();
+        closeHandle(handle);
     }
 
     @android.annotation.TargetApi(27)
@@ -113,14 +100,14 @@ final class MemoryPayload implements AutoCloseable {
                 }
                 if (!memory.setProtect(OsConstants.PROT_READ))
                     throw new IOException("Could not protect calculation transfer");
-                return new MemoryPayload(memory, memory, bytes.length);
+                return new MemoryPayload(null, memory, bytes.length);
             } catch (ErrnoException | IOException | RuntimeException ex) {
                 if (memory != null) memory.close();
                 throw new IOException("Could not allocate calculation transfer", ex);
             }
         }
 
-        static boolean isMemory(Parcelable handle) {
+        static boolean isMemory(Object handle) {
             return handle instanceof SharedMemory;
         }
 

@@ -29,6 +29,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - api: 26
+            target: default
           - api: 29
             target: default
           - api: 35
@@ -64,7 +66,13 @@ jobs:
           script: |
             adb shell input keyevent KEYCODE_WAKEUP
             adb shell wm dismiss-keyguard
-            bash scripts/test-device.sh
+            if [ "${{ matrix.api }}" = "26" ]; then
+              gradle --no-daemon --console=plain :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=dev.exactrpn.MemoryTransportTest
+              mkdir -p app/build/reports/device-tests
+              cp -R app/build/reports/androidTests/connected app/build/reports/device-tests/transport
+            else
+              bash scripts/test-device.sh
+            fi
       - name: Upload device test report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
