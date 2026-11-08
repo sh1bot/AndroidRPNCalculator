@@ -39,6 +39,22 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void keyTextArraysCoverTheCatalogAndKeepTranslatedLabels() {
+        android.content.res.Resources resources =
+                InstrumentationRegistry.getInstrumentation().getTargetContext().getResources();
+        String[] labels = resources.getStringArray(R.array.key_labels);
+        String[] descriptions = resources.getStringArray(R.array.key_descriptions);
+        assertEquals(CalculatorKey.values().length, labels.length);
+        assertEquals(labels.length, descriptions.length);
+        assertEquals(resources.getString(R.string.enter), labels[CalculatorKey.ENTER.ordinal()]);
+        assertEquals(resources.getString(R.string.factor), labels[CalculatorKey.FACTOR.ordinal()]);
+        assertEquals(
+                resources.getString(R.string.reciprocal_description),
+                descriptions[CalculatorKey.RECIPROCAL.ordinal()]);
+        assertEquals("", labels[CalculatorKey.LOG10.ordinal()]);
+    }
+
+    @Test
     public void scientificDisplayStylesPowersAndKeepsEntryAndCopyLiteral() {
         for (Locale locale :
                 new Locale[] {Locale.US, Locale.GERMANY, Locale.forLanguageTag("ar-EG")}) {

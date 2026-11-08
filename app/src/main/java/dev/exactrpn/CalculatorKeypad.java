@@ -31,6 +31,7 @@ public final class CalculatorKeypad extends ViewGroup {
     private final Button functions, complements;
     private final ThemeColors colors;
     private LocaleNumbers numbers;
+    private final String[] keyLabels, keyDescriptions;
     private final Map<String, Button> numberButtons = new HashMap<>();
     private final LinearLayout controls;
     private Button deleteButton,
@@ -57,6 +58,8 @@ public final class CalculatorKeypad extends ViewGroup {
             boolean expanded,
             BiConsumer<Boolean, Boolean> savePanel) {
         super(context);
+        keyLabels = getResources().getStringArray(R.array.key_labels);
+        keyDescriptions = getResources().getStringArray(R.array.key_descriptions);
         this.command = command;
         this.expanded = expanded;
         this.savePanel = savePanel;
@@ -143,8 +146,8 @@ public final class CalculatorKeypad extends ViewGroup {
     private CharSequence functionLabel(String wire) {
         CalculatorKey key = CalculatorKey.find(wire);
         if (key == null) return wire;
-        int resource = KeyResources.resource(key.labelText);
-        if (resource != 0) return getContext().getString(resource);
+        String translated = keyLabels[key.ordinal()];
+        if (!translated.isEmpty()) return translated;
         if (key == CalculatorKey.LOG10) {
             SpannableString logarithm = new SpannableString(key.label);
             logarithm.setSpan(new RelativeSizeSpan(.7f), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -425,8 +428,8 @@ public final class CalculatorKeypad extends ViewGroup {
 
     private String keyDescription(String wire) {
         CalculatorKey key = CalculatorKey.find(wire);
-        int resource = key == null ? 0 : KeyResources.resource(key.description);
-        return resource == 0 ? wire : getContext().getString(resource);
+        String translated = key == null ? "" : keyDescriptions[key.ordinal()];
+        return translated.isEmpty() ? wire : translated;
     }
 
     private boolean longPress(String key) {
