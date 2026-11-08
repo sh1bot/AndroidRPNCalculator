@@ -226,6 +226,13 @@ final class StackRowRenderer {
                             depth,
                             display.rows.get(i).startsWith("≈ "),
                             value.getText()));
+            if (display.editing)
+                label.setContentDescription(
+                        rowDescription(
+                                true,
+                                depth,
+                                display.rows.get(i).startsWith("≈ "),
+                                value.getText()));
             stackRows.addView(row);
         }
         showSelection(stackRows, selectedRows);
