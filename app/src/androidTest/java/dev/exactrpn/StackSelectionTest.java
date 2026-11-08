@@ -106,16 +106,42 @@ public final class StackSelectionTest {
                     () -> state.enqueue(Command.parse("PASTE_RAW:" + new String(digits))));
             await(() -> !state.busy && state.display.editing);
             key(a, "ENTER");
-            await(
-                    () -> {
-                        android.widget.TextView value =
-                                (android.widget.TextView) tagged(a, "stack-value:0");
-                        if (value == null) return false;
-                        View row = tagged(a, "stack-row:0");
-                        View viewport = (View) row.getParent().getParent();
-                        return value.getText().length() < 100
-                                && row.getHeight() <= viewport.getHeight();
-                    });
+            try {
+                await(
+                        () -> {
+                            android.widget.TextView value =
+                                    (android.widget.TextView) tagged(a, "stack-value:0");
+                            if (value == null) return false;
+                            View row = tagged(a, "stack-row:0");
+                            View viewport = (View) row.getParent().getParent();
+                            return value.getText().length() < 100
+                                    && row.getHeight() <= viewport.getHeight();
+                        });
+            } catch (AssertionError failed) {
+                java.util.concurrent.atomic.AtomicReference<String> detail =
+                        new java.util.concurrent.atomic.AtomicReference<>();
+                instrumentation.runOnMainSync(
+                        () -> {
+                            android.widget.TextView value =
+                                    (android.widget.TextView) tagged(a, "stack-value:0");
+                            View row = tagged(a, "stack-row:0");
+                            View viewport = (View) row.getParent().getParent();
+                            detail.set(
+                                    "textLength="
+                                            + value.getText().length()
+                                            + " valueHeight="
+                                            + value.getHeight()
+                                            + " rowHeight="
+                                            + row.getHeight()
+                                            + " viewportHeight="
+                                            + viewport.getHeight()
+                                            + " width="
+                                            + value.getWidth()
+                                            + " maxLines="
+                                            + value.getMaxLines());
+                        });
+                throw new AssertionError(detail.get(), failed);
+            }
             key(a, "FUNCTIONS");
             await(
                     () -> {
