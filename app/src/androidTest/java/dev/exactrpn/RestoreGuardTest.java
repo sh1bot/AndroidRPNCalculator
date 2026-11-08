@@ -79,4 +79,23 @@ public final class RestoreGuardTest {
             remove(directory);
         }
     }
+
+    @Test
+    public void oversizedSnapshotIsRejectedWithoutAllocatingItsContents() throws Exception {
+        File directory = directory();
+        try {
+            File saved = new File(directory, "calculator-state.bin");
+            try (java.io.RandomAccessFile file = new java.io.RandomAccessFile(saved, "rw")) {
+                file.setLength((long) MemoryPayload.MAX_LENGTH + 1);
+            }
+            try {
+                new CalculatorStore(directory).beginRestore();
+                fail("Oversized snapshot unexpectedly loaded");
+            } catch (java.io.IOException expected) {
+                assertTrue(expected.getMessage().contains("too large"));
+            }
+        } finally {
+            remove(directory);
+        }
+    }
 }
