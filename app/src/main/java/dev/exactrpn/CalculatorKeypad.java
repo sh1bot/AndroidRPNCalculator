@@ -489,11 +489,7 @@ public final class CalculatorKeypad extends ViewGroup {
         }
         b.setContentDescription(description);
         b.setOnClickListener(
-                v ->
-                        command.accept(
-                                key.equals(Command.UNDO) && calculating
-                                        ? Command.CANCEL
-                                        : key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
+                v -> command.accept(key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
         if (key.equals("π"))
             b.setOnLongClickListener(
                     v -> {

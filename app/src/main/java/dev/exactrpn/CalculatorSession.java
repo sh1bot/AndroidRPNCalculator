@@ -241,6 +241,10 @@ final class CalculatorSession {
         }
     }
 
+    private static boolean displayOnly(Command key) {
+        return key.is("FORMAT") || key.is("NUMBER_FORMAT") || key.is("FRACTION") || key.is("ANGLE");
+    }
+
     private byte[] completedDraft() throws java.io.IOException {
         if (editor == null) return null;
         return editor.entryForCommit().save();
@@ -298,7 +302,9 @@ final class CalculatorSession {
                 long revision = generation;
                 if (onMain(() -> editLocally(command, revision))) continue;
                 Bundle request = new Bundle();
-                if (!key.is(Command.RESTORE) && key.kind != Command.Kind.COPY_ROWS)
+                if (!key.is(Command.RESTORE)
+                        && !displayOnly(key)
+                        && key.kind != Command.Kind.COPY_ROWS)
                     request.putByteArray("entryDraft", onMain(this::completedDraft));
                 request.putString("key", key.wire);
                 CalculationSnapshot input = checkpoint;
@@ -381,16 +387,15 @@ final class CalculatorSession {
                         fractionMode = nextDisplay.fractionMode;
                         boolean keepEdits =
                                 editor != null
-                                        && (nextDisplay.editing
-                                                || key.is("FORMAT")
-                                                || key.is("FRACTION")
-                                                || key.is("NUMBER_FORMAT")
-                                                || key.is("ANGLE"))
-                                        && nextDisplay.entry.equals(editor.entry())
-                                        && nextDisplay.editing == editor.isEditing()
-                                        && nextDisplay.raw == editor.rawEntry()
-                                        && nextDisplay.start == editor.selectionStart()
-                                        && nextDisplay.end == editor.selectionEnd();
+                                        && (displayOnly(key)
+                                                || nextDisplay.editing
+                                                        && editor.isEditing()
+                                                        && nextDisplay.entry.equals(editor.entry())
+                                                        && nextDisplay.raw == editor.rawEntry()
+                                                        && nextDisplay.start
+                                                                == editor.selectionStart()
+                                                        && nextDisplay.end
+                                                                == editor.selectionEnd());
                         if (!keepEdits) {
                             try {
                                 editor = RpnCalculator.load(result.getByteArray("entryState"));

@@ -86,6 +86,16 @@ public final class EntryOperatorTest {
             connection.setAccessible(true);
             assertNull(
                     "Typing must not reconnect to the arithmetic service", connection.get(remote));
+            key(session, "FORMAT");
+            assertEquals("12.3", session.display.entry);
+            assertEquals(
+                    "Mode changes must not submit the draft",
+                    "",
+                    RpnCalculator.load(session.checkpoint.bytes).entry());
+            key(session, "UNDO");
+            assertEquals("12.", session.display.entry);
+            key(session, "REDO");
+            assertEquals("12.3", session.display.entry);
             key(session, "ENTER");
             assertFalse(session.display.editing);
             assertEquals(Arrays.asList("12.3"), session.display.rows);
