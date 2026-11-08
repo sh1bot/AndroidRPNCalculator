@@ -93,10 +93,10 @@
     <string name="process_stopped">Calculation process stopped; previous state preserved</string>
     <string name="result_unreadable">Could not read calculation result</string>
     <string name="process_start_failed">Could not start calculation process</string>
-    <string name="copy_level">Copy stack level %1$d: %2$s</string>
-    <string name="copy_level_approximate">Copy stack level %1$d, approximately: %2$s</string>
-    <string name="select_level_value">Select stack level %1$d: %2$s</string>
-    <string name="select_level_approximate">Select stack level %1$d, approximately: %2$s</string>
+    <string name="copy_level">Stack level %1$d: %2$s; long press to copy</string>
+    <string name="copy_level_approximate">Stack level %1$d, approximately: %2$s; long press to copy</string>
+    <string name="select_level_value">Select stack level %1$d: %2$s; long press to copy</string>
+    <string name="select_level_approximate">Select stack level %1$d, approximately: %2$s; long press to copy</string>
     <string name="app_name">Exact RPN</string>
     <string name="error_need_values">Enter another value first, then the operator</string>
     <string name="error_entry_too_long">Entry is too long (maximum %1$d characters)</string>
