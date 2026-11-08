@@ -4,8 +4,10 @@ package dev.exactrpn;
 import static org.junit.Assert.*;
 
 import android.content.Context;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.FileObserver;
+import android.os.Parcel;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -55,6 +57,7 @@ public final class MemoryTransportTest {
     @Test
     public void snapshotsAndClipboardLargerThanBinderSurviveWorkerReplacementWithoutFiles()
             throws Exception {
+        org.junit.Assume.assumeTrue(Build.VERSION.SDK_INT >= 27);
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context, true);
         ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -142,16 +145,38 @@ public final class MemoryTransportTest {
     }
 
     @Test
-    public void androidEightMemoryPipeTransfersLargeDataAndHandlesAbandonment() throws Exception {
-        byte[] bytes = new byte[2 * 1024 * 1024];
-        new java.util.Random(42).nextBytes(bytes);
-        try (MemoryPayload payload = MemoryPayload.pipe(bytes)) {
-            Bundle bundle = new Bundle();
-            payload.put(bundle, "data");
-            assertArrayEquals(bytes, MemoryPayload.take(bundle, "data"));
-        }
-        try (MemoryPayload abandoned = MemoryPayload.pipe(bytes)) {
-            // Closing an unread pipe must release its blocked writer, without waiting for a reader.
+    public void smallPayloadsUseBinderAndLargeOnesRequireSharedMemory() throws Exception {
+        for (int length :
+                new int[] {0, MemoryPayload.INLINE_LIMIT - 1, MemoryPayload.INLINE_LIMIT}) {
+            byte[] bytes = new byte[length];
+            new java.util.Random(42).nextBytes(bytes);
+            if (length >= MemoryPayload.INLINE_LIMIT && Build.VERSION.SDK_INT < 27) {
+                try {
+                    MemoryPayload.create(bytes);
+                    fail("Android 8.0 must reject transfers requiring shared memory");
+                } catch (java.io.IOException expected) {
+                    assertTrue(expected.getMessage().contains("Android 8.1"));
+                }
+                continue;
+            }
+            try (MemoryPayload payload = MemoryPayload.create(bytes)) {
+                Bundle sent = new Bundle();
+                payload.put(sent, "data");
+                assertEquals(
+                        length < MemoryPayload.INLINE_LIMIT, sent.get("data") instanceof byte[]);
+                Parcel parcel = Parcel.obtain();
+                try {
+                    parcel.writeBundle(sent);
+                    parcel.setDataPosition(0);
+                    Bundle received = parcel.readBundle(MemoryPayload.class.getClassLoader());
+                    assertArrayEquals(bytes, MemoryPayload.take(received, "data"));
+                    assertFalse(received.containsKey("data"));
+                } finally {
+                    parcel.recycle();
+                }
+                MemoryPayload.discard(sent, "data");
+                assertTrue(sent.isEmpty());
+            }
         }
     }
 }
