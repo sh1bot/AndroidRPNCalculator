@@ -27,7 +27,7 @@ final class CalculatorSession {
     private RpnCalculator editor;
     private Display arithmeticDisplay;
     private long editRevision;
-    private boolean editorDirty;
+    private boolean editorDirty, localBranch;
     private final java.util.Map<NumberMode, NumberText.Profile> inputProfiles =
             new java.util.EnumMap<>(NumberMode.class);
     private final Object persistenceLock = new Object();
@@ -189,8 +189,7 @@ final class CalculatorSession {
                                         || key.is("±")
                                         || cursorCommand(wire))
                         || key.is(Command.UNDO) && editor.undoCount() > 0
-                        || key.is(Command.REDO)
-                                && (editor.redoCount() > 0 || editor.undoCount() > 0);
+                        || key.is(Command.REDO) && editor.redoCount() > 0;
         if (editing && key.kind == Command.Kind.HOLD_DIGIT) local = true;
         if (key.kind == Command.Kind.PASTE_RAW) {
             long lines =
@@ -201,6 +200,9 @@ final class CalculatorSession {
         }
         if (!local) return false;
         try {
+            String before = editor.entry();
+            boolean wasEditing = editor.isEditing(), wasRaw = editor.rawEntry();
+            int undos = editor.undoCount(), redos = editor.redoCount();
             editor.setInputProfile(inputProfile(numberMode));
             key.apply(editor, inputProfile(NumberMode.LOCALE), inputProfile(numberMode));
             if (checkpoint == null) {
@@ -212,6 +214,13 @@ final class CalculatorSession {
                     throw new IllegalStateException(ex);
                 }
             }
+            if (!key.is(Command.UNDO) && !key.is(Command.REDO))
+                localBranch |=
+                        !before.equals(editor.entry())
+                                || wasEditing != editor.isEditing()
+                                || wasRaw != editor.rawEntry()
+                                || undos != editor.undoCount()
+                                || redos != editor.redoCount();
             loaded = true;
             editorDirty = true;
             editRevision++;
@@ -304,8 +313,10 @@ final class CalculatorSession {
                 Bundle request = new Bundle();
                 if (!key.is(Command.RESTORE)
                         && !displayOnly(key)
-                        && key.kind != Command.Kind.COPY_ROWS)
+                        && key.kind != Command.Kind.COPY_ROWS) {
                     request.putByteArray("entryDraft", onMain(this::completedDraft));
+                    request.putBoolean("entryBranch", localBranch);
+                }
                 request.putString("key", key.wire);
                 CalculationSnapshot input = checkpoint;
                 if (input != null) input.input(request);
@@ -403,6 +414,7 @@ final class CalculatorSession {
                                 throw new IllegalStateException("Invalid entry response", ex);
                             }
                             editorDirty = editor.undoCount() > 0 || editor.redoCount() > 0;
+                            localBranch = false;
                             editRevision++;
                         }
                         arithmeticDisplay = nextDisplay;
@@ -455,7 +467,8 @@ final class CalculatorSession {
                 } else if (!version.equals(persistedCheckpoint)) {
                     store.save(
                             editorDirty
-                                    ? RpnCalculator.saveWithEntry(accepted.bytes, editor)
+                                    ? RpnCalculator.saveWithEntry(
+                                            accepted.bytes, editor, localBranch)
                                     : accepted.bytes);
                     persistedCheckpoint = version;
                 }

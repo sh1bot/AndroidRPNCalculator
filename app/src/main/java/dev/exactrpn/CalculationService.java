@@ -186,6 +186,7 @@ public class CalculationService extends Service {
             List<UnifiedReal> before = cached.values();
             candidate = cached;
             byte[] draft = request.getByteArray("entryDraft");
+            if (request.getBoolean("entryBranch")) candidate.discardRedo();
             if (draft != null) {
                 try {
                     candidate.useEntryEditor(RpnCalculator.load(draft));

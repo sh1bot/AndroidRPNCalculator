@@ -23,6 +23,10 @@ final class EntryDraftTest {
         assertEquals("", resumed.entry());
         resumed.key("REDO");
         assertEquals("123", resumed.entry());
+        engine.useEntryEditor(resumed.entryForCommit());
+        engine.key("REDO");
+        assertEquals("123", engine.values().get(0).bigIntegerValue().toString());
+        assertFalse(engine.isEditing());
     }
 
     @Test
@@ -94,5 +98,20 @@ final class EntryDraftTest {
         restored.key("UNDO");
         assertEquals("7", restored.entry());
         assertEquals(110, restored.values().size());
+    }
+
+    @Test
+    void aRestoredNewDraftCannotRedoTheAbandonedArithmeticBranch() throws Exception {
+        RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
+        engine.paste("42");
+        engine.key("ENTER");
+        engine.key("UNDO");
+        engine.detachEntryEditor();
+        draft.key("9");
+        RpnCalculator restored =
+                RpnCalculator.load(RpnCalculator.saveWithEntry(engine.save(), draft, true));
+        restored.key("REDO");
+        assertEquals("9", restored.entry());
+        assertTrue(restored.values().isEmpty());
     }
 }
