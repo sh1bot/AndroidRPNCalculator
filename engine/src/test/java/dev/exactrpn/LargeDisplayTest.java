@@ -28,7 +28,7 @@ final class LargeDisplayTest {
     @Test
     void hugeIntegersStayExactButNeverReachTheUiInFull() throws Exception {
         RpnCalculator c = new RpnCalculator();
-        c.paste("65536");
+        CalculatorTestSupport.paste(c, "65536");
         c.key("10ˣ");
         for (FractionMode mode : FractionMode.values()) {
             String text =

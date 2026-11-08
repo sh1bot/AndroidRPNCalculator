@@ -259,117 +259,130 @@ final class CalculatorSession {
         return editor.entryForCommit().save();
     }
 
+    private synchronized PendingKey nextKey() {
+        if (cancelRequested) pending.clear();
+        if (!pending.isEmpty()) {
+            calculatingThread = Thread.currentThread();
+            return pending.removeFirst();
+        }
+        calculatingThread = null;
+        busy = operationPending = false;
+        Thread.interrupted();
+        return null;
+    }
+
     private void drainKeys() {
-        while (true) {
-            Command key;
-            long generation;
-            java.util.function.Consumer<String> copy;
-            synchronized (this) {
-                if (cancelRequested) pending.clear();
-                if (pending.isEmpty()) {
-                    calculatingThread = null;
-                    busy = false;
-                    operationPending = false;
-                    Thread.interrupted();
-                    key = null;
-                    generation = inputGeneration;
-                    copy = null;
-                } else {
-                    PendingKey input = pending.removeFirst();
-                    key = input.command;
-                    generation = input.generation;
-                    copy = input.copy;
-                    calculatingThread = Thread.currentThread();
+        PendingKey input;
+        while ((input = nextKey()) != null) processKey(input);
+        if (!closing && background) saveForLifecycle();
+    }
+
+    private void processKey(PendingKey input) {
+        Command key = input.command;
+        long generation = input.generation;
+        try {
+            checkCancelled();
+            if (!policy.temporary && DeviceAccess.locked(context)) {
+                if (key.is(Command.RESTORE)) restorePending = true;
+                synchronized (this) {
+                    pending.clear();
                 }
-            }
-            if (key == null) {
-                if (!closing && background) saveForLifecycle();
                 return;
             }
-            try {
-                checkCancelled();
-                if (!policy.temporary && DeviceAccess.locked(context)) {
-                    if (key.is(Command.RESTORE)) restorePending = true;
-                    synchronized (this) {
-                        pending.clear();
-                    }
-                    continue;
-                }
-                if (key.is(Command.RESTORE) && !policy.temporary) {
-                    try {
-                        byte[] saved = store.load();
-                        checkpoint =
-                                saved == null
-                                        ? null
-                                        : new CalculationSnapshot(
-                                                UUID.randomUUID().toString(), saved, false);
-                    } catch (java.io.IOException ex) {
-                        throw new IllegalStateException("Could not restore saved calculator", ex);
-                    }
-                }
-                Command command = key;
-                long revision = generation;
-                if (onMain(() -> editLocally(command, revision))) continue;
-                Bundle request = new Bundle();
-                if (!key.is(Command.RESTORE)
-                        && !displayOnly(key)
-                        && key.kind != Command.Kind.COPY_ROWS) {
-                    request.putByteArray("entryDraft", onMain(this::completedDraft));
-                    request.putBoolean("entryBranch", localBranch);
-                }
-                request.putString("key", key.wire);
-                CalculationSnapshot input = checkpoint;
-                if (input != null) input.input(request);
-                request.putString("locale", localeTag);
-                request.putString("angle", display.angleUnit.name());
-                request.putString("notation", notation.name());
-                request.putInt("numberMode", numberMode.id);
-                request.putInt("fractionMode", fractionMode.id);
-                Bundle result = remote.evaluate(request);
-                if (key.kind == Command.Kind.COPY_ROWS) {
-                    if (copy != null) handler.post(() -> copy.accept(result.getString("copyText")));
-                    continue;
-                }
-                Display nextDisplay = new Display(result);
-                publishResult(result, nextDisplay, key, generation);
-                if (background) saveForLifecycle();
-            } catch (RuntimeException ex) {
-                if (ex instanceof DeviceAccess.Locked
-                        || (!policy.temporary
-                                && (DeviceAccess.locked(context)
-                                        || (restorePending && key.is(Command.RESTORE))))) {
-                    if (key.is(Command.RESTORE)) restorePending = true;
-                    setError(generation, context.getString(R.string.unlock_to_resume));
-                } else {
-
-                    if (key.is(Command.RESTORE)) {
-                        checkpoint = null;
-                        remote.cancel();
-                        if (ex instanceof RemoteCalculator.InvalidCheckpoint) {
-                            try {
-                                store.quarantine();
-                            } catch (java.io.IOException | DeviceAccess.Locked backupError) {
-                                android.util.Log.e(
-                                        "ExactRPN", "Could not quarantine checkpoint", backupError);
-                            }
-                        }
-                    }
-                    setError(
-                            generation,
-                            cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
-                                    ? context.getString(R.string.calculation_cancelled)
-                                    : key.is(Command.RESTORE)
-                                            ? context.getString(R.string.restore_failed)
-                                            : context.getString(
-                                                    R.string.error_prefix,
-                                                    ErrorMessages.describe(context, ex)));
-                }
-                synchronized (this) {
-                    pending.removeIf(input -> input.generation <= generation);
-                }
-            } finally {
-                Thread.interrupted();
+            if (onMain(() -> editLocally(key, generation))) return;
+            Bundle result = remote.evaluate(request(key));
+            if (key.kind == Command.Kind.COPY_ROWS) {
+                if (input.copy != null)
+                    handler.post(() -> input.copy.accept(result.getString("copyText")));
+                return;
             }
+            publishResult(result, new Display(result), key, generation);
+            if (key.is(Command.RESTORE) && !policy.temporary) acknowledgeRestore();
+            if (background) saveForLifecycle();
+        } catch (RuntimeException ex) {
+            handleFailure(key, generation, ex);
+        } finally {
+            Thread.interrupted();
+        }
+    }
+
+    private Bundle request(Command key) {
+        Bundle request = new Bundle();
+        if (!key.is(Command.RESTORE) && !displayOnly(key) && key.kind != Command.Kind.COPY_ROWS) {
+            request.putByteArray("entryDraft", onMain(this::completedDraft));
+            request.putBoolean("entryBranch", localBranch);
+        }
+        request.putString("key", key.wire);
+        CalculationSnapshot input = checkpoint;
+        if (key.is(Command.RESTORE) && !policy.temporary) {
+            try {
+                byte[] saved = store.beginRestore();
+                input =
+                        saved == null
+                                ? null
+                                : new CalculationSnapshot(
+                                        UUID.randomUUID().toString(), saved, false);
+            } catch (java.io.IOException ex) {
+                throw new IllegalStateException("Could not restore saved calculator", ex);
+            }
+        }
+        if (input != null) input.input(request);
+        request.putString("locale", localeTag);
+        request.putString("angle", display.angleUnit.name());
+        request.putString("notation", notation.name());
+        request.putInt("numberMode", numberMode.id);
+        request.putInt("fractionMode", fractionMode.id);
+        return request;
+    }
+
+    private void acknowledgeRestore() {
+        // Keep the marker through initial layout too, so early UI crashes count as failed starts.
+        handler.postDelayed(
+                () -> {
+                    if (!closing && loaded && canUseSavedState()) endRestore(false);
+                },
+                2000);
+    }
+
+    private void endRestore(boolean quarantine) {
+        try {
+            if (quarantine) store.quarantine();
+            else store.finishRestore();
+        } catch (java.io.IOException | DeviceAccess.Locked ex) {
+            android.util.Log.e("ExactRPN", "Could not finish restore bookkeeping", ex);
+        }
+    }
+
+    private void handleFailure(Command key, long generation, RuntimeException ex) {
+        if (ex instanceof DeviceAccess.Locked
+                || (!policy.temporary
+                        && (DeviceAccess.locked(context)
+                                || (restorePending && key.is(Command.RESTORE))))) {
+            if (key.is(Command.RESTORE)) restorePending = true;
+            setError(generation, context.getString(R.string.unlock_to_resume));
+        } else {
+
+            if (key.is(Command.RESTORE)) {
+                checkpoint = null;
+                remote.cancel();
+                if (!policy.temporary
+                        && (ex instanceof RemoteCalculator.InvalidCheckpoint
+                                || cancelRequested
+                                || ex instanceof com.hp.creals.CR.AbortedException))
+                    endRestore(ex instanceof RemoteCalculator.InvalidCheckpoint);
+            }
+            setError(
+                    generation,
+                    cancelRequested || ex instanceof com.hp.creals.CR.AbortedException
+                            ? context.getString(R.string.calculation_cancelled)
+                            : key.is(Command.RESTORE)
+                                    ? context.getString(R.string.restore_failed)
+                                    : context.getString(
+                                            R.string.error_prefix,
+                                            ErrorMessages.describe(context, ex)));
+        }
+        synchronized (this) {
+            pending.removeIf(input -> input.generation <= generation);
         }
     }
 

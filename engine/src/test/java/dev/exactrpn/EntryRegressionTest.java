@@ -10,27 +10,30 @@ import org.junit.jupiter.api.Test;
 final class EntryRegressionTest extends RegressionSupport {
     @Test
     void arithmeticAndEntryTransactions() throws Exception {
-        check((FractionMode.DECIMAL).next() == FractionMode.MIXED, "decimal cycles to mixed");
-        check((FractionMode.MIXED).next() == FractionMode.IMPROPER, "mixed cycles to improper");
-        check((FractionMode.IMPROPER).next() == FractionMode.DECIMAL, "improper cycles to decimal");
+        assertTrue((FractionMode.DECIMAL).next() == FractionMode.MIXED, "decimal cycles to mixed");
+        assertTrue(
+                (FractionMode.MIXED).next() == FractionMode.IMPROPER, "mixed cycles to improper");
+        assertTrue(
+                (FractionMode.IMPROPER).next() == FractionMode.DECIMAL,
+                "improper cycles to decimal");
         RpnCalculator c = new RpnCalculator();
         number(c, "0.1");
         c.key("ENTER");
         number(c, "0.2");
         c.key("+");
-        check(top(c).definitelyEquals(RpnCalculator.parse("0.3")), "exact decimal addition");
+        assertTrue(top(c).definitelyEquals(RpnCalculator.parse("0.3")), "exact decimal addition");
         keys(c, "CLEAR", "2", "ENTER", "3", "−");
-        check(top(c).definitelyEquals(UnifiedReal.MINUS_ONE), "subtraction order");
+        assertTrue(top(c).definitelyEquals(UnifiedReal.MINUS_ONE), "subtraction order");
         keys(c, "CLEAR", "2", "ENTER", "3", "÷");
-        check(
+        assertTrue(
                 top(c).multiply(new UnifiedReal(3)).definitelyEquals(UnifiedReal.TWO),
                 "division order and exact rational");
         keys(c, "CLEAR", "2", "√", "ENTER", "×");
-        check(top(c).definitelyEquals(UnifiedReal.TWO), "sqrt simplification");
+        assertTrue(top(c).definitelyEquals(UnifiedReal.TWO), "sqrt simplification");
         keys(c, "CLEAR", "π", "sin");
-        check(top(c).definitelyZero(), "symbolic sine pi");
+        assertTrue(top(c).definitelyZero(), "symbolic sine pi");
         keys(c, "CLEAR", "2", "ENTER", "3", "xʸ");
-        check(top(c).definitelyEquals(new UnifiedReal(8)), "power order");
+        assertTrue(top(c).definitelyEquals(new UnifiedReal(8)), "power order");
         keys(c, "UNDO");
         assertEquals(1, c.values().size(), "undo restores stack");
         assertEquals("3", c.entry(), "undo restores pending entry");
@@ -40,28 +43,30 @@ final class EntryRegressionTest extends RegressionSupport {
             throw new AssertionError("zero division accepted");
         } catch (ArithmeticException expected) {
         }
-        check(c.values().size() == 2 && !c.isEditing(), "zero division preserves committed entry");
+        assertTrue(
+                c.values().size() == 2 && !c.isEditing(),
+                "zero division preserves committed entry");
         keys(c, "CLEAR", "1", "±", "ENTER");
         try {
             c.key("√");
             throw new AssertionError("negative root accepted");
         } catch (ArithmeticException expected) {
         }
-        check(top(c).definitelyEquals(UnifiedReal.MINUS_ONE), "domain error preserves stack");
+        assertTrue(top(c).definitelyEquals(UnifiedReal.MINUS_ONE), "domain error preserves stack");
         keys(c, "CLEAR", "1", "ENTER", "2", "ENTER", "SWAP");
-        check(top(c).definitelyOne(), "swap");
+        assertTrue(top(c).definitelyOne(), "swap");
         keys(c, "DROP");
-        check(top(c).definitelyEquals(UnifiedReal.TWO), "drop");
+        assertTrue(top(c).definitelyEquals(UnifiedReal.TWO), "drop");
         keys(c, "DUP");
-        check(c.values().size() == 2, "duplicate");
+        assertTrue(c.values().size() == 2, "duplicate");
         keys(c, "CLEAR");
         try {
             c.key("+");
             throw new AssertionError("underflow accepted");
         } catch (IllegalArgumentException expected) {
         }
-        check(c.values().isEmpty(), "underflow preserves stack");
-        check(
+        assertTrue(c.values().isEmpty(), "underflow preserves stack");
+        assertTrue(
                 RpnCalculator.parse("1e-20").multiply(RpnCalculator.parse("1e20")).definitelyOne(),
                 "exact decimal parser");
         // Cancellation must interrupt undecidable real comparisons and roll back pending input.
@@ -73,20 +78,22 @@ final class EntryRegressionTest extends RegressionSupport {
         } finally {
             Thread.interrupted();
         }
-        check(c.values().size() == 2 && !c.isEditing(), "operator error preserves committed entry");
+        assertTrue(
+                c.values().size() == 2 && !c.isEditing(),
+                "operator error preserves committed entry");
     }
 
     @Test
     void copyAndCancellation() throws Exception {
         RpnCalculator original = new RpnCalculator();
         keys(original, "1", "ENTER", "2");
-        RpnCalculator candidate = original.copy();
+        RpnCalculator candidate = CalculatorTestSupport.copy(original);
         candidate.key("+");
-        check(
+        assertTrue(
                 original.entry().equals("2") && original.values().size() == 1,
                 "candidate does not mutate live state");
         candidate.key("UNDO");
-        check(
+        assertTrue(
                 candidate.entry().equals("2") && candidate.values().size() == 1,
                 "candidate preserves undo");
         java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
@@ -112,55 +119,51 @@ final class EntryRegressionTest extends RegressionSupport {
         Thread.sleep(25);
         difficult.interrupt();
         difficult.join(2000);
-        check(
+        assertTrue(
                 !difficult.isAlive() && aborted.get() && failure.get() == null,
                 "interrupt stops difficult real comparison");
         original.key("+");
-        check(
+        assertTrue(
                 top(original).definitelyEquals(new UnifiedReal(3)),
                 "calculation works after cancelled candidate");
-        check("7".equals(KeyboardInput.command(14, '7', false, false, false)), "digit key mapping");
-        check(
-                "7".equals(KeyboardInput.command(151, 0, false, false, false)),
-                "numpad digit mapping");
-        check("+".equals(KeyboardInput.command(157, 0, false, false, false)), "numpad arithmetic");
-        check(
-                "+".equals(KeyboardInput.command(81, '+', false, false, false)),
-                "shifted plus mapping");
-        check(
-                "ENTER".equals(KeyboardInput.command(66, 0, false, false, false)),
-                "enter key mapping");
-        check(
-                "ENTER".equals(KeyboardInput.command(160, 0, false, false, false)),
+        assertEquals("7", KeyboardInput.command(14, '7', false, false, false), "digit key mapping");
+        assertEquals(
+                "7", KeyboardInput.command(151, 0, false, false, false), "numpad digit mapping");
+        assertEquals("+", KeyboardInput.command(157, 0, false, false, false), "numpad arithmetic");
+        assertEquals(
+                "+", KeyboardInput.command(81, '+', false, false, false), "shifted plus mapping");
+        assertEquals(
+                "ENTER", KeyboardInput.command(66, 0, false, false, false), "enter key mapping");
+        assertEquals(
+                "ENTER",
+                KeyboardInput.command(160, 0, false, false, false),
                 "numpad enter mapping");
-        check("ENTER".equals(KeyboardInput.command(62, ' ', false, false, false)), "space mapping");
-        check(
-                "BACK".equals(KeyboardInput.command(67, 0, false, false, false)),
-                "backspace mapping");
-        check(
-                "DELETE".equals(KeyboardInput.command(112, 0, false, false, false)),
-                "delete mapping");
-        check(
-                "ESCAPE".equals(KeyboardInput.command(111, 0, false, false, false)),
-                "escape mapping");
-        check("UNDO".equals(KeyboardInput.command(54, 0, true, false, false)), "undo shortcut");
-        check("DUP".equals(KeyboardInput.command(32, 0, true, false, false)), "duplicate shortcut");
-        check("SWAP".equals(KeyboardInput.command(47, 0, true, false, false)), "swap shortcut");
-        check(
+        assertEquals("ENTER", KeyboardInput.command(62, ' ', false, false, false), "space mapping");
+        assertEquals(
+                "BACK", KeyboardInput.command(67, 0, false, false, false), "backspace mapping");
+        assertEquals(
+                "DELETE", KeyboardInput.command(112, 0, false, false, false), "delete mapping");
+        assertEquals(
+                "ESCAPE", KeyboardInput.command(111, 0, false, false, false), "escape mapping");
+        assertEquals("UNDO", KeyboardInput.command(54, 0, true, false, false), "undo shortcut");
+        assertEquals("DUP", KeyboardInput.command(32, 0, true, false, false), "duplicate shortcut");
+        assertEquals("SWAP", KeyboardInput.command(47, 0, true, false, false), "swap shortcut");
+        assertTrue(
                 KeyboardInput.command(54, 'z', false, true, false) == null,
                 "leave alt shortcuts to system");
-        check(
-                "eˣ".equals(KeyboardInput.command(33, 'E', false, false, false)),
+        assertEquals(
+                "eˣ",
+                KeyboardInput.command(33, 'E', false, false, false),
                 "uppercase exponential shortcut");
         keys(original, "4", "5", "CE");
-        check(
+        assertTrue(
                 original.entry().isEmpty() && top(original).definitelyEquals(new UnifiedReal(3)),
                 "clear entry preserves stack");
-        RpnCalculator branch = original.copy();
+        RpnCalculator branch = CalculatorTestSupport.copy(original);
         branch.key("UNDO");
         branch.key("ENTER");
         original.key("UNDO");
-        check(
+        assertTrue(
                 original.entry().equals("45") && original.values().size() == 1,
                 "undo history independent across candidates");
     }
@@ -168,49 +171,51 @@ final class EntryRegressionTest extends RegressionSupport {
     @Test
     void stackAndEditModes() throws Exception {
         RpnCalculator hp = new RpnCalculator();
-        check(!hp.isEditing() && hp.entry().isEmpty(), "initial stack mode");
+        assertTrue(!hp.isEditing() && hp.entry().isEmpty(), "initial stack mode");
         hp.key("BACK");
-        check(hp.values().isEmpty() && !hp.isEditing(), "drop on empty stack");
+        assertTrue(hp.values().isEmpty() && !hp.isEditing(), "drop on empty stack");
         number(hp, "123456789012345678901234567890");
         hp.key("ENTER");
-        check(
+        assertTrue(
                 !hp.isEditing()
-                        && hp.formattedValues(sci, FractionMode.DECIMAL)
+                        && CalculatorTestSupport.formattedValues(hp, sci, FractionMode.DECIMAL)
                                 .get(0)
                                 .equals("123456789012345678901234567890"),
                 "bottom integer expands in stack mode");
         hp.key("4");
-        check(
+        assertTrue(
                 hp.isEditing()
-                        && hp.formattedValues(sci, FractionMode.DECIMAL).get(0).contains("e+29"),
+                        && CalculatorTestSupport.formattedValues(hp, sci, FractionMode.DECIMAL)
+                                .get(0)
+                                .contains("e+29"),
                 "typing moves prior integer to compact stack");
         hp.key("BACK");
-        check(
+        assertTrue(
                 hp.isEditing() && hp.entry().isEmpty() && hp.values().size() == 1,
                 "backspace to empty stays editing");
         hp.key("BACK");
-        check(hp.isEditing() && hp.values().size() == 1, "empty backspace never drops stack");
+        assertTrue(hp.isEditing() && hp.values().size() == 1, "empty backspace never drops stack");
         hp.key("DROP");
-        check(
+        assertTrue(
                 hp.isEditing() && hp.values().size() == 1,
                 "delete key also respects empty entry mode");
         hp.key("ENTER");
-        check(
+        assertTrue(
                 !hp.isEditing() && hp.values().size() == 1,
                 "enter on blank entry returns to stack without duplication");
         hp.key("ENTER");
-        check(hp.values().size() == 2 && !hp.isEditing(), "enter duplicates in stack mode");
+        assertTrue(hp.values().size() == 2 && !hp.isEditing(), "enter duplicates in stack mode");
         hp.key("BACK");
-        check(hp.values().size() == 1 && !hp.isEditing(), "context key drops result");
+        assertTrue(hp.values().size() == 1 && !hp.isEditing(), "context key drops result");
         hp.key("UNDO");
-        check(hp.values().size() == 2 && !hp.isEditing(), "undo drop restores stack mode");
+        assertTrue(hp.values().size() == 2 && !hp.isEditing(), "undo drop restores stack mode");
         keys(hp, "5", "BACK", "CANCEL_ENTRY", "UNDO");
-        check(
+        assertTrue(
                 hp.isEditing() && hp.entry().isEmpty(),
                 "undo restores explicitly empty editing mode");
-        RpnCalculator editCopy = hp.copy();
+        RpnCalculator editCopy = CalculatorTestSupport.copy(hp);
         editCopy.key("6");
-        check(
+        assertTrue(
                 hp.isEditing() && hp.entry().isEmpty() && editCopy.entry().equals("6"),
                 "copy preserves independent empty edit");
         keys(hp, "CE", "CLEAR", "9", "ENTER", "0");
@@ -219,7 +224,7 @@ final class EntryRegressionTest extends RegressionSupport {
             throw new AssertionError("division accepted");
         } catch (ArithmeticException expected) {
         }
-        check(
+        assertTrue(
                 !hp.isEditing() && hp.values().size() == 2 && top(hp).definitelyZero(),
                 "error keeps committed zero on stack");
         hp.key("BACK");
@@ -228,71 +233,76 @@ final class EntryRegressionTest extends RegressionSupport {
             throw new AssertionError("underflow accepted");
         } catch (IllegalArgumentException expected) {
         }
-        check(!hp.isEditing() && hp.values().size() == 1, "failed operation preserves stack");
+        assertTrue(!hp.isEditing() && hp.values().size() == 1, "failed operation preserves stack");
         keys(hp, "CLEAR", "2", "ENTER", "3", "+");
-        check(
+        assertTrue(
                 !hp.isEditing() && top(hp).definitelyEquals(new UnifiedReal(5)),
                 "operation ends entry mode");
         hp.setAngleUnit(RpnCalculator.AngleUnit.DEG);
         keys(hp, "CLEAR", "9", "0", "sin");
-        check(top(hp).definitelyOne(), "sin 90 degrees exactly one");
+        assertTrue(top(hp).definitelyOne(), "sin 90 degrees exactly one");
         keys(hp, "CLEAR", "4", "5", "tan");
-        check(top(hp).definitelyOne(), "tan 45 degrees exactly one");
+        assertTrue(top(hp).definitelyOne(), "tan 45 degrees exactly one");
         hp.setAngleUnit(RpnCalculator.AngleUnit.GRAD);
         keys(hp, "CLEAR", "1", "0", "0", "sin");
-        check(top(hp).definitelyOne(), "sin 100 gradians exactly one");
+        assertTrue(top(hp).definitelyOne(), "sin 100 gradians exactly one");
         keys(hp, "CLEAR", "2", "0", "0", "cos");
-        check(
+        assertTrue(
                 top(hp).definitelyEquals(UnifiedReal.MINUS_ONE),
                 "cos 200 gradians exactly minus one");
         hp.setAngleUnit(RpnCalculator.AngleUnit.RAD);
         keys(hp, "CLEAR", "π", "2", "÷", "sin");
-        check(top(hp).definitelyOne(), "radians unchanged");
+        assertTrue(top(hp).definitelyOne(), "radians unchanged");
         hp.key("7");
         hp.key("ANGLE");
-        check(
+        assertTrue(
                 hp.angleUnit() == RpnCalculator.AngleUnit.DEG
                         && hp.isEditing()
                         && hp.entry().equals("7"),
                 "angle toggle preserves entry and stack");
         hp.key("ANGLE");
-        check(hp.angleUnit() == RpnCalculator.AngleUnit.GRAD, "cycle to gradians");
+        assertTrue(hp.angleUnit() == RpnCalculator.AngleUnit.GRAD, "cycle to gradians");
         hp.key("ANGLE");
-        check(hp.angleUnit() == RpnCalculator.AngleUnit.RAD, "cycle to radians");
-        check(normalize("1234.56", ',', '.', 3, 3).equals("1234.56"), "C decimal in comma locale");
-        check(
+        assertTrue(hp.angleUnit() == RpnCalculator.AngleUnit.RAD, "cycle to radians");
+        assertEquals("1234.56", normalize("1234.56", ',', '.', 3, 3), "C decimal in comma locale");
+        assertTrue(
                 NumberText.analyze("1.234", new NumberText.Profile(',', '.', 3, 3)).ambiguous(),
                 "dot-only ambiguity is never guessed");
-        check(normalize("1.234,56", ',', '.', 3, 3).equals("1234.56"), "German grouped decimal");
-        check(normalize("-0,1250", ',', '.', 3, 3).equals("-0.1250"), "negative local subunit");
+        assertEquals("1234.56", normalize("1.234,56", ',', '.', 3, 3), "German grouped decimal");
+        assertEquals("-0.1250", normalize("-0,1250", ',', '.', 3, 3), "negative local subunit");
         assertEquals("0.5", normalize(",5", ',', '.', 3, 3), "local leading decimal");
-        check(normalize("1,234.56", '.', ',', 3, 3).equals("1234.56"), "US grouped decimal");
-        check(
+        assertEquals("1234.56", normalize("1,234.56", '.', ',', 3, 3), "US grouped decimal");
+        assertTrue(
                 NumberText.analyze("1,234", new NumberText.Profile('.', ',', 3, 3)).ambiguous(),
                 "US grouped integer can be a foreign decimal");
-        check(
+        assertTrue(
                 NumberText.analyze("1,234", new NumberText.Profile(',', '.', 3, 3)).ambiguous(),
                 "local decimal can be foreign grouping");
-        check(normalize("12,34,567.89", '.', ',', 3, 2).equals("1234567.89"), "Indian grouping");
-        check(normalize("1 234,5", ',', '\u202f', 3, 3).equals("1234.5"), "French space grouping");
-        check(
-                normalize("1\u00a0234,5", ',', '\u202f', 3, 3).equals("1234.5"),
+        assertEquals("1234567.89", normalize("12,34,567.89", '.', ',', 3, 2), "Indian grouping");
+        assertEquals("1234.5", normalize("1 234,5", ',', '\u202f', 3, 3), "French space grouping");
+        assertEquals(
+                "1234.5",
+                normalize("1\u00a0234,5", ',', '\u202f', 3, 3),
                 "French nonbreaking space grouping");
         assertEquals("1234.5", normalize("1’234.5", '.', '’', 3, 3), "Swiss grouping");
-        check(normalize("1'234.5", '.', '’', 3, 3).equals("1234.5"), "Swiss ASCII apostrophe");
-        check(
-                normalize("−1,25e−3", ',', '.', 3, 3).equals("-1.25e-3"),
+        assertEquals("1234.5", normalize("1'234.5", '.', '’', 3, 3), "Swiss ASCII apostrophe");
+        assertEquals(
+                "-1.25e-3",
+                normalize("−1,25e−3", ',', '.', 3, 3),
                 "local scientific notation and minus");
-        check(
-                normalize("\u061c-١٬٢٣٤٫٥", '٫', '٬', 3, 3).equals("-1234.5"),
+        assertEquals(
+                "-1234.5",
+                normalize("\u061c-١٬٢٣٤٫٥", '٫', '٬', 3, 3),
                 "Arabic digits and bidi mark");
-        check(
-                normalize("  +12.50E+2  ", ',', '.', 3, 3).equals("+12.50E+2"),
+        assertEquals(
+                "+12.50E+2",
+                normalize("  +12.50E+2  ", ',', '.', 3, 3),
                 "C scientific paste preserves exact text");
-        check(
-                normalize("1\u2009234.5", '.', ',', 3, 3).equals("1234.5"),
+        assertEquals(
+                "1234.5",
+                normalize("1\u2009234.5", '.', ',', 3, 3),
                 "thin space computer grouping");
-        check(normalize("1 234.5", '.', ',', 3, 3).equals("1234.5"), "space computer grouping");
+        assertEquals("1234.5", normalize("1 234.5", '.', ',', 3, 3), "space computer grouping");
         for (String invalid :
                 new String[] {
                     "1,23.4",
@@ -310,14 +320,14 @@ final class EntryRegressionTest extends RegressionSupport {
                 normalize(invalid, '.', ',', 3, 3);
                 throw new AssertionError("accepted invalid paste: " + invalid);
             } catch (IllegalArgumentException expected) {
-                check(true, "reject invalid clipboard number");
+                assertTrue(true, "reject invalid clipboard number");
             }
         }
         try {
             NumberText.selected("123,456", new NumberText.Profile('.', ',', 3, 2));
             throw new AssertionError("bad Indian grouping accepted");
         } catch (IllegalArgumentException expected) {
-            check(true, "Indian secondary width enforced");
+            assertTrue(true, "Indian secondary width enforced");
         }
     }
 
@@ -325,42 +335,44 @@ final class EntryRegressionTest extends RegressionSupport {
     void canonicalPaste() throws Exception {
         RpnCalculator pasted = new RpnCalculator();
         keys(pasted, "7", "ENTER", "8");
-        pasted.paste(normalize("1.234,56", ',', '.', 3, 3));
-        check(
+        CalculatorTestSupport.paste(pasted, normalize("1.234,56", ',', '.', 3, 3));
+        assertTrue(
                 pasted.isEditing()
                         && pasted.entry().equals("1234.56")
                         && top(pasted).definitelyEquals(new UnifiedReal(7)),
                 "paste replaces entry without changing stack");
         pasted.key("UNDO");
-        check(pasted.entry().equals("8") && pasted.isEditing(), "paste is one undo transaction");
+        assertTrue(
+                pasted.entry().equals("8") && pasted.isEditing(), "paste is one undo transaction");
         try {
-            pasted.paste("oops");
+            CalculatorTestSupport.paste(pasted, "oops");
             throw new AssertionError("invalid direct paste accepted");
         } catch (IllegalArgumentException expected) {
             assertEquals("8", pasted.entry(), "invalid paste preserves state");
         }
         keys(pasted, "PASTE_RAW:0.1", "ENTER", "PASTE_RAW:0.2", "+");
-        check(
+        assertTrue(
                 top(pasted).definitelyEquals(RpnCalculator.parse("0.3")),
                 "pasted arithmetic remains exact");
-        check(
-                ValueFormatter.clipboard(huge, sci).equals("123456789012345678901234567890"),
+        assertEquals(
+                "123456789012345678901234567890",
+                ValueFormatter.clipboard(huge, sci),
                 "clipboard retains full exact integer");
-        check(
-                ValueFormatter.clipboard(RpnCalculator.parse("-1e-20"), sci)
-                        .equals("-0.00000000000000000001"),
+        assertEquals(
+                "-0.00000000000000000001",
+                ValueFormatter.clipboard(RpnCalculator.parse("-1e-20"), sci),
                 "clipboard preserves tiny exact value with ASCII minus");
-        check(
-                ValueFormatter.clipboard(third, sci)
-                        .equals("0.3333333333333333333333333333333333333333"),
+        assertEquals(
+                "0.3333333333333333333333333333333333333333",
+                ValueFormatter.clipboard(third, sci),
                 "clipboard omits approximation annotation");
-        check(
-                "PASTE".equals(KeyboardInput.command(50, 0, true, false, false)),
-                "Ctrl V paste shortcut");
-        check(
-                "5".equals(KeyboardInput.command(0, '٥', false, false, false)),
+        assertEquals(
+                "PASTE", KeyboardInput.command(50, 0, true, false, false), "Ctrl V paste shortcut");
+        assertEquals(
+                "5",
+                KeyboardInput.command(0, '٥', false, false, false),
                 "localized hardware digits");
-        pasted.paste("1e-3");
+        CalculatorTestSupport.paste(pasted, "1e-3");
         pasted.key(".");
         assertEquals("1e-3", pasted.entry(), "decimal key does not corrupt pasted exponent");
     }

@@ -12,7 +12,7 @@ import java.math.BigInteger;
 final class MoreFunctionsTest {
     private UnifiedReal apply(String value, String operation) {
         RpnCalculator calculator = new RpnCalculator();
-        calculator.paste(value);
+        CalculatorTestSupport.paste(calculator, value);
         calculator.key(operation);
         return calculator.values().get(0);
     }
@@ -100,7 +100,7 @@ final class MoreFunctionsTest {
     @Test
     void newFunctionsAreTransactionalAndUndoable() throws Exception {
         RpnCalculator calculator = new RpnCalculator();
-        calculator.paste("2.9");
+        CalculatorTestSupport.paste(calculator, "2.9");
         calculator.key("floor");
         assertEquals("2", calculator.values().get(0).bigIntegerValue().toString());
         calculator = RpnCalculator.load(calculator.save());
@@ -108,7 +108,7 @@ final class MoreFunctionsTest {
         assertEquals("2.9", calculator.entry());
         assertTrue(calculator.values().isEmpty());
         RpnCalculator invalid = new RpnCalculator();
-        invalid.paste("-1");
+        CalculatorTestSupport.paste(invalid, "-1");
         assertThrows(ArithmeticException.class, () -> invalid.key("log10"));
         assertFalse(invalid.isEditing());
         assertEquals("-1", invalid.values().get(0).bigIntegerValue().toString());

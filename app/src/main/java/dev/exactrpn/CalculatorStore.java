@@ -12,7 +12,7 @@ import java.util.function.BooleanSupplier;
 
 /** Only the UI process can commit a result; cancelled workers never overwrite this file. */
 final class CalculatorStore {
-    private final AtomicFile file;
+    private final AtomicFile file, restoreAttempt;
     private final File directory;
     private final BooleanSupplier allowed;
 
@@ -24,6 +24,7 @@ final class CalculatorStore {
         this.allowed = allowed;
         this.directory = directory;
         file = new AtomicFile(new File(directory, "calculator-state.bin"));
+        restoreAttempt = new AtomicFile(new File(directory, "calculator-restore.bin"));
     }
 
     String checkpoint() throws IOException {
@@ -47,6 +48,53 @@ final class CalculatorStore {
         }
     }
 
+    /** Two interrupted attempts at the same snapshot are enough; preserve it for recovery. */
+    byte[] beginRestore() throws IOException {
+        byte[] bytes = load();
+        if (bytes == null) {
+            finishRestore();
+            return null;
+        }
+        byte[] fingerprint;
+        try {
+            fingerprint = java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
+        } catch (java.security.NoSuchAlgorithmException impossible) {
+            throw new AssertionError(impossible);
+        }
+        int attempts = 0;
+        try {
+            byte[] previous = restoreAttempt.readFully();
+            if (previous.length == 33
+                    && previous[32] > 0
+                    && previous[32] <= 2
+                    && java.util.Arrays.equals(fingerprint, java.util.Arrays.copyOf(previous, 32)))
+                attempts = previous[32] & 255;
+        } catch (IOException absentOrDamaged) {
+            // A missing/damaged attempt record must not prevent recovery of a valid calculation.
+        }
+        if (attempts >= 2) {
+            quarantine();
+            throw new IOException("Saved calculation repeatedly failed to restore");
+        }
+        checkAccess();
+        FileOutputStream out = restoreAttempt.startWrite();
+        try {
+            out.write(fingerprint);
+            out.write(attempts + 1);
+            checkAccess();
+            restoreAttempt.finishWrite(out);
+        } catch (IOException | RuntimeException ex) {
+            restoreAttempt.failWrite(out);
+            throw ex;
+        }
+        return bytes;
+    }
+
+    void finishRestore() {
+        checkAccess();
+        restoreAttempt.delete();
+    }
+
     void save(byte[] bytes) throws IOException {
         checkAccess();
         FileOutputStream out = file.startWrite();
@@ -54,6 +102,7 @@ final class CalculatorStore {
             out.write(bytes);
             checkAccess();
             file.finishWrite(out);
+            finishRestore();
         } catch (IOException | RuntimeException ex) {
             file.failWrite(out);
             throw ex;
@@ -68,11 +117,13 @@ final class CalculatorStore {
                     new File(directory, "calculator-state.corrupt").toPath(),
                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         file.delete();
+        finishRestore();
     }
 
     void clear() {
         if (!allowed.getAsBoolean()) return;
         file.delete();
+        restoreAttempt.delete();
     }
 
     void removeLegacyWorkFiles() {

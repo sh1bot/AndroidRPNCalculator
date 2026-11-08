@@ -19,10 +19,6 @@ abstract class RegressionSupport {
                 .canonical();
     }
 
-    static void check(boolean b, String label) {
-        assertTrue(b, label);
-    }
-
     static void keys(RpnCalculator c, String... keys) {
         for (String k : keys) Command.parse(k).apply(c, NumberText.COMPUTER, NumberText.COMPUTER);
     }

@@ -9,7 +9,7 @@ final class SelectedUnaryTest {
     void atomicInPlaceUndoRedoAndReplay() throws Exception {
         RpnCalculator c = new RpnCalculator();
         for (String n : new String[] {"4", "9", "16"}) {
-            c.paste(n);
+            CalculatorTestSupport.paste(c, n);
             c.key("ENTER");
         }
         Command.parse("UNARY_ROWS:√:0,2").apply(c, NumberText.COMPUTER, NumberText.COMPUTER);
@@ -25,9 +25,9 @@ final class SelectedUnaryTest {
     @Test
     void failureOnLaterRowChangesNothing() throws Exception {
         RpnCalculator c = new RpnCalculator();
-        c.paste("4");
+        CalculatorTestSupport.paste(c, "4");
         c.key("ENTER");
-        c.paste("-1");
+        CalculatorTestSupport.paste(c, "-1");
         c.key("ENTER");
         byte[] before = c.save();
         assertThrows(ArithmeticException.class, () -> c.transformRows(Operation.SQRT, 0, 1));

@@ -183,7 +183,7 @@ public final class FunctionsTest {
                             .multiply(new com.android.calculator2.UnifiedReal(3))
                             .definitelyEquals(new com.android.calculator2.UnifiedReal(7)));
             calculator = new RpnCalculator();
-            calculator.paste("84");
+            CalculatorTestSupport.paste(calculator, "84");
             Files.write(seed.toPath(), calculator.save());
             Bundle factored =
                     worker.submit(

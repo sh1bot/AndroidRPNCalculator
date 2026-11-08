@@ -7,6 +7,7 @@ on:
       - 'app/src/main/java/**'
       - 'engine/src/main/java/dev/exactrpn/**'
       - 'app/src/androidTest/**'
+      - 'test-support/**'
       - 'app/src/main/res/**'
       - 'app/src/main/AndroidManifest.xml'
       - 'app/build.gradle'

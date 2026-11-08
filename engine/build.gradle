@@ -4,3 +4,5 @@ dependencies { testImplementation 'org.junit.jupiter:junit-jupiter:5.11.4'; test
 test { useJUnitPlatform() }
 // Keep the documented command and CI entry point; normal `test` runs the same suite.
 tasks.register('regression') { dependsOn test }
+
+sourceSets.test.java.srcDir rootProject.file('test-support/src/main/java')

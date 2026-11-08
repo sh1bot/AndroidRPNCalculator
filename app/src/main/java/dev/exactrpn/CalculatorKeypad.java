@@ -363,7 +363,26 @@ public final class CalculatorKeypad extends ViewGroup {
     }
 
     private Button button(String key, CharSequence label) {
-        Button b = new Button(getContext());
+        Button button = new Button(getContext());
+        button.setAllCaps(false);
+        button.setTag(key);
+        registerButton(key, button);
+        labelButton(key, label, button);
+        styleKey(key, button);
+        button.setContentDescription(keyDescription(key));
+        button.setOnClickListener(
+                v -> command.accept(key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
+        boolean longPressKey =
+                RpnCalculator.isEntryKey(key)
+                        || switch (key) {
+                            case "π", Command.UNDO, "BACK", "SWAP", Command.ENTER -> true;
+                            default -> false;
+                        };
+        if (longPressKey) button.setOnLongClickListener(v -> longPress(key));
+        return button;
+    }
+
+    private void registerButton(String key, Button b) {
         if (key.equals("CLEAR")) clearButton = b;
         if (key.equals("SWAP")) swapButton = b;
         if (key.equals("+")) sumButton = b;
@@ -371,8 +390,6 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.equals(Command.UNDO)) undoButton = b;
         if (key.equals(Command.ENTER)) enterButton = b;
         if (key.equals("π")) piButton = b;
-        b.setAllCaps(false);
-        b.setTag(key);
         if (Arrays.asList(
                         Command.INVERSE,
                         "sin",
@@ -385,6 +402,9 @@ public final class CalculatorKeypad extends ViewGroup {
                         "rem",
                         "floor")
                 .contains(key)) inverseButtons.put(key, b);
+    }
+
+    private void labelButton(String key, CharSequence label, Button b) {
         if (key.equals("xʸ")
                 || key.equals(Command.INVERSE)
                 || key.equals("!")
@@ -395,11 +415,14 @@ public final class CalculatorKeypad extends ViewGroup {
             SpannableString fraction = new SpannableString("1/x");
             fraction.setSpan(new ReciprocalSpan(), 0, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             b.setText(fraction);
-        } else b.setText(key.matches("[0-9.]") ? numbers.entry(label.toString()) : label);
-        if (key.matches("[0-9.]")) {
+        } else b.setText(RpnCalculator.isEntryKey(key) ? numbers.entry(label.toString()) : label);
+        if (RpnCalculator.isEntryKey(key)) {
             b.setFontFeatureSettings("tnum");
             numberButtons.put(key, b);
         }
+    }
+
+    private void styleKey(String key, Button b) {
         b.setTextColor(colors.text);
         b.setSingleLine(true);
         b.setHorizontallyScrolling(false);
@@ -412,7 +435,7 @@ public final class CalculatorKeypad extends ViewGroup {
         b.setPadding(dp(2), 0, dp(2), 0);
         b.setElevation(0);
         b.setStateListAnimator(null);
-        boolean number = key.matches("[0-9.]");
+        boolean number = RpnCalculator.isEntryKey(key);
         int color =
                 key.equals(Command.ENTER)
                         ? colors.enterKey
@@ -422,120 +445,63 @@ public final class CalculatorKeypad extends ViewGroup {
         shape.setColor(color);
         shape.setCornerRadius(dp(100));
         b.setBackground(new RippleDrawable(ColorStateList.valueOf(colors.ripple), shape, null));
-        String description;
+    }
+
+    private String keyDescription(String key) {
+        int resource =
+                switch (key) {
+                    case "SWAP" -> R.string.swap_description;
+                    case Command.INVERSE -> R.string.inverse_off;
+                    case "!" -> R.string.factorial_description;
+                    case "Factor" -> R.string.factor_description;
+                    case "floor" -> R.string.floor_description;
+                    case "log10" -> R.string.log10_description;
+                    case "φ" -> R.string.phi_description;
+                    case "mod" -> R.string.modulo_description;
+                    case "rem" -> R.string.remainder_description;
+                    case Command.UNDO -> R.string.undo_description;
+                    case Command.ENTER -> R.string.enter_description;
+                    case "." -> R.string.decimal_separator;
+                    case "BACK" -> R.string.backspace;
+                    case "CLEAR" -> R.string.clear_stack;
+                    case "CE" -> R.string.clear_entry;
+                    case "xʸ" -> R.string.power_description;
+                    case "eˣ" -> R.string.exp_description;
+                    case "e" -> R.string.e_description;
+                    case "π" -> R.string.pi_description;
+                    case "1/x" -> R.string.reciprocal_description;
+                    default -> 0;
+                };
+        return resource == 0 ? key : getContext().getString(resource);
+    }
+
+    private boolean longPress(String key) {
         switch (key) {
-            case "SWAP":
-                description = getContext().getString(R.string.swap_description);
-                break;
-            case Command.INVERSE:
-                description = getContext().getString(R.string.inverse_off);
-                break;
-            case "!":
-                description = getContext().getString(R.string.factorial_description);
-                break;
-            case "Factor":
-                description = getContext().getString(R.string.factor_description);
-                break;
-            case "floor":
-                description = getContext().getString(R.string.floor_description);
-                break;
-            case "log10":
-                description = getContext().getString(R.string.log10_description);
-                break;
-            case "φ":
-                description = getContext().getString(R.string.phi_description);
-                break;
-            case "mod":
-                description = getContext().getString(R.string.modulo_description);
-                break;
-            case "rem":
-                description = getContext().getString(R.string.remainder_description);
-                break;
-            case Command.UNDO:
-                description = getContext().getString(R.string.undo_description);
-                break;
-            case Command.ENTER:
-                description = getContext().getString(R.string.enter_description);
+            case "π":
+                tau = !tau;
+                updateConstant();
+                saveTau.accept(tau);
                 break;
             case ".":
-                description = getContext().getString(R.string.decimal_separator);
+                command.accept("HOLD_DECIMAL");
+                break;
+            case Command.UNDO:
+                if (calculating || !selecting)
+                    command.accept(calculating ? Command.CANCEL : Command.REDO);
                 break;
             case "BACK":
-                description = getContext().getString(R.string.backspace);
+                if (!selecting) command.accept("HOLD_DROP");
                 break;
-            case "CLEAR":
-                description = getContext().getString(R.string.clear_stack);
+            case "SWAP":
+                if (!selecting) command.accept("ROLL_UP");
                 break;
-            case "CE":
-                description = getContext().getString(R.string.clear_entry);
-                break;
-            case "xʸ":
-                description = getContext().getString(R.string.power_description);
-                break;
-            case "eˣ":
-                description = getContext().getString(R.string.exp_description);
-                break;
-            case "e":
-                description = getContext().getString(R.string.e_description);
-                break;
-            case "π":
-                description = getContext().getString(R.string.pi_description);
-                break;
-            case "1/x":
-                description = getContext().getString(R.string.reciprocal_description);
+            case Command.ENTER:
+                command.accept(Command.PASTE);
                 break;
             default:
-                description = key;
+                command.accept("HOLD_DIGIT:" + key);
         }
-        b.setContentDescription(description);
-        b.setOnClickListener(
-                v -> command.accept(key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
-        if (key.equals("π"))
-            b.setOnLongClickListener(
-                    v -> {
-                        tau = !tau;
-                        updateConstant();
-                        saveTau.accept(tau);
-                        return true;
-                    });
-        if (key.equals("."))
-            b.setOnLongClickListener(
-                    v -> {
-                        command.accept("HOLD_DECIMAL");
-                        return true;
-                    });
-        if (key.matches("[0-9]"))
-            b.setOnLongClickListener(
-                    v -> {
-                        command.accept("HOLD_DIGIT:" + key);
-                        return true;
-                    });
-        if (key.equals(Command.UNDO))
-            b.setOnLongClickListener(
-                    v -> {
-                        if (calculating || !selecting)
-                            command.accept(calculating ? Command.CANCEL : Command.REDO);
-                        return true;
-                    });
-        if (key.equals("BACK"))
-            b.setOnLongClickListener(
-                    v -> {
-                        if (!selecting) command.accept("HOLD_DROP");
-                        return true;
-                    });
-        if (key.equals("SWAP"))
-            b.setOnLongClickListener(
-                    v -> {
-                        if (!selecting) command.accept("ROLL_UP");
-                        return true;
-                    });
-        if (key.equals(Command.ENTER))
-            b.setOnLongClickListener(
-                    v -> {
-                        command.accept(Command.PASTE);
-                        return true;
-                    });
-        return b;
+        return true;
     }
 
     private void addRows(String[][] keys, List<LinearLayout> rows) {
@@ -629,6 +595,30 @@ public final class CalculatorKeypad extends ViewGroup {
         button.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, indicator, null);
     }
 
+    private int preferredLabelSize(String key) {
+        if (RpnCalculator.isEntryKey(key)) return 26;
+        return switch (key) {
+            case "+", "−", "×", "÷", "±", "CLEAR", "CE", "BACK" -> 26;
+            case "SWAP" -> selecting ? 16 : 26;
+            case "π", "τ", "e", "φ", "√" -> 24;
+            case "1/x", "eˣ", "xʸ", "root", "x²", "!", "floor", "ceil", "10ˣ" -> 22;
+            case "sin", "cos", "tan", "ln", "log10", "asin", "acos", "atan", "rem", "mod" -> 20;
+            case Command.ENTER -> 18;
+            default -> 16;
+        };
+    }
+
+    private void fitDeleteIcon(Button button, int width, int height, int maximum) {
+        android.graphics.drawable.Drawable icon = getContext().getDrawable(R.drawable.ic_delete);
+        icon.setTint(colors.text);
+        int size = Math.min(maximum, Math.min(width, height));
+        int left = (width - size) / 2, top = (height - size) / 2;
+        button.setForeground(
+                new android.graphics.drawable.InsetDrawable(
+                        icon, left, top, width - size - left, height - size - top));
+        button.setForegroundGravity(Gravity.FILL);
+    }
+
     private void fitLabel(Button button, int width, int height) {
         int minimum =
                 Math.max(
@@ -639,38 +629,7 @@ public final class CalculatorKeypad extends ViewGroup {
                                         10,
                                         getResources().getDisplayMetrics())));
         String key = effectiveKey((String) button.getTag());
-        int preferred = 16;
-        if (key.matches("[0-9.]")) preferred = 26;
-        else if (key.matches("[+−×÷±]")
-                || key.equals("CLEAR")
-                || key.equals("CE")
-                || key.equals("BACK")
-                || (key.equals("SWAP") && !selecting)) preferred = 26;
-        else if (key.equals("π")
-                || key.equals("τ")
-                || key.equals("e")
-                || key.equals("φ")
-                || key.equals("√")) preferred = 24;
-        else if (key.equals("1/x")
-                || key.equals("eˣ")
-                || key.equals("xʸ")
-                || key.equals("root")
-                || key.equals("x²")
-                || key.equals("!")
-                || key.equals("floor")
-                || key.equals("ceil")
-                || key.equals("10ˣ")) preferred = 22;
-        else if (key.equals("sin")
-                || key.equals("cos")
-                || key.equals("tan")
-                || key.equals("ln")
-                || key.equals("log10")
-                || key.equals("asin")
-                || key.equals("acos")
-                || key.equals("atan")
-                || key.equals("rem")
-                || key.equals("mod")) preferred = 20;
-        else if (key.equals(Command.ENTER)) preferred = 18;
+        int preferred = preferredLabelSize(key);
         // A small folded-only increase; expanded function labels keep their existing sizes.
         if (!expanded) preferred += preferred >= 24 ? 2 : 1;
         int preferredPixels =
@@ -688,17 +647,8 @@ public final class CalculatorKeypad extends ViewGroup {
                                 preferredPixels,
                                 Math.round(Math.min(width, height) * sizeFraction)));
         // Drop is a vector rather than text; give it the same sp-aware size budget.
-        if (key.equals("BACK") && button.getForeground() != null) {
-            android.graphics.drawable.Drawable icon =
-                    getContext().getDrawable(R.drawable.ic_delete);
-            icon.setTint(colors.text);
-            int size = Math.min(maximum, Math.min(width, height));
-            int left = (width - size) / 2, top = (height - size) / 2;
-            button.setForeground(
-                    new android.graphics.drawable.InsetDrawable(
-                            icon, left, top, width - size - left, height - size - top));
-            button.setForegroundGravity(Gravity.FILL);
-        }
+        if (key.equals("BACK") && button.getForeground() != null)
+            fitDeleteIcon(button, width, height, maximum);
         if (button.getAutoSizeMaxTextSize() != maximum
                 || button.getAutoSizeMinTextSize() != minimum)
             button.setAutoSizeTextTypeUniformWithConfiguration(

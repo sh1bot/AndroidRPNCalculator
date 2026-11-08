@@ -74,24 +74,18 @@ public class CalculationService extends Service {
     private void evaluate(Bundle request, Messenger client) {
         Bundle response = new Bundle();
         MemoryPayload payload = null;
+        boolean readOnly = false;
         try {
+            Command command = Command.parse(request.getString("key"));
             checkAccess();
             loadCheckpoint(request, response);
+            readOnly = command.kind == Command.Kind.COPY_ROWS;
             Bundle display;
-            if (Command.parse(request.getString("key")).kind == Command.Kind.COPY_ROWS) {
+            if (readOnly) {
                 display = new Bundle();
-                display.putString("copyText", copyRows(request));
+                display.putString("copyText", copyRows(request, command));
             } else {
-                Evaluation evaluation = new Evaluation(request);
-                byte[] entryState = evaluation.candidate.detachEntryEditor().save();
-                byte[] state = evaluation.candidate.save();
-                display = evaluation.presentation();
-                String id = UUID.randomUUID().toString();
-                display.putString("checkpoint", id);
-                display.putByteArray("state", state);
-                display.putByteArray("entryState", entryState);
-                cachedId = id;
-                cachedStackId = evaluation.stackId;
+                display = arithmeticResult(request);
             }
             checkAccess();
             payload = MemoryPayload.create(DisplayResult.encode(display));
@@ -100,10 +94,13 @@ public class CalculationService extends Service {
             android.os.Process.killProcess(android.os.Process.myPid());
             return;
         } catch (IOException | RuntimeException | StackOverflowError ex) {
-            // In-place evaluation is safe only after its snapshot and display are accepted.
-            // Unexpected failures reload the last accepted checkpoint on the next request.
-            cached = null;
-            texts.clear();
+            boolean intact = readOnly && !(ex instanceof DeviceAccess.Locked);
+            response.putBoolean("cacheIntact", intact);
+            if (!intact) {
+                // Mutating requests must reload the last accepted state after a failure.
+                cached = null;
+                texts.clear();
+            }
             if (ex instanceof DeviceAccess.Locked) response.putBoolean("deviceLocked", true);
             else if (ex instanceof CalculationError) {
                 CalculationError failure = (CalculationError) ex;
@@ -128,8 +125,21 @@ public class CalculationService extends Service {
         }
     }
 
-    private String copyRows(Bundle request) {
-        Command command = Command.parse(request.getString("key"));
+    private Bundle arithmeticResult(Bundle request) throws IOException {
+        Evaluation evaluation = new Evaluation(request);
+        byte[] entryState = evaluation.candidate.detachEntryEditor().save();
+        byte[] state = evaluation.candidate.save();
+        Bundle display = evaluation.presentation();
+        String id = UUID.randomUUID().toString();
+        display.putString("checkpoint", id);
+        display.putByteArray("state", state);
+        display.putByteArray("entryState", entryState);
+        cachedId = id;
+        cachedStackId = evaluation.stackId;
+        return display;
+    }
+
+    private String copyRows(Bundle request, Command command) {
         ValueFormatter.Notation notation =
                 ValueFormatter.Notation.valueOf(request.getString("notation"));
         FractionMode fraction = FractionMode.fromId(request.getInt("fractionMode"));

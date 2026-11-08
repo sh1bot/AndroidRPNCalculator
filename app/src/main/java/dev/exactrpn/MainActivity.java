@@ -648,7 +648,7 @@ public class MainActivity extends Activity {
         return root;
     }
 
-    private void addModeButtons(LinearLayout root) {
+    private LinearLayout modeHeader() {
         LinearLayout header =
                 new LinearLayout(this) {
                     @Override
@@ -665,30 +665,36 @@ public class MainActivity extends Activity {
                         super.onMeasure(widthSpec, heightSpec);
                     }
                 };
+        return header;
+    }
+
+    private Button modeButton(LinearLayout header, String command) {
+        Button button = new Button(this);
+        styleModeButton(button);
+        button.setOnClickListener(v -> execute(command));
+        header.addView(button, new LinearLayout.LayoutParams(dp(54), dp(48)));
+        return button;
+    }
+
+    private void addModeButtons(LinearLayout root) {
+        LinearLayout header = modeHeader();
         header.setTag("mode-row");
         header.setGravity(Gravity.CENTER_VERTICAL);
-        angleButton = new Button(this);
-        styleModeButton(angleButton);
-        angleButton.setOnClickListener(v -> execute("ANGLE"));
-        header.addView(angleButton, new LinearLayout.LayoutParams(dp(54), dp(48)));
-        notationButton = new Button(this);
-        styleModeButton(notationButton);
-        notationButton.setOnClickListener(v -> execute("FORMAT"));
-        header.addView(notationButton, new LinearLayout.LayoutParams(dp(54), dp(48)));
-        numberFormatButton = new Button(this);
-        styleModeButton(numberFormatButton);
-        numberFormatButton.setOnClickListener(v -> execute("NUMBER_FORMAT"));
-        header.addView(numberFormatButton, new LinearLayout.LayoutParams(dp(54), dp(48)));
-        fractionButton = new Button(this);
-        styleModeButton(fractionButton);
-        fractionButton.setOnClickListener(v -> execute("FRACTION"));
-        header.addView(fractionButton, new LinearLayout.LayoutParams(dp(54), dp(48)));
+        angleButton = modeButton(header, "ANGLE");
+        notationButton = modeButton(header, "FORMAT");
+        numberFormatButton = modeButton(header, "NUMBER_FORMAT");
+        fractionButton = modeButton(header, "FRACTION");
         status = text(12);
         status.setTag("calculation-status");
         status.setGravity(Gravity.CENTER_VERTICAL);
         status.setSingleLine(true);
         status.setEllipsize(android.text.TextUtils.TruncateAt.END);
         header.addView(status, new LinearLayout.LayoutParams(0, dp(48), 1));
+        header.addView(overflowMenu(), new LinearLayout.LayoutParams(dp(48), dp(48)));
+        root.addView(header);
+    }
+
+    private Button overflowMenu() {
         Button menu = new Button(this);
         menu.setTag("overflow-menu");
         styleModeButton(menu);
@@ -717,37 +723,29 @@ public class MainActivity extends Activity {
         icon.setTint(colors.text);
         menu.setForegroundGravity(Gravity.CENTER);
         menu.setForeground(icon);
-        menu.setOnClickListener(
-                v -> {
-                    dismissErrorNotice();
-                    android.widget.PopupMenu popup = new android.widget.PopupMenu(this, menu);
-                    popup.getMenu()
-                            .add(R.string.help)
-                            .setOnMenuItemClickListener(
-                                    item -> {
-                                        AboutDialog.show(this, true);
-                                        return true;
-                                    });
-                    popup.getMenu()
-                            .add(R.string.licenses)
-                            .setOnMenuItemClickListener(
-                                    item -> {
-                                        AboutDialog.show(this, false);
-                                        return true;
-                                    });
-                    popup.getMenu()
-                            .add(R.string.source_code)
-                            .setOnMenuItemClickListener(
-                                    item -> {
-                                        AboutDialog.source(this);
-                                        return true;
-                                    });
-                    popup.setOnDismissListener(dismissed -> menu.setActivated(false));
-                    popup.show();
-                    menu.setActivated(true);
-                });
-        header.addView(menu, new LinearLayout.LayoutParams(dp(48), dp(48)));
-        root.addView(header);
+        menu.setOnClickListener(v -> showMenu(menu));
+        return menu;
+    }
+
+    private void menuItem(android.widget.PopupMenu menu, int label, Runnable action) {
+        menu.getMenu()
+                .add(label)
+                .setOnMenuItemClickListener(
+                        item -> {
+                            action.run();
+                            return true;
+                        });
+    }
+
+    private void showMenu(Button button) {
+        dismissErrorNotice();
+        android.widget.PopupMenu menu = new android.widget.PopupMenu(this, button);
+        menuItem(menu, R.string.help, () -> AboutDialog.show(this, true));
+        menuItem(menu, R.string.licenses, () -> AboutDialog.show(this, false));
+        menuItem(menu, R.string.source_code, () -> AboutDialog.source(this));
+        menu.setOnDismissListener(dismissed -> button.setActivated(false));
+        menu.show();
+        button.setActivated(true);
     }
 
     private void addEntry(LinearLayout root) {

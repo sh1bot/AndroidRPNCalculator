@@ -2,6 +2,7 @@ plugins { id 'com.android.application' }
 def signingFile = System.getenv('ANDROID_KEYSTORE_PATH')
 android {
     namespace 'dev.exactrpn'
+    sourceSets.androidTest.java.srcDir rootProject.file('test-support/src/main/java')
     compileSdk 36
     defaultConfig {
         applicationId 'dev.exactrpn'

@@ -226,12 +226,13 @@ public final class AdaptiveKeypadTest {
                                     .apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
                             assertEquals(
                                     java.util.Arrays.asList("1", "2", "1"),
-                                    calculator.formattedValues(
+                                    CalculatorTestSupport.formattedValues(
+                                            calculator,
                                             ValueFormatter.Notation.SCIENTIFIC,
                                             FractionMode.DECIMAL));
                             find(keypad, "0").performLongClick();
                             assertEquals("HOLD_DIGIT:0", command.get());
-                            calculator.paste("4");
+                            CalculatorTestSupport.paste(calculator, "4");
                             keypad.setEditing(true);
                             find(keypad, "1").performLongClick();
                             Command.parse(command.get())

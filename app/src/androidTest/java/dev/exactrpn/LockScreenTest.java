@@ -111,7 +111,7 @@ public final class LockScreenTest {
 
     private File seed(Context context, CalculatorStore store) throws Exception {
         RpnCalculator calculator = new RpnCalculator();
-        calculator.paste("99");
+        CalculatorTestSupport.paste(calculator, "99");
         calculator.key("ENTER");
         File seed = File.createTempFile("locked-test-", ".state", context.getNoBackupFilesDir());
         Files.write(seed.toPath(), calculator.save());

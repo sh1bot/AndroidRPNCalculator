@@ -101,6 +101,7 @@ final class RemoteCalculator {
             epoch = generation;
             reuse = inputId != null && inputId.equals(remoteSnapshotId);
         }
+        boolean cacheIntact = false;
         try (MemoryPayload payload = input != null && !reuse ? MemoryPayload.create(input) : null) {
             if (payload != null) payload.put(outgoing, "input");
             synchronized (this) {
@@ -115,25 +116,8 @@ final class RemoteCalculator {
             }
             Bundle response = future.get();
             try {
-                if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
-                if (response.getBoolean("invalidCheckpoint"))
-                    throw new InvalidCheckpoint(response.getString("error"));
-                if (response.containsKey("errorCode"))
-                    throw new UserFailure(
-                            ErrorMessages.fromCode(
-                                    context,
-                                    CalculationError.Code.valueOf(response.getString("errorCode")),
-                                    response.getInt("errorArgument")));
-                if (response.containsKey("error"))
-                    throw new UserFailure(response.getString("error"));
-                Bundle result = DisplayResult.decode(MemoryPayload.take(response, "payload"));
-                synchronized (this) {
-                    if (closed || epoch != generation)
-                        throw new com.hp.creals.CR.AbortedException();
-                    if (result.containsKey("state"))
-                        remoteSnapshotId = result.getString("checkpoint");
-                }
-                return result;
+                cacheIntact = response.getBoolean("cacheIntact");
+                return readResponse(response, epoch);
             } finally {
                 MemoryPayload.discard(response, "payload");
             }
@@ -147,9 +131,28 @@ final class RemoteCalculator {
             forgetSnapshot();
             throw new UserFailure(context.getString(R.string.result_unreadable), ex);
         } catch (RuntimeException ex) {
-            forgetSnapshot();
+            if (!cacheIntact) forgetSnapshot();
             throw ex;
         }
+    }
+
+    private Bundle readResponse(Bundle response, int epoch) throws IOException {
+        if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
+        if (response.getBoolean("invalidCheckpoint"))
+            throw new InvalidCheckpoint(response.getString("error"));
+        if (response.containsKey("errorCode"))
+            throw new UserFailure(
+                    ErrorMessages.fromCode(
+                            context,
+                            CalculationError.Code.valueOf(response.getString("errorCode")),
+                            response.getInt("errorArgument")));
+        if (response.containsKey("error")) throw new UserFailure(response.getString("error"));
+        Bundle result = DisplayResult.decode(MemoryPayload.take(response, "payload"));
+        synchronized (this) {
+            if (closed || epoch != generation) throw new com.hp.creals.CR.AbortedException();
+            if (result.containsKey("state")) remoteSnapshotId = result.getString("checkpoint");
+        }
+        return result;
     }
 
     private synchronized void forgetSnapshot() {

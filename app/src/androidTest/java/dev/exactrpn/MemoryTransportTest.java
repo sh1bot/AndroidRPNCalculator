@@ -75,7 +75,7 @@ public final class MemoryTransportTest {
             for (int i = 0; i < depth; i++) {
                 String literal = prefix + String.format(java.util.Locale.ROOT, "%04d", i);
                 literals.add(literal);
-                calculator.paste(literal);
+                CalculatorTestSupport.paste(calculator, literal);
                 calculator.key("ENTER");
             }
             calculator.clearUndo();
@@ -119,7 +119,7 @@ public final class MemoryTransportTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
             RpnCalculator calculator = new RpnCalculator();
-            calculator.paste("42");
+            CalculatorTestSupport.paste(calculator, "42");
             calculator.key("ENTER");
             Bundle seed = new Bundle();
             seed.putByteArray("state", calculator.save());
@@ -138,6 +138,40 @@ public final class MemoryTransportTest {
                     worker.submit(() -> remote.evaluate(request("COPY_ROWS:0", accepted)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("42", copied.getString("copyText"));
+        } finally {
+            remote.close();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test
+    public void failedCopyPreservesBothCachesWithoutResendingTheSnapshot() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        RemoteCalculator remote = new RemoteCalculator(context, true);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            RpnCalculator calculator = new RpnCalculator();
+            CalculatorTestSupport.paste(calculator, "45");
+            calculator.key("ENTER");
+            Bundle seed = new Bundle();
+            seed.putByteArray("state", calculator.save());
+            Bundle accepted =
+                    worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
+                            .get(20, TimeUnit.SECONDS);
+            try {
+                worker.submit(() -> remote.evaluate(request("COPY_ROWS:999", accepted)))
+                        .get(15, TimeUnit.SECONDS);
+                fail("Missing row unexpectedly copied");
+            } catch (java.util.concurrent.ExecutionException expected) {
+                assertTrue(expected.getCause() instanceof RemoteCalculator.UserFailure);
+            }
+            var field = RemoteCalculator.class.getDeclaredField("remoteSnapshotId");
+            field.setAccessible(true);
+            assertEquals(accepted.getString("checkpoint"), field.get(remote));
+            Bundle next = request("COPY_ROWS:0", accepted);
+            next.remove("input");
+            Bundle copied = worker.submit(() -> remote.evaluate(next)).get(15, TimeUnit.SECONDS);
+            assertEquals("45", copied.getString("copyText"));
         } finally {
             remote.close();
             worker.shutdownNow();

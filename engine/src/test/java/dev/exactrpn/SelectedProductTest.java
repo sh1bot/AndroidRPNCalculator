@@ -12,10 +12,10 @@ final class SelectedProductTest {
     void exactProductPreservesEntryAndOriginalsAndSurvivesUndoRedoAndRestore() throws Exception {
         RpnCalculator c = new RpnCalculator();
         for (String text : new String[] {"0.1", "99", "0.2"}) {
-            c.paste(text);
+            CalculatorTestSupport.paste(c, text);
             c.key("ENTER");
         }
-        c.paste("45");
+        CalculatorTestSupport.paste(c, "45");
         c.select(1, 1);
         Command command = Command.parse("PRODUCT_ROWS:2,0,2");
         assertTrue(command.preservesSelection());
@@ -37,7 +37,7 @@ final class SelectedProductTest {
     void irrationalProductRetainsItsExactExpression() throws Exception {
         RpnCalculator c = new RpnCalculator();
         c.key("π");
-        c.paste("2");
+        CalculatorTestSupport.paste(c, "2");
         c.key("ENTER");
         c.productRows(0, 1);
         RpnCalculator restored = RpnCalculator.load(c.save());

@@ -9,7 +9,7 @@ final class EntryOperatorTest {
     @Test
     void underflowCommitsAndCanBeUndoneAndRedoneAfterRestore() throws Exception {
         RpnCalculator c = new RpnCalculator();
-        c.paste("123");
+        CalculatorTestSupport.paste(c, "123");
         Exception failure = assertThrows(IllegalArgumentException.class, () -> c.key("+"));
         assertEquals(CalculationError.Code.NEED_VALUES, ((CalculationError) failure).code());
         assertFalse(c.isEditing());
@@ -21,7 +21,7 @@ final class EntryOperatorTest {
         assertTrue(restored.values().isEmpty());
         restored.key("REDO");
         assertFalse(restored.isEditing());
-        restored.paste("2");
+        CalculatorTestSupport.paste(restored, "2");
         restored.key("+");
         assertEquals("125", restored.values().get(0).bigIntegerValue().toString());
     }
