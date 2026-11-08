@@ -74,10 +74,11 @@ public class CalculationService extends Service {
     private void evaluate(Bundle request, Messenger client) {
         Bundle response = new Bundle();
         MemoryPayload payload = null;
-        boolean readOnly = false;
+        boolean readOnly = true;
         try {
-            Command command = Command.parse(request.getString("key"));
             checkAccess();
+            Command command = Command.parse(request.getString("key"));
+            readOnly = false;
             loadCheckpoint(request, response);
             readOnly = command.kind == Command.Kind.COPY_ROWS;
             Bundle display;
