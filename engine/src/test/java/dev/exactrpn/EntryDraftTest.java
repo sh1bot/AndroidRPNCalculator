@@ -32,7 +32,7 @@ final class EntryDraftTest {
     @Test
     void lifecycleEnvelopeRestoresDraftUndoRedoAndArithmeticIndependently() throws Exception {
         RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
-        engine.paste("42");
+        CalculatorTestSupport.paste(engine, "42");
         engine.key("ENTER");
         draft.key("1");
         draft.key("2");
@@ -86,7 +86,7 @@ final class EntryDraftTest {
     void completedDraftKeepsAFullHistoryWithinItsStorageLimit() throws Exception {
         RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
         for (int i = 0; i < 110; i++) {
-            engine.paste(Integer.toString(i));
+            CalculatorTestSupport.paste(engine, Integer.toString(i));
             engine.key("ENTER");
         }
         assertEquals(100, engine.undoCount());
@@ -103,7 +103,7 @@ final class EntryDraftTest {
     @Test
     void aRestoredNewDraftCannotRedoTheAbandonedArithmeticBranch() throws Exception {
         RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
-        engine.paste("42");
+        CalculatorTestSupport.paste(engine, "42");
         engine.key("ENTER");
         engine.key("UNDO");
         engine.detachEntryEditor();

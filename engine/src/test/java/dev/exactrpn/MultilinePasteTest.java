@@ -17,7 +17,7 @@ final class MultilinePasteTest {
     @Test
     void batchIsAtomicOrderedUndoableAndRestorable() throws Exception {
         RpnCalculator c = new RpnCalculator();
-        c.paste("7");
+        CalculatorTestSupport.paste(c, "7");
         Command.parse("PASTE_RAW:1\r\n\n2.5\n3").apply(c, NumberText.COMPUTER, NumberText.COMPUTER);
         assertFalse(c.isEditing());
         assertEquals(4, c.values().size());
@@ -34,7 +34,7 @@ final class MultilinePasteTest {
     void badOrAmbiguousLineLeavesEntryStackAndHistoryUntouched() throws Exception {
         for (String text : new String[] {"1\nnope\n3", "1\n1,234\n3", "1\n1e1001\n3"}) {
             RpnCalculator c = new RpnCalculator();
-            c.paste("8");
+            CalculatorTestSupport.paste(c, "8");
             byte[] before = c.save();
             Exception ex =
                     assertThrows(

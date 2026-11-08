@@ -47,7 +47,7 @@ final class CommandTest {
         RpnCalculator calculator = new RpnCalculator();
         for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"})
             calculator.key(key);
-        calculator.paste("45");
+        CalculatorTestSupport.paste(calculator, "45");
         calculator.key("HOLD_DROP");
         assertEquals("4", calculator.entry());
         calculator.key("HOLD_DROP");
@@ -56,19 +56,19 @@ final class CommandTest {
         assertEquals("", calculator.entry());
         assertEquals(
                 java.util.Arrays.asList("1", "2", "3"),
-                calculator.formattedValues(
-                        ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
+                CalculatorTestSupport.formattedValues(
+                        calculator, ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
         calculator.key("ENTER");
         calculator.key("HOLD_DROP");
         assertEquals(
                 java.util.Arrays.asList("3", "1", "2"),
-                calculator.formattedValues(
-                        ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
+                CalculatorTestSupport.formattedValues(
+                        calculator, ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
         calculator.key("UNDO");
         assertEquals(
                 java.util.Arrays.asList("1", "2", "3"),
-                calculator.formattedValues(
-                        ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
+                CalculatorTestSupport.formattedValues(
+                        calculator, ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
     }
 
     @Test
@@ -76,7 +76,7 @@ final class CommandTest {
         for (int depth = 1; depth <= 10; depth++) {
             RpnCalculator calculator = new RpnCalculator();
             for (int n = 101; n <= 110; n++) {
-                calculator.paste(Integer.toString(n));
+                CalculatorTestSupport.paste(calculator, Integer.toString(n));
                 calculator.key("ENTER");
             }
             com.android.calculator2.UnifiedReal original = calculator.values().get(10 - depth);
@@ -101,7 +101,7 @@ final class CommandTest {
     void heldDigitsEditAtTheCursorWithoutPickingOrCommitting() {
         RpnCalculator calculator = new RpnCalculator();
         calculator.key("π");
-        calculator.paste("45");
+        CalculatorTestSupport.paste(calculator, "45");
         calculator.select(1, 1);
         Command.parse("HOLD_DIGIT:7").apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals("475", calculator.entry());

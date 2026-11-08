@@ -41,7 +41,92 @@ public final class RpnCalculator {
     private NumberText.Profile inputProfile = new NumberText.Profile('.', ',', 3, 3);
     private NumberText.Profile rawProfile = inputProfile;
     private final IdentityHashMap<UnifiedReal, SavedValue> savedValues = new IdentityHashMap<>();
-    private final Deque<State> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
+    private final Set<UnifiedReal> pendingValues =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private final IdentityHashMap<UnifiedReal, Integer> references = new IdentityHashMap<>();
+    private Set<UnifiedReal> currentValues = Collections.newSetFromMap(new IdentityHashMap<>());
+    private final Deque<State> undo = new History(), redo = new History();
+
+    private void saveValue(UnifiedReal value, SavedValue expression) {
+        savedValues.put(value, expression);
+        if (!references.containsKey(value)) pendingValues.add(value);
+    }
+
+    private void discardPendingValues() {
+        for (UnifiedReal value : pendingValues)
+            if (!references.containsKey(value)) savedValues.remove(value);
+        pendingValues.clear();
+    }
+
+    private void retain(UnifiedReal value) {
+        references.merge(value, 1, Integer::sum);
+    }
+
+    private void release(UnifiedReal value) {
+        int count = references.get(value) - 1;
+        if (count == 0) {
+            references.remove(value);
+            savedValues.remove(value);
+        } else references.put(value, count);
+    }
+
+    /** History owns references independently of the mutable current stack. */
+    private final class History extends ArrayDeque<State> {
+        @Override
+        public void push(State state) {
+            addFirst(state);
+        }
+
+        @Override
+        public State pop() {
+            return removeFirst();
+        }
+
+        @Override
+        public void addFirst(State state) {
+            for (UnifiedReal value : state.stack) retain(value);
+            super.addFirst(state);
+        }
+
+        @Override
+        public void addLast(State state) {
+            for (UnifiedReal value : state.stack) retain(value);
+            super.addLast(state);
+        }
+
+        @Override
+        public boolean addAll(java.util.Collection<? extends State> states) {
+            for (State state : states) addLast(state);
+            return !states.isEmpty();
+        }
+
+        @Override
+        public State removeFirst() {
+            State state = super.removeFirst();
+            for (UnifiedReal value : state.stack) release(value);
+            return state;
+        }
+
+        @Override
+        public State removeLast() {
+            State state = super.removeLast();
+            for (UnifiedReal value : state.stack) release(value);
+            return state;
+        }
+
+        @Override
+        public void clear() {
+            while (!isEmpty()) removeFirst();
+        }
+    }
+
+    private void syncCurrentValues() {
+        Set<UnifiedReal> next = Collections.newSetFromMap(new IdentityHashMap<>());
+        next.addAll(stack);
+        for (UnifiedReal value : next) if (!currentValues.contains(value)) retain(value);
+        for (UnifiedReal value : currentValues) if (!next.contains(value)) release(value);
+        currentValues = next;
+    }
 
     private static final class State {
         final List<UnifiedReal> stack;
@@ -86,6 +171,7 @@ public final class RpnCalculator {
         selectionStart = s.start;
         selectionEnd = s.end;
         rawProfile = s.profile;
+        syncCurrentValues();
     }
 
     private void remember(State s) {
@@ -95,15 +181,15 @@ public final class RpnCalculator {
                 && s.raw == raw
                 && s.start == selectionStart
                 && s.end == selectionEnd
-                && (!raw || sameProfile(s.profile, rawProfile))) return;
-        boolean discarded = !redo.isEmpty();
-        redo.clear();
-        undo.push(s);
-        if (undo.size() > 100) {
-            undo.removeLast();
-            discarded = true;
+                && (!raw || sameProfile(s.profile, rawProfile))) {
+            discardPendingValues();
+            return;
         }
-        if (discarded) pruneSavedValues();
+        undo.push(s);
+        syncCurrentValues();
+        redo.clear();
+        if (undo.size() > 100) undo.removeLast();
+        discardPendingValues();
     }
 
     private static boolean sameProfile(NumberText.Profile a, NumberText.Profile b) {
@@ -111,17 +197,6 @@ public final class RpnCalculator {
                 && a.grouping == b.grouping
                 && a.primary == b.primary
                 && a.secondary == b.secondary;
-    }
-
-    public RpnCalculator copy() {
-        RpnCalculator c = new RpnCalculator();
-        c.restore(new State(this));
-        c.angleUnit = angleUnit;
-        c.inputProfile = inputProfile;
-        c.undo.addAll(undo);
-        c.redo.addAll(redo);
-        c.savedValues.putAll(savedValues);
-        return c;
     }
 
     /** Entry-only editor: no arithmetic values or expression graph crosses into the UI. */
@@ -193,7 +268,6 @@ public final class RpnCalculator {
             if (undo.size() + redo.size() > 100) {
                 if (undo.size() > 1) undo.removeLast();
                 else redo.removeLast();
-                pruneSavedValues();
             }
         }
         restore(entryState(new State(editor), stack));
@@ -319,33 +393,6 @@ public final class RpnCalculator {
         return Collections.unmodifiableList(new ArrayList<>(stack));
     }
 
-    public List<String> formattedValues(
-            ValueFormatter.Notation notation, FractionMode fractionMode) {
-        List<String> rows = new ArrayList<>();
-        for (int i = 0; i < stack.size(); i++) {
-            if (Thread.currentThread().isInterrupted())
-                throw new com.hp.creals.CR.AbortedException();
-            rows.add(
-                    ValueFormatter.format(
-                            stack.get(i),
-                            !editing && i == stack.size() - 1,
-                            notation,
-                            fractionMode));
-        }
-        return Collections.unmodifiableList(rows);
-    }
-
-    /** Trusted canonical paste, also used by programmatic callers. */
-    public void paste(String canonical) {
-        parse(canonical);
-        State before = new State(this);
-        entry = canonical;
-        editing = true;
-        raw = false;
-        select(entry.length(), entry.length());
-        remember(before);
-    }
-
     /** Clipboard text is retained, including ambiguous or invalid punctuation, for correction. */
     /** Multiple nonblank lines are validated before any state is changed. */
     public void pasteClipboard(String text, NumberText.Profile locale) {
@@ -379,7 +426,7 @@ public final class RpnCalculator {
         }
         for (UnifiedReal value : values) {
             stack.add(value);
-            savedValues.put(value, SavedValue.of(value, "r", null, null));
+            saveValue(value, SavedValue.of(value, "r", null, null));
         }
         if (before.editing) collapseEntryEdits(before);
         remember(before);
@@ -506,14 +553,16 @@ public final class RpnCalculator {
         if (key.equals(Command.UNDO)) {
             if (!undo.isEmpty()) {
                 redo.push(new State(this));
-                restore(undo.pop());
+                restore(undo.peek());
+                undo.pop();
             }
             return;
         }
         if (key.equals(Command.REDO)) {
             if (!redo.isEmpty()) {
                 undo.push(new State(this));
-                restore(redo.pop());
+                restore(redo.peek());
+                redo.pop();
             }
             return;
         }
@@ -521,53 +570,8 @@ public final class RpnCalculator {
         State committed = null;
         boolean clearsEntry = key.equals("CE") || key.equals("CLEAR") || key.equals("CANCEL_ENTRY");
         try {
-            if (isEntryKey(key)) {
-                editing = true;
-                if (key.equals(".")) {
-                    if (raw) {
-                        replaceSelection(Character.toString(inputProfile.decimal));
-                        resolveExplicitDecimal();
-                    } else {
-                        String remaining = entryWithoutSelection();
-                        if (remaining.contains(".")
-                                || remaining.contains("e")
-                                || remaining.contains("E")) return;
-                        replaceSelection(entry.isEmpty() || entry.equals("-") ? "0." : ".");
-                    }
-                } else replaceSelection(key);
-                resolveRaw();
-            } else if (key.equals("HOLD_DECIMAL")) {
-                String remaining = entryWithoutSelection();
-                if (remaining.contains("e") || remaining.contains("E")) return;
-                replaceSelection("e");
-                resolveRaw();
-            } else if (key.equals("BACK") || key.equals("DROP") || key.equals("DELETE")) {
-                if (editing) {
-                    if (selectionStart != selectionEnd) replaceSelection("");
-                    else if (key.equals("DELETE")) {
-                        if (selectionStart < entry.length()) {
-                            int start = selectionStart;
-                            select(start, entry.offsetByCodePoints(start, 1));
-                            replaceSelection("");
-                        }
-                    } else if (selectionStart > 0) {
-                        int end = selectionStart;
-                        select(entry.offsetByCodePoints(end, -1), end);
-                        replaceSelection("");
-                    }
-                    resolveRaw();
-                } else if (!stack.isEmpty()) stack.remove(stack.size() - 1);
-            } else if (key.equals("±") && editing) {
-                boolean negative = entry.startsWith("-") || entry.startsWith("−");
-                entry = negative ? entry.substring(1) : "-" + entry;
-                select(selectionStart + (negative ? -1 : 1), selectionEnd + (negative ? -1 : 1));
-                resolveRaw();
-            } else if (clearsEntry) {
-                if (key.equals("CLEAR")) stack.clear();
-                entry = "";
-                if (!key.equals("CE")) editing = false;
-                raw = false;
-                select(0, 0);
+            if (applyEntryKey(key, clearsEntry)) {
+                // Entry changes share the transaction and undo policy below.
             } else if (key.equals(Command.ENTER)) {
                 if (editing) commit();
                 else {
@@ -595,6 +599,58 @@ public final class RpnCalculator {
         }
     }
 
+    private boolean applyEntryKey(String key, boolean clearsEntry) {
+        if (isEntryKey(key)) {
+            editing = true;
+            if (key.equals(".")) {
+                if (raw) {
+                    replaceSelection(Character.toString(inputProfile.decimal));
+                    resolveExplicitDecimal();
+                } else {
+                    String remaining = entryWithoutSelection();
+                    if (remaining.contains(".")
+                            || remaining.contains("e")
+                            || remaining.contains("E")) return true;
+                    replaceSelection(entry.isEmpty() || entry.equals("-") ? "0." : ".");
+                }
+            } else replaceSelection(key);
+            resolveRaw();
+        } else if (key.equals("HOLD_DECIMAL")) {
+            String remaining = entryWithoutSelection();
+            if (remaining.contains("e") || remaining.contains("E")) return true;
+            replaceSelection("e");
+            resolveRaw();
+        } else if (key.equals("BACK") || key.equals("DROP") || key.equals("DELETE")) {
+            if (editing) {
+                if (selectionStart != selectionEnd) replaceSelection("");
+                else if (key.equals("DELETE")) {
+                    if (selectionStart < entry.length()) {
+                        int start = selectionStart;
+                        select(start, entry.offsetByCodePoints(start, 1));
+                        replaceSelection("");
+                    }
+                } else if (selectionStart > 0) {
+                    int end = selectionStart;
+                    select(entry.offsetByCodePoints(end, -1), end);
+                    replaceSelection("");
+                }
+                resolveRaw();
+            } else if (!stack.isEmpty()) stack.remove(stack.size() - 1);
+        } else if (key.equals("±") && editing) {
+            boolean negative = entry.startsWith("-") || entry.startsWith("−");
+            entry = negative ? entry.substring(1) : "-" + entry;
+            select(selectionStart + (negative ? -1 : 1), selectionEnd + (negative ? -1 : 1));
+            resolveRaw();
+        } else if (clearsEntry) {
+            if (key.equals("CLEAR")) stack.clear();
+            entry = "";
+            if (!key.equals("CE")) editing = false;
+            raw = false;
+            select(0, 0);
+        } else return false;
+        return true;
+    }
+
     private void collapseEntryEdits(State before) {
         while (!undo.isEmpty() && undo.peek().editing && sameStack(undo.peek().stack, before.stack))
             undo.pop();
@@ -610,7 +666,7 @@ public final class RpnCalculator {
                 for (BigInteger factor : factors) {
                     UnifiedReal value = new UnifiedReal(factor);
                     stack.add(value);
-                    savedValues.put(value, SavedValue.of(value, "r", null, null));
+                    saveValue(value, SavedValue.of(value, "r", null, null));
                 }
                 break;
             case "DUP":
@@ -697,7 +753,7 @@ public final class RpnCalculator {
         }
         State before = new State(this);
         stack.add(sum);
-        savedValues.put(sum, expression);
+        saveValue(sum, expression);
         remember(before);
     }
 
@@ -726,7 +782,7 @@ public final class RpnCalculator {
         for (int row : rows) {
             UnifiedReal result = results.get(i);
             stack.set(row, result);
-            savedValues.put(result, expressions.get(i++));
+            saveValue(result, expressions.get(i++));
         }
         remember(before);
     }
@@ -776,21 +832,17 @@ public final class RpnCalculator {
     public void discardRedo() {
         if (redo.isEmpty()) return;
         redo.clear();
-        pruneSavedValues();
     }
 
     public void clearUndo() {
         undo.clear();
         redo.clear();
-        pruneSavedValues();
     }
 
+    // Only needed after loading expression nodes or rolling back a failed result.
     private void pruneSavedValues() {
-        Set<UnifiedReal> live = Collections.newSetFromMap(new IdentityHashMap<>());
-        live.addAll(stack);
-        for (State state : undo) live.addAll(state.stack);
-        for (State state : redo) live.addAll(state.stack);
-        savedValues.keySet().retainAll(live);
+        savedValues.keySet().retainAll(references.keySet());
+        pendingValues.clear();
     }
 
     /**
@@ -802,7 +854,6 @@ public final class RpnCalculator {
         while (result.length > 1024 * 1024 && (!undo.isEmpty() || !redo.isEmpty())) {
             if (!undo.isEmpty()) undo.removeLast();
             else redo.removeLast();
-            pruneSavedValues();
             result = encode();
         }
         return result;
@@ -975,7 +1026,7 @@ public final class RpnCalculator {
         if (!entry.isEmpty()) {
             UnifiedReal value = parse(entry);
             stack.add(value);
-            savedValues.put(value, SavedValue.of(value, "r", null, null));
+            saveValue(value, SavedValue.of(value, "r", null, null));
         }
         entry = "";
         editing = false;
@@ -990,7 +1041,7 @@ public final class RpnCalculator {
         UnifiedReal a = operation.arity == 0 ? null : stack.get(stack.size() - operation.arity);
         UnifiedReal b = operation.arity == 2 ? top() : null;
         UnifiedReal result = operation.evaluate(a, b, angleUnit);
-        savedValues.put(
+        saveValue(
                 result,
                 SavedValue.of(
                         result,
