@@ -23,6 +23,13 @@ final class CalculatorSession {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private volatile boolean closing;
     private String persistedCheckpoint;
+    // This calculator is an entry editor only: its stack and expression map stay empty.
+    private RpnCalculator editor;
+    private Display arithmeticDisplay;
+    private long editRevision;
+    private boolean editorDirty;
+    private final java.util.Map<NumberMode, NumberText.Profile> inputProfiles =
+            new java.util.EnumMap<>(NumberMode.class);
     private final Object persistenceLock = new Object();
     volatile Display display;
     volatile String error = "";
@@ -84,6 +91,7 @@ final class CalculatorSession {
 
     void attach(android.content.Context context) {
         this.context = context.getApplicationContext();
+        inputProfiles.clear();
         localeTag = context.getResources().getConfiguration().getLocales().get(0).toLanguageTag();
         if (remote == null) {
             if (!policy.temporary) {
@@ -127,6 +135,9 @@ final class CalculatorSession {
             saveForLifecycle();
             return;
         }
+        if (!busy
+                && Looper.myLooper() == Looper.getMainLooper()
+                && editLocally(command, inputGeneration)) return;
         boolean start;
         synchronized (this) {
             pending.addLast(new PendingKey(command, inputGeneration, copy));
@@ -143,6 +154,96 @@ final class CalculatorSession {
             }
         }
         if (start) worker.submit(this::drainKeys);
+    }
+
+    private NumberText.Profile inputProfile(NumberMode mode) {
+        return inputProfiles.computeIfAbsent(
+                mode,
+                m -> new LocaleNumbers(java.util.Locale.forLanguageTag(localeTag), m).profile());
+    }
+
+    private static boolean cursorCommand(String wire) {
+        String direction = wire.startsWith("SELECT_") ? wire.substring(7) : wire;
+        return direction.equals("LEFT")
+                || direction.equals("RIGHT")
+                || direction.equals("HOME")
+                || direction.equals("END");
+    }
+
+    private boolean editLocally(Command key, long generation) {
+        if (editor == null) editor = new RpnCalculator();
+        boolean editing = editor.isEditing();
+        String wire = key.wire;
+        boolean local =
+                key.isEntryUpdate()
+                        || RpnCalculator.isEntryKey(wire)
+                        || key.is("CE")
+                        || key.is("CANCEL_ENTRY")
+                        || key.is("HOLD_DECIMAL")
+                        || editing
+                                && (key.is("BACK")
+                                        || key.is("DROP")
+                                        || key.is("DELETE")
+                                        || key.is("HOLD_DROP")
+                                        || key.is("SMART_CLEAR")
+                                        || key.is("±")
+                                        || cursorCommand(wire))
+                        || key.is(Command.UNDO) && editor.undoCount() > 0
+                        || key.is(Command.REDO)
+                                && (editor.redoCount() > 0 || editor.undoCount() > 0);
+        if (editing && key.kind == Command.Kind.HOLD_DIGIT) local = true;
+        if (key.kind == Command.Kind.PASTE_RAW) {
+            long lines =
+                    java.util.Arrays.stream(key.text.split("\\R", -1))
+                            .filter(line -> !line.trim().isEmpty())
+                            .count();
+            local = lines < 2;
+        }
+        if (!local) return false;
+        try {
+            editor.setInputProfile(inputProfile(numberMode));
+            key.apply(editor, inputProfile(NumberMode.LOCALE), inputProfile(numberMode));
+            if (checkpoint == null) {
+                try {
+                    checkpoint =
+                            new CalculationSnapshot(
+                                    UUID.randomUUID().toString(), new RpnCalculator().save(), true);
+                } catch (java.io.IOException ex) {
+                    throw new IllegalStateException(ex);
+                }
+            }
+            loaded = true;
+            editorDirty = true;
+            editRevision++;
+            display = new Display(arithmeticDisplay == null ? display : arithmeticDisplay, editor);
+            setError(generation, "");
+        } catch (RuntimeException ex) {
+            setError(
+                    generation,
+                    context.getString(R.string.error_prefix, ErrorMessages.describe(context, ex)));
+        }
+        return true;
+    }
+
+    private <T> T onMain(java.util.concurrent.Callable<T> action) {
+        FutureTask<T> task = new FutureTask<>(action);
+        if (Looper.myLooper() == Looper.getMainLooper()) task.run();
+        else handler.post(task);
+        try {
+            return task.get();
+        } catch (InterruptedException ex) {
+            task.cancel(false);
+            Thread.currentThread().interrupt();
+            throw new com.hp.creals.CR.AbortedException();
+        } catch (ExecutionException ex) {
+            if (ex.getCause() instanceof RuntimeException) throw (RuntimeException) ex.getCause();
+            throw new IllegalStateException(ex.getCause());
+        }
+    }
+
+    private byte[] completedDraft() throws java.io.IOException {
+        if (editor == null) return null;
+        return editor.entryForCommit().save();
     }
 
     private void drainKeys() {
@@ -169,7 +270,7 @@ final class CalculatorSession {
                 }
             }
             if (key == null) {
-                if (!closing && background) persistSession(generation);
+                if (!closing && background) saveForLifecycle();
                 return;
             }
             try {
@@ -193,7 +294,12 @@ final class CalculatorSession {
                         throw new IllegalStateException("Could not restore saved calculator", ex);
                     }
                 }
+                Command command = key;
+                long revision = generation;
+                if (onMain(() -> editLocally(command, revision))) continue;
                 Bundle request = new Bundle();
+                if (!key.is(Command.RESTORE) && key.kind != Command.Kind.COPY_ROWS)
+                    request.putByteArray("entryDraft", onMain(this::completedDraft));
                 request.putString("key", key.wire);
                 CalculationSnapshot input = checkpoint;
                 if (input != null) input.input(request);
@@ -209,7 +315,7 @@ final class CalculatorSession {
                 }
                 Display nextDisplay = new Display(result);
                 publishResult(result, nextDisplay, key, generation);
-                if (background) persistSession(generation);
+                if (background) saveForLifecycle();
             } catch (RuntimeException ex) {
                 if (ex instanceof DeviceAccess.Locked
                         || (!policy.temporary
@@ -273,7 +379,29 @@ final class CalculatorSession {
                         notation = nextDisplay.notation;
                         numberMode = nextDisplay.numberMode;
                         fractionMode = nextDisplay.fractionMode;
-                        display = nextDisplay;
+                        boolean keepEdits =
+                                editor != null
+                                        && (nextDisplay.editing
+                                                || key.is("FORMAT")
+                                                || key.is("FRACTION")
+                                                || key.is("NUMBER_FORMAT")
+                                                || key.is("ANGLE"))
+                                        && nextDisplay.entry.equals(editor.entry())
+                                        && nextDisplay.editing == editor.isEditing()
+                                        && nextDisplay.raw == editor.rawEntry()
+                                        && nextDisplay.start == editor.selectionStart()
+                                        && nextDisplay.end == editor.selectionEnd();
+                        if (!keepEdits) {
+                            try {
+                                editor = RpnCalculator.load(result.getByteArray("entryState"));
+                            } catch (java.io.IOException ex) {
+                                throw new IllegalStateException("Invalid entry response", ex);
+                            }
+                            editorDirty = editor.undoCount() > 0 || editor.redoCount() > 0;
+                            editRevision++;
+                        }
+                        arithmeticDisplay = nextDisplay;
+                        display = new Display(nextDisplay, editor);
                         String operationError = result.getString("operationError", "");
                         if (!key.is(Command.CHECKPOINT))
                             setError(
@@ -287,29 +415,19 @@ final class CalculatorSession {
                         if (!key.is(Command.CHECKPOINT)) loaded = true;
                     }
                 };
-        if (key.kind != Command.Kind.DROP_ROWS) {
-            accept.run();
-            return;
-        }
-        // Publish selection remapping and the new rows together on the UI thread, before
-        // another queued result can overtake this one. Failed/cancelled drops leave selection
-        // intact.
-        FutureTask<Void> commit = new FutureTask<>(accept, null);
-        handler.post(commit);
-        try {
-            commit.get();
-        } catch (InterruptedException ex) {
-            commit.cancel(false);
-            Thread.currentThread().interrupt();
-            throw new com.hp.creals.CR.AbortedException();
-        } catch (ExecutionException ex) {
-            if (ex.getCause() instanceof RuntimeException) throw (RuntimeException) ex.getCause();
-            throw new IllegalStateException("Could not update stack selection", ex.getCause());
-        }
+        onMain(
+                () -> {
+                    accept.run();
+                    return null;
+                });
     }
 
     void saveForLifecycle() {
-        persistSession(inputGeneration);
+        onMain(
+                () -> {
+                    persistSession(inputGeneration);
+                    return null;
+                });
     }
 
     private void persistSession(long generation) {
@@ -320,15 +438,21 @@ final class CalculatorSession {
             CalculationSnapshot accepted = checkpoint;
             if (accepted == null) return;
             try {
-                if (background && !busy && accepted.empty) {
+                String version = accepted.id + ":" + editRevision;
+                boolean empty = display.rows.isEmpty() && display.entry.isEmpty();
+                if (background && !busy && empty) {
                     store.clear();
                     synchronized (this) {
                         if (checkpoint == accepted) checkpoint = null;
                     }
                     persistedCheckpoint = null;
-                } else if (!accepted.id.equals(persistedCheckpoint)) {
-                    store.save(accepted.bytes);
-                    persistedCheckpoint = accepted.id;
+                    if (editor != null) editor.clearUndo();
+                } else if (!version.equals(persistedCheckpoint)) {
+                    store.save(
+                            editorDirty
+                                    ? RpnCalculator.saveWithEntry(accepted.bytes, editor)
+                                    : accepted.bytes);
+                    persistedCheckpoint = version;
                 }
             } catch (java.io.IOException | RuntimeException ex) {
                 android.util.Log.e("ExactRPN", "Could not save calculator", ex);

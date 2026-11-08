@@ -83,11 +83,13 @@ public class CalculationService extends Service {
                 display.putString("copyText", copyRows(request));
             } else {
                 Evaluation evaluation = new Evaluation(request);
+                byte[] entryState = evaluation.candidate.detachEntryEditor().save();
                 byte[] state = evaluation.candidate.save();
                 display = evaluation.presentation();
                 String id = UUID.randomUUID().toString();
                 display.putString("checkpoint", id);
                 display.putByteArray("state", state);
+                display.putByteArray("entryState", entryState);
                 cachedId = id;
                 cachedStackId = evaluation.stackId;
             }
@@ -183,6 +185,14 @@ public class CalculationService extends Service {
             Command key = Command.parse(request.getString("key"));
             List<UnifiedReal> before = cached.values();
             candidate = cached;
+            byte[] draft = request.getByteArray("entryDraft");
+            if (draft != null) {
+                try {
+                    candidate.useEntryEditor(RpnCalculator.load(draft));
+                } catch (IOException ex) {
+                    throw new IllegalArgumentException("Invalid entry draft", ex);
+                }
+            }
             Locale locale = Locale.forLanguageTag(request.getString("locale"));
             numberMode = NumberMode.fromId(request.getInt("numberMode"));
             fractionMode = FractionMode.fromId(request.getInt("fractionMode"));
@@ -218,7 +228,7 @@ public class CalculationService extends Service {
             ArrayList<String> compact = new ArrayList<>(values.size());
             for (int i = 0; i < values.size(); i++) {
                 UnifiedReal value = values.get(i);
-                boolean newest = !candidate.isEditing() && i == values.size() - 1;
+                boolean newest = i == values.size() - 1;
                 rows.add(texts.row(value, newest, notation, fractionMode));
                 compact.add(
                         texts.row(

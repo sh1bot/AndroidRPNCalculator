@@ -7,7 +7,7 @@ import java.util.Collections;
 import java.util.List;
 
 final class Display {
-    final List<String> rows, compactRows;
+    final List<String> rows, fullRows, compactRows;
     final String entry, problem, stackId;
     final ValueFormatter.Notation notation;
     final boolean editing, raw;
@@ -21,7 +21,7 @@ final class Display {
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
             FractionMode fractionMode) {
-        rows = compactRows = Collections.emptyList();
+        rows = fullRows = compactRows = Collections.emptyList();
         entry = problem = "";
         stackId = "initial";
         this.notation = notation;
@@ -33,7 +33,7 @@ final class Display {
     }
 
     Display(Bundle result) {
-        rows = Collections.unmodifiableList(result.getStringArrayList("rows"));
+        fullRows = Collections.unmodifiableList(result.getStringArrayList("rows"));
         compactRows = Collections.unmodifiableList(result.getStringArrayList("compactRows"));
         stackId = result.getString("stackId");
         entry = result.getString("entry");
@@ -43,8 +43,26 @@ final class Display {
         numberMode = NumberMode.fromId(result.getInt("numberMode"));
         fractionMode = FractionMode.fromId(result.getInt("fractionMode"));
         editing = result.getBoolean("editing");
+        rows = editing ? compactRows : fullRows;
         raw = result.getBoolean("raw");
         start = result.getInt("start");
         end = result.getInt("end");
+    }
+
+    Display(Display stack, RpnCalculator editor) {
+        fullRows = stack.fullRows;
+        compactRows = stack.compactRows;
+        stackId = stack.stackId;
+        notation = stack.notation;
+        angleUnit = stack.angleUnit;
+        numberMode = stack.numberMode;
+        fractionMode = stack.fractionMode;
+        editing = editor.isEditing();
+        rows = editing ? compactRows : fullRows;
+        entry = editor.entry();
+        problem = editor.entryProblem();
+        raw = editor.rawEntry();
+        start = editor.selectionStart();
+        end = editor.selectionEnd();
     }
 }

@@ -22,7 +22,7 @@ final class DisplayResult {
     static byte[] encode(Bundle result) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
-            out.writeInt(0x44525033);
+            out.writeInt(0x44525034);
             boolean copy = result.containsKey("copyText");
             out.writeBoolean(copy);
             if (copy) {
@@ -32,6 +32,9 @@ final class DisplayResult {
             byte[] state = result.getByteArray("state");
             out.writeInt(state.length);
             out.write(state);
+            byte[] entry = result.getByteArray("entryState");
+            out.writeInt(entry.length);
+            out.write(entry);
             for (String key : TEXT) writeText(out, result.getString(key));
             for (String key : LISTS) {
                 ArrayList<String> list = result.getStringArrayList(key);
@@ -47,7 +50,7 @@ final class DisplayResult {
 
     static Bundle decode(byte[] bytes) throws IOException {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes))) {
-            if (in.readInt() != 0x44525033) throw new IOException("Unknown display protocol");
+            if (in.readInt() != 0x44525034) throw new IOException("Unknown display protocol");
             Bundle result = new Bundle();
             if (in.readBoolean()) {
                 result.putString("copyText", readText(in));
@@ -59,6 +62,11 @@ final class DisplayResult {
             byte[] state = new byte[size];
             in.readFully(state);
             result.putByteArray("state", state);
+            size = in.readInt();
+            if (size < 0 || size > in.available()) throw new IOException("Invalid entry length");
+            byte[] entry = new byte[size];
+            in.readFully(entry);
+            result.putByteArray("entryState", entry);
             for (String key : TEXT) result.putString(key, readText(in));
             for (String key : LISTS) {
                 int count = in.readInt();
