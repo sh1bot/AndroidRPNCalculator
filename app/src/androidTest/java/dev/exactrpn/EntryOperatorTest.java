@@ -48,6 +48,60 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void digitsAndCursorEditsStayLocalUntilCommit() throws Exception {
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL,
+                        true);
+        session.attach(instrumentation.getTargetContext());
+        try {
+            key(session, "RESTORE");
+            CalculationSnapshot accepted = session.checkpoint;
+            java.lang.reflect.Field remoteField =
+                    CalculatorSession.class.getDeclaredField("remote");
+            remoteField.setAccessible(true);
+            RemoteCalculator remote = (RemoteCalculator) remoteField.get(session);
+            instrumentation.runOnMainSync(remote::cancel);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        for (String input :
+                                new String[] {
+                                    "1", "2", ".", "3", "LEFT", "RIGHT", "BACK", "UNDO", "REDO",
+                                    "UNDO"
+                                }) {
+                            session.enqueue(Command.parse(input));
+                            assertFalse("Typing must not start worker activity", session.busy);
+                            assertSame(
+                                    "Typing must not serialize a new stack snapshot",
+                                    accepted,
+                                    session.checkpoint);
+                        }
+                    });
+            assertEquals("12.3", session.display.entry);
+            java.lang.reflect.Field connection =
+                    RemoteCalculator.class.getDeclaredField("connection");
+            connection.setAccessible(true);
+            assertNull(
+                    "Typing must not reconnect to the arithmetic service", connection.get(remote));
+            key(session, "ENTER");
+            assertFalse(session.display.editing);
+            assertEquals(Arrays.asList("12.3"), session.display.rows);
+            key(session, "UNDO");
+            assertEquals("12.3", session.display.entry);
+            assertTrue(session.display.rows.isEmpty());
+            key(session, "UNDO");
+            assertFalse(session.display.editing);
+            assertTrue(session.display.rows.isEmpty());
+        } finally {
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     public void multilinePasteIsAtomicAcrossTheWorkerAndUndoRemovesTheBatch() throws Exception {
         android.content.Context context = instrumentation.getTargetContext();
         CalculatorSession session =

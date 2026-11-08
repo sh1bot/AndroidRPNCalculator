@@ -28,6 +28,7 @@ public final class RpnCalculator {
     private List<UnifiedReal> stack = new ArrayList<>();
     private String entry = "";
     private boolean editing, raw;
+    private RpnCalculator restoredEditor;
     private int selectionStart, selectionEnd;
 
     public enum AngleUnit {
@@ -121,6 +122,133 @@ public final class RpnCalculator {
         c.redo.addAll(redo);
         c.savedValues.putAll(savedValues);
         return c;
+    }
+
+    /** Entry-only editor: no arithmetic values or expression graph crosses into the UI. */
+    public RpnCalculator detachEntryEditor() {
+        if (restoredEditor != null) {
+            RpnCalculator editor = restoredEditor;
+            restoredEditor = null;
+            for (int i = 0; i < editor.undo.size(); i++) undo.removeFirst();
+            for (int i = 0; i < editor.redo.size(); i++) redo.removeFirst();
+            return editor;
+        }
+        RpnCalculator editor = new RpnCalculator();
+        editor.inputProfile = inputProfile;
+        editor.restore(entryState(new State(this), Collections.emptyList()));
+        if (editing) {
+            moveEntryHistory(undo, editor.undo);
+            moveEntryHistory(redo, editor.redo);
+        }
+        return editor;
+    }
+
+    private void moveEntryHistory(Deque<State> source, Deque<State> target) {
+        while (!source.isEmpty() && sameStack(source.peek().stack, stack)) {
+            State state = source.pop();
+            target.addLast(entryState(state, Collections.emptyList()));
+            if (!state.editing) break;
+        }
+    }
+
+    private static State entryState(State entry, List<UnifiedReal> stack) {
+        return new State(
+                new ArrayList<>(stack),
+                entry.entry,
+                entry.editing,
+                entry.raw,
+                entry.start,
+                entry.end,
+                entry.profile);
+    }
+
+    /** Completed entry and its pre-edit boundary, without per-character undo history. */
+    public RpnCalculator entryForCommit() {
+        RpnCalculator editor = new RpnCalculator();
+        editor.inputProfile = inputProfile;
+        editor.restore(entryState(new State(this), Collections.emptyList()));
+        for (State state : undo) {
+            if (!state.editing) {
+                editor.undo.push(entryState(state, Collections.emptyList()));
+                break;
+            }
+        }
+        return editor;
+    }
+
+    /** Install a completed UI draft without retaining its individual edits. */
+    public void useEntryEditor(RpnCalculator editor) {
+        if (!editor.stack.isEmpty())
+            throw new IllegalArgumentException("Entry contains stack values");
+        if (editor.editing) {
+            for (State state : editor.undo) {
+                if (!state.editing) {
+                    if (undo.isEmpty()
+                            || undo.peek().editing
+                            || !sameStack(undo.peek().stack, stack))
+                        undo.push(entryState(state, stack));
+                    break;
+                }
+            }
+        }
+        restore(entryState(new State(editor), stack));
+    }
+
+    /** Persist a UI draft beside an already encoded arithmetic snapshot; no graph decoding. */
+    public static byte[] saveWithEntry(byte[] calculation, RpnCalculator editor)
+            throws IOException {
+        byte[] draft = editor.save();
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeInt(0x52504e33);
+        out.writeInt(calculation.length);
+        out.write(calculation);
+        out.writeInt(draft.length);
+        out.write(draft);
+        return bytes.toByteArray();
+    }
+
+    private static RpnCalculator loadWithEntry(DataInputStream in) throws IOException {
+        byte[] calculation = readSection(in), draft = readSection(in);
+        if (in.available() != 0) throw new IOException("Trailing saved state data");
+        // Sections are ordinary snapshots, never nested envelopes.
+        if (new DataInputStream(new ByteArrayInputStream(calculation)).readInt() == 0x52504e33
+                || new DataInputStream(new ByteArrayInputStream(draft)).readInt() == 0x52504e33)
+            throw new IOException("Nested entry snapshot");
+        RpnCalculator calculator = load(calculation), editor = load(draft);
+        if (!editor.stack.isEmpty()) throw new IOException("Entry contains stack values");
+        calculator.restore(entryState(new State(editor), calculator.stack));
+        for (State state : editor.undo) {
+            if (!state.stack.isEmpty()) throw new IOException("Invalid entry history");
+        }
+        for (State state : editor.redo) {
+            if (!state.stack.isEmpty()) throw new IOException("Invalid entry history");
+        }
+        while (calculator.undo.size()
+                        + calculator.redo.size()
+                        + editor.undo.size()
+                        + editor.redo.size()
+                > 100) {
+            if (!calculator.undo.isEmpty()) calculator.undo.removeLast();
+            else calculator.redo.removeLast();
+        }
+        // The worker detached these edits when publishing the arithmetic snapshot.
+        List<State> edits = new ArrayList<>(editor.undo);
+        for (int i = edits.size() - 1; i >= 0; i--)
+            calculator.undo.push(entryState(edits.get(i), calculator.stack));
+        edits = new ArrayList<>(editor.redo);
+        for (int i = edits.size() - 1; i >= 0; i--)
+            calculator.redo.addFirst(entryState(edits.get(i), calculator.stack));
+        calculator.restoredEditor = editor;
+        return calculator;
+    }
+
+    private static byte[] readSection(DataInputStream in) throws IOException {
+        int length = in.readInt();
+        if (length < 0 || length > in.available()) throw new IOException("Invalid snapshot length");
+        byte[] section = new byte[length];
+        in.readFully(section);
+        return section;
     }
 
     public String entry() {
@@ -342,6 +470,7 @@ public final class RpnCalculator {
     }
 
     public void key(String key) {
+        restoredEditor = null;
         if (key.equals("HOLD_DECIMAL") && !editing) return;
         if (key.equals("SMART_CLEAR")) key = editing ? "CE" : "CLEAR";
         // Resolve against the calculation state, even when UI updates trail queued input.
@@ -722,6 +851,7 @@ public final class RpnCalculator {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
             int version = in.readInt();
+            if (version == 0x52504e33) return loadWithEntry(in);
             if (version != 0x52504e31 && version != 0x52504e32)
                 throw new IOException("Unknown saved state version");
             RpnCalculator c = new RpnCalculator();
