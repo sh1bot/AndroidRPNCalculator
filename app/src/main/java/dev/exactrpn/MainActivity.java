@@ -229,7 +229,8 @@ public class MainActivity extends Activity {
         if (key.is(Command.CANCEL)
                 || (key.is(Command.UNDO)
                         && session.busy
-                        && SystemClock.elapsedRealtime() - session.busySince >= 250)) {
+                        && (session.operationPending
+                                || SystemClock.elapsedRealtime() - session.busySince >= 250))) {
             cancelCalculation();
             return;
         }
@@ -904,6 +905,7 @@ public class MainActivity extends Activity {
         boolean showProgress =
                 session.busy
                         && (session.cancelRequested
+                                || session.operationPending
                                 || SystemClock.elapsedRealtime() - session.busySince >= 250);
         status.setText(
                 showProgress

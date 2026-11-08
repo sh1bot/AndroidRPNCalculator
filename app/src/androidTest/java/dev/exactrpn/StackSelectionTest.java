@@ -95,6 +95,54 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void cancelOverridesUnselectDuringASelectedUnaryOperation() throws Exception {
+        MainActivity a = open();
+        CalculatorSession state = session(a);
+        try {
+            for (String key : new String[] {"π", "e", "+", "e", "π", "+", "−"}) key(a, key);
+            await(() -> tagged(a, "stack-row:0") != null && tagged(a, "stack-row:1") == null);
+            instrumentation.runOnMainSync(() -> tagged(a, "stack-row:0").performClick());
+            assertEquals(1, state.selectedRows.size());
+            instrumentation.runOnMainSync(() -> tagged(a, "1/x").performClick());
+            SystemClock.sleep(300);
+            assertTrue(state.busy);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        assertEquals("Cancel", ((Button) tagged(a, "UNDO")).getText().toString());
+                        assertEquals(
+                                "Cancel calculation",
+                                tagged(a, "UNDO").getContentDescription().toString());
+                        tagged(a, "UNDO").performClick();
+                    });
+            long started = SystemClock.elapsedRealtime();
+            await(() -> !state.busy);
+            assertTrue(SystemClock.elapsedRealtime() - started < 2000);
+            assertEquals(1, state.selectedRows.size());
+            assertEquals(1, state.display.rows.size());
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
+    public void hugeIntegerResultUsesCompactTextWithoutBlockingTheActivity() throws Exception {
+        MainActivity a = open();
+        CalculatorSession state = session(a);
+        try {
+            for (String key : new String[] {"6", "5", "5", "3", "6"}) key(a, key);
+            instrumentation.runOnMainSync(() -> state.enqueue(Command.parse("10ˣ")));
+            await(() -> !state.busy && !state.display.editing);
+            assertEquals(java.util.Arrays.asList("1e+65536"), state.display.rows);
+            assertTrue(state.error.isEmpty());
+            key(a, "ENTER");
+            key(a, "÷");
+            assertEquals(java.util.Arrays.asList("1"), state.display.rows);
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
     public void wholeRowsSelectAndControlsHaveFixedSelectionRoles() throws Exception {
         MainActivity a = open();
         CalculatorSession session = session(a);
