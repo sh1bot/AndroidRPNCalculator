@@ -39,25 +39,39 @@ final class CalculatorStore {
     byte[] load() throws IOException {
         checkAccess();
         if (checkpoint() == null) return null;
+        checkSize(file.getBaseFile().length());
         try (FileInputStream in = file.openRead();
                 java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
             byte[] buffer = new byte[8192];
             int count;
-            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            while ((count = in.read(buffer)) != -1) {
+                checkSize((long) out.size() + count);
+                out.write(buffer, 0, count);
+            }
             return out.toByteArray();
         }
     }
 
     /** Two interrupted attempts at the same snapshot are enough; preserve it for recovery. */
     byte[] beginRestore() throws IOException {
-        byte[] bytes = load();
-        if (bytes == null) {
+        if (checkpoint() == null) {
             finishRestore();
             return null;
         }
         byte[] fingerprint;
         try {
-            fingerprint = java.security.MessageDigest.getInstance("SHA-256").digest(bytes);
+            checkSize(file.getBaseFile().length());
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
+            try (FileInputStream in = file.openRead()) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = in.read(buffer)) != -1) {
+                    if (Thread.currentThread().isInterrupted())
+                        throw new com.hp.creals.CR.AbortedException();
+                    digest.update(buffer, 0, count);
+                }
+            }
+            fingerprint = digest.digest();
         } catch (java.security.NoSuchAlgorithmException impossible) {
             throw new AssertionError(impossible);
         }
@@ -87,7 +101,13 @@ final class CalculatorStore {
             restoreAttempt.failWrite(out);
             throw ex;
         }
-        return bytes;
+        // Record the attempt before allocating the snapshot: an OOM here must count too.
+        return load();
+    }
+
+    private static void checkSize(long length) throws IOException {
+        if (length > MemoryPayload.MAX_LENGTH)
+            throw new IOException("Saved calculation is too large");
     }
 
     void finishRestore() {

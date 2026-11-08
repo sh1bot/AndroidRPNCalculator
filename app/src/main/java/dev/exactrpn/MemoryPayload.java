@@ -15,7 +15,7 @@ import java.nio.ByteBuffer;
 /** Small transfers use Binder directly; larger ones use read-only shared memory. */
 final class MemoryPayload implements AutoCloseable {
     static final int INLINE_LIMIT = 256 * 1024;
-    private static final int LIMIT = 128 * 1024 * 1024;
+    static final int MAX_LENGTH = 128 * 1024 * 1024;
     private final Parcelable handle;
     private final byte[] bytes;
     private final int length;
@@ -27,7 +27,7 @@ final class MemoryPayload implements AutoCloseable {
     }
 
     static MemoryPayload create(byte[] bytes) throws IOException {
-        if (bytes.length > LIMIT) throw new IOException("Calculation transfer is too large");
+        if (bytes.length > MAX_LENGTH) throw new IOException("Calculation transfer is too large");
         if (bytes.length < INLINE_LIMIT) return new MemoryPayload(bytes, null, bytes.length);
         if (Build.VERSION.SDK_INT < 27)
             throw new IOException("Large calculation transfers require Android 8.1 or newer");
@@ -50,12 +50,12 @@ final class MemoryPayload implements AutoCloseable {
         try {
             if (data instanceof byte[]) {
                 byte[] bytes = (byte[]) data;
-                if (bytes.length > LIMIT)
+                if (bytes.length > MAX_LENGTH)
                     throw new IOException("Invalid calculation transfer size");
                 return bytes;
             }
             if (data == null) throw new IOException("Missing calculation transfer");
-            if (length < 0 || length > LIMIT)
+            if (length < 0 || length > MAX_LENGTH)
                 throw new IOException("Invalid calculation transfer size");
             if (Build.VERSION.SDK_INT >= 27 && Api27.isMemory(data))
                 return Api27.read((Parcelable) data, length);
