@@ -48,7 +48,8 @@ public final class WindowInsetsTest {
                                 "Decor must not inset content before app padding", 0, location[1]);
                         WindowInsets insets =
                                 Build.VERSION.SDK_INT < 29
-                                        ? new WindowInsets(new Rect(0, status, 0, status))
+                                        ? root.getRootWindowInsets()
+                                                .replaceSystemWindowInsets(0, status, 0, status)
                                         : new WindowInsets.Builder()
                                                 .setSystemWindowInsets(
                                                         Insets.of(0, status, 0, status))
