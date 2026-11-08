@@ -41,7 +41,9 @@ public final class RpnCalculator {
             Collections.newSetFromMap(new IdentityHashMap<>());
     private final IdentityHashMap<UnifiedReal, Integer> references = new IdentityHashMap<>();
     private Set<UnifiedReal> currentValues = Collections.newSetFromMap(new IdentityHashMap<>());
-    private final Deque<State> undo = new History(), redo = new History();
+    private final UndoHistory<State> history =
+            new UndoHistory<>(new History(), new History(), this::syncCurrentValues);
+    private final Deque<State> undo = history.undo, redo = history.redo;
 
     private void saveValue(UnifiedReal value, SavedValue expression) {
         savedValues.put(value, expression);
@@ -149,10 +151,7 @@ public final class RpnCalculator {
             discardPendingValues();
             return;
         }
-        undo.push(s);
-        syncCurrentValues();
-        redo.clear();
-        if (undo.size() > 100) undo.removeLast();
+        history.remember(s);
         discardPendingValues();
     }
 
@@ -236,10 +235,7 @@ public final class RpnCalculator {
         if (newBranch) discardRedo();
         editor.inputProfile = draft.inputProfile;
         editor.restore(new EntryEditor.State(draft));
-        while (undo.size() + redo.size() + draft.undoCount() + draft.redoCount() > 100) {
-            if (!undo.isEmpty()) undo.removeLast();
-            else redo.removeLast();
-        }
+        history.trim(100 - draft.undoCount() - draft.redoCount());
         List<EntryEditor.State> edits = new ArrayList<>(draft.undo);
         for (int i = edits.size() - 1; i >= 0; i--) undo.push(entryState(edits.get(i), stack));
         edits = new ArrayList<>(draft.redo);
@@ -406,20 +402,10 @@ public final class RpnCalculator {
             angleUnit = AngleUnit.values()[(angleUnit.ordinal() + 1) % AngleUnit.values().length];
             return;
         }
-        if (key.equals(Command.UNDO)) {
-            if (!undo.isEmpty()) {
-                redo.push(new State(this));
-                restore(undo.peek());
-                undo.pop();
-            }
-            return;
-        }
-        if (key.equals(Command.REDO)) {
-            if (!redo.isEmpty()) {
-                undo.push(new State(this));
-                restore(redo.peek());
-                redo.pop();
-            }
+        if (key.equals(Command.UNDO) || key.equals(Command.REDO)) {
+            boolean backwards = key.equals(Command.UNDO);
+            if (!(backwards ? undo : redo).isEmpty())
+                history.move(backwards, new State(this), this::restore);
             return;
         }
         State before = new State(this);
@@ -630,8 +616,7 @@ public final class RpnCalculator {
     }
 
     public void clearUndo() {
-        undo.clear();
-        redo.clear();
+        history.clear();
     }
 
     // Only needed after loading expression nodes or rolling back a failed result.
@@ -645,11 +630,7 @@ public final class RpnCalculator {
         byte[] body = encode();
         byte[] currentEntry = editor.save();
         while (body.length + currentEntry.length + 13 > CalculationLimits.ARITHMETIC_BYTES
-                && (!undo.isEmpty() || !redo.isEmpty())) {
-            if (!undo.isEmpty()) undo.removeLast();
-            else redo.removeLast();
-            body = encode();
-        }
+                && history.evictOldest()) body = encode();
         CalculationLimits.require(
                 body.length + currentEntry.length + 13, CalculationLimits.ARITHMETIC_BYTES);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();

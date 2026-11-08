@@ -2,7 +2,6 @@
 package dev.exactrpn;
 
 import java.io.*;
-import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Objects;
 
@@ -14,15 +13,16 @@ public final class EntryEditor {
     int selectionStart, selectionEnd;
     NumberText.Profile inputProfile = new NumberText.Profile('.', ',', 3, 3);
     NumberText.Profile rawProfile = inputProfile;
-    final Deque<State> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
-    private final boolean history;
+    private final UndoHistory<State> history = new UndoHistory<>();
+    final Deque<State> undo = history.undo, redo = history.redo;
+    private final boolean recordHistory;
 
     public EntryEditor() {
         this(true);
     }
 
     EntryEditor(boolean history) {
-        this.history = history;
+        recordHistory = history;
     }
 
     static final class State {
@@ -70,10 +70,7 @@ public final class EntryEditor {
     }
 
     private void remember(State before) {
-        if (!history || before.same(this)) return;
-        redo.clear();
-        undo.push(before);
-        if (undo.size() > 100) undo.removeLast();
+        if (recordHistory && !before.same(this)) history.remember(before);
     }
 
     static boolean sameProfile(NumberText.Profile a, NumberText.Profile b) {
@@ -92,8 +89,7 @@ public final class EntryEditor {
     }
 
     public void clearUndo() {
-        undo.clear();
-        redo.clear();
+        history.clear();
     }
 
     public EntryEditor entryForCommit() {
@@ -121,12 +117,9 @@ public final class EntryEditor {
             return true;
         }
         if (key.equals(Command.UNDO) || key.equals(Command.REDO)) {
-            Deque<State> from = key.equals(Command.UNDO) ? undo : redo;
-            Deque<State> to = key.equals(Command.UNDO) ? redo : undo;
-            if (!from.isEmpty()) {
-                to.push(new State(this));
-                restore(from.pop());
-            }
+            boolean backwards = key.equals(Command.UNDO);
+            if (!(backwards ? undo : redo).isEmpty())
+                history.move(backwards, new State(this), this::restore);
             return true;
         }
         State before = new State(this);
@@ -345,11 +338,7 @@ public final class EntryEditor {
 
     public byte[] save(int limit) throws IOException {
         byte[] bytes = encode();
-        while (bytes.length > limit && (!undo.isEmpty() || !redo.isEmpty())) {
-            if (!undo.isEmpty()) undo.removeLast();
-            else redo.removeLast();
-            bytes = encode();
-        }
+        while (bytes.length > limit && history.evictOldest()) bytes = encode();
         CalculationLimits.require(bytes.length, limit);
         return bytes;
     }
