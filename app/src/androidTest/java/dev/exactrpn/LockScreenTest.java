@@ -220,10 +220,12 @@ public final class LockScreenTest {
         FileObserver observer = watch(context, accesses);
         LockedCalculatorActivity activity = null;
         boolean credential = false;
+        String lockDelay = shell("settings get secure lock_screen_lock_after_timeout").trim();
         try {
             shell("locksettings set-pin 1234");
             credential = true;
             await(manager::isDeviceSecure);
+            shell("settings put secure lock_screen_lock_after_timeout 0");
             shell("input keyevent KEYCODE_SLEEP");
             await(manager::isDeviceLocked);
             shell("input keyevent KEYCODE_WAKEUP");
@@ -290,6 +292,11 @@ public final class LockScreenTest {
             // filesystem events can leak into the next test watching the same directory.
             try {
                 if (credential) shell("locksettings clear --old 1234");
+                shell(
+                        lockDelay.equals("null")
+                                ? "settings delete secure lock_screen_lock_after_timeout"
+                                : "settings put secure lock_screen_lock_after_timeout "
+                                        + lockDelay);
                 if (activity != null) StackSelectionTest.finish(activity);
                 shell("input keyevent KEYCODE_WAKEUP");
                 shell("wm dismiss-keyguard");
