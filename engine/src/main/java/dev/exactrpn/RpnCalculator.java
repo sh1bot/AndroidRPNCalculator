@@ -190,6 +190,10 @@ public final class RpnCalculator {
                     break;
                 }
             }
+            if (undo.size() > 100) {
+                undo.removeLast();
+                pruneSavedValues();
+            }
         }
         restore(entryState(new State(editor), stack));
     }
