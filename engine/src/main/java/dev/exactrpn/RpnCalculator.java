@@ -556,6 +556,36 @@ public final class RpnCalculator {
         remember(before);
     }
 
+    /** Validate every result before replacing any selected row. */
+    public void transformRows(Operation operation, int... indices) {
+        if (operation == null || operation.arity != 1)
+            throw new IllegalArgumentException("Expected a unary operation");
+        TreeSet<Integer> rows = rowSet(indices);
+        if (rows.isEmpty()) return;
+        List<UnifiedReal> results = new ArrayList<>();
+        List<SavedValue> expressions = new ArrayList<>();
+        for (int row : rows) {
+            UnifiedReal original = stack.get(row);
+            UnifiedReal result = operation.evaluate(original, null, angleUnit);
+            ValueFormatter.format(result, true, ValueFormatter.Notation.SCIENTIFIC);
+            results.add(result);
+            expressions.add(
+                    SavedValue.of(
+                            result,
+                            operation.savedName(angleUnit),
+                            savedValues.get(original),
+                            null));
+        }
+        State before = new State(this);
+        int i = 0;
+        for (int row : rows) {
+            UnifiedReal result = results.get(i);
+            stack.set(row, result);
+            savedValues.put(result, expressions.get(i++));
+        }
+        remember(before);
+    }
+
     private TreeSet<Integer> rowSet(int... indices) {
         TreeSet<Integer> rows = new TreeSet<>();
         for (int index : indices) {

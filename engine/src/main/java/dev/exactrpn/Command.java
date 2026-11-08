@@ -16,6 +16,7 @@ public final class Command {
         SUM_ROWS(true),
         PRODUCT_ROWS(true),
         COPY_ROWS(true),
+        UNARY_ROWS(true),
         HOLD_DIGIT,
         PASTE_RAW;
         final boolean takesRows;
@@ -107,7 +108,14 @@ public final class Command {
             throw new IllegalArgumentException("Invalid digit shortcut");
         int[] rows =
                 kind.takesRows
-                        ? Arrays.stream(payload.split(",")).mapToInt(Integer::parseInt).toArray()
+                        ? Arrays.stream(
+                                        (kind == Kind.UNARY_ROWS
+                                                        ? payload.substring(
+                                                                payload.indexOf(':') + 1)
+                                                        : payload)
+                                                .split(","))
+                                .mapToInt(Integer::parseInt)
+                                .toArray()
                         : new int[0];
         return new Command(kind, wire, payload, 0, 0, false, false, rows);
     }
@@ -134,6 +142,10 @@ public final class Command {
     public void apply(
             RpnCalculator calculator, NumberText.Profile locale, NumberText.Profile format) {
         switch (kind) {
+            case UNARY_ROWS:
+                calculator.transformRows(
+                        Operation.find(text.substring(0, text.indexOf(':'))), rows);
+                break;
             case DROP_ROWS:
                 calculator.dropRows(rows);
                 break;

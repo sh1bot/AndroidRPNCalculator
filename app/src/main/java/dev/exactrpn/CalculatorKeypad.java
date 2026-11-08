@@ -36,6 +36,7 @@ public final class CalculatorKeypad extends ViewGroup {
     private final LinearLayout controls;
     private Button deleteButton,
             undoButton,
+            enterButton,
             clearButton,
             piButton,
             swapButton,
@@ -188,6 +189,7 @@ public final class CalculatorKeypad extends ViewGroup {
                                     : getContext().getString(R.string.off));
             }
         }
+        updateSelectionFunctions();
         updateExpansion();
     }
 
@@ -258,9 +260,9 @@ public final class CalculatorKeypad extends ViewGroup {
                 getContext()
                         .getString(
                                 selecting
-                                        ? R.string.copy_selected
+                                        ? R.string.select_all_description
                                         : editing ? R.string.clear_entry : R.string.clear_stack));
-        setButtonIcon(clearButton, selecting ? R.drawable.ic_copy : 0);
+        setButtonIcon(clearButton, selecting ? R.drawable.ic_select_all : 0);
         deleteButton.setText(!selecting && editing ? "⌫" : "");
         setButtonIcon(deleteButton, !selecting && editing ? 0 : R.drawable.ic_delete);
         deleteButton.setContentDescription(
@@ -272,7 +274,9 @@ public final class CalculatorKeypad extends ViewGroup {
                                                 ? R.string.backspace
                                                 : R.string.drop_roll_description));
         deleteButton.setLongClickable(!selecting);
-        swapButton.setText(selecting ? getContext().getString(R.string.pick) : "⇅");
+        swapButton.setText("⇅");
+        swapButton.setEnabled(!selecting);
+        swapButton.setAlpha(selecting ? .38f : 1f);
         setButtonIcon(swapButton, 0);
         swapButton.setContentDescription(
                 getContext()
@@ -284,7 +288,43 @@ public final class CalculatorKeypad extends ViewGroup {
         productButton.setText(selecting ? "Π" : "×");
         productButton.setContentDescription(
                 selecting ? getContext().getString(R.string.product_selected) : "×");
+        enterButton.setText(getContext().getString(selecting ? R.string.pick : R.string.enter));
+        enterButton.setContentDescription(
+                getContext()
+                        .getString(
+                                selecting ? R.string.pick_selected : R.string.enter_description));
+        enterButton.setLongClickable(!selecting);
+        updateSelectionFunctions();
         updateUndoButton();
+    }
+
+    private void updateSelectionFunctions() {
+        for (LinearLayout row : scientificRows) {
+            for (int i = 0; i < row.getChildCount(); i++) {
+                Button button = (Button) ((FrameLayout) row.getChildAt(i)).getChildAt(0);
+                String key = effectiveKey((String) button.getTag());
+                Operation operation = Operation.find(key);
+                button.setEnabled(
+                        !selecting
+                                || !key.equals("Factor")
+                                        && (operation == null || operation.arity != 2));
+            }
+        }
+        for (LinearLayout row : scientificRows)
+            for (int i = 0; i < row.getChildCount(); i++) {
+                Button button = (Button) ((FrameLayout) row.getChildAt(i)).getChildAt(0);
+                button.setAlpha(button.isEnabled() ? 1f : .38f);
+            }
+        for (LinearLayout row : primaryRows)
+            for (int i = 0; i < row.getChildCount(); i++) {
+                Button button = (Button) ((FrameLayout) row.getChildAt(i)).getChildAt(0);
+                String key = (String) button.getTag();
+                Operation operation = Operation.find(key);
+                if (operation != null && operation.arity == 2)
+                    button.setEnabled(!selecting || key.equals("+") || key.equals("×"));
+                if (operation != null && operation.arity == 2)
+                    button.setAlpha(button.isEnabled() ? 1f : .38f);
+            }
     }
 
     private void setButtonIcon(Button button, int resource) {
@@ -306,20 +346,14 @@ public final class CalculatorKeypad extends ViewGroup {
                 calculating
                         ? getContext().getString(R.string.cancel)
                         : selecting ? "" : getContext().getString(R.string.undo));
-        setButtonIcon(
-                undoButton,
-                selecting && !calculating
-                        ? (allSelected ? R.drawable.ic_select_none : R.drawable.ic_select_all)
-                        : 0);
+        setButtonIcon(undoButton, selecting && !calculating ? R.drawable.ic_select_none : 0);
         undoButton.setContentDescription(
                 getContext()
                         .getString(
                                 calculating
                                         ? R.string.cancel_calculation
                                         : selecting
-                                                ? (allSelected
-                                                        ? R.string.select_none_description
-                                                        : R.string.select_all_description)
+                                                ? R.string.select_none_description
                                                 : R.string.undo_description));
         undoButton.setLongClickable(!selecting || calculating);
     }
@@ -335,6 +369,7 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.equals("+")) sumButton = b;
         if (key.equals("×")) productButton = b;
         if (key.equals(Command.UNDO)) undoButton = b;
+        if (key.equals(Command.ENTER)) enterButton = b;
         if (key.equals("π")) piButton = b;
         b.setAllCaps(false);
         b.setTag(key);

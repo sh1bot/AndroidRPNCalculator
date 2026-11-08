@@ -38,13 +38,13 @@ The constants are π, e and φ (the exact golden ratio). Long-press π/τ to swi
 
 ## Copying, pasting and selection
 
-Tap a stack value to copy it. Copy uses the configured decimal separator without grouping. Fraction modes copy plain text such as `7/3` or `2 1/3`. Decimal mode preserves terminating decimals and copies recurring or irrational values to 40 significant digits.
+Long-press any stack row to copy just that value, including during entry or selection. Copy uses the configured decimal separator without grouping. Fraction modes copy plain text such as `7/3` or `2 1/3`. Decimal mode preserves terminating decimals and copies recurring or irrational values to 40 significant digits.
 
 Long-press Enter or press Ctrl+V to paste. Multiple non-empty lines are added to the stack in order, with the last line at X, as one undoable action. Every line must be a valid, unambiguous number; otherwise an error identifies the line and nothing is added. Blank lines are ignored. Any current entry is committed first and must also be valid. Pasted text stays in entry mode. Safe input can proceed with Enter, an operator or a function. Ambiguous or invalid input is red and blocks those actions until corrected. Edit the separator to match the configured decimal character or remove ambiguous grouping.
 
-Tap a stack label to select a row. Checkboxes appear, and tapping a row toggles it. Selection is available only in stack mode. Back/Escape exits selection.
+Tap anywhere on a stack row to select it. Checkboxes appear, and tapping a row toggles it. Selection is available only in stack mode. Back/Escape exits selection.
 
-In selection mode the controls change: AC becomes Copy, ⇅ becomes Pick, trash drops selected values, + becomes Σ (sum), and × becomes Π (product). Pick, sum and product append results without removing the originals. The ⎌ key becomes a stacked-checkbox control to select all or clear selection.
+In selection mode Enter becomes Pick, AC selects all rows, and ⎌ clears the selection. Trash drops selected values, + becomes Σ (sum), and × becomes Π (product). Pick, sum and product append results without removing the originals. Unary functions replace each selected value in place as one undoable action; if any result fails, none are changed. Factorise, Swap and the other binary operations are unavailable while selecting.
 
 ## Keyboard
 

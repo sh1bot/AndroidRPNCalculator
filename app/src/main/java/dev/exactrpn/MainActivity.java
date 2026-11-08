@@ -100,6 +100,10 @@ public class MainActivity extends Activity {
                             }
 
                             public void tap(int index, Display display) {
+                                toggleStackRow(index, display);
+                            }
+
+                            public void copy(int index, Display display) {
                                 stackRowTapped(index, display);
                             }
                         });
@@ -331,17 +335,7 @@ public class MainActivity extends Activity {
 
     private void stackRowTapped(int index, Display snapshot) {
         if (!stackActionAllowed(snapshot)) return;
-        if (!session.selectedRows.isEmpty()) toggleStackRow(index, snapshot);
-        else session.copyRows(new int[] {index}, text -> copyValue(text, snapshot.numberMode));
-    }
-
-    private boolean toggleAllStackRows(Display snapshot) {
-        if (session.display.editing || !stackActionAllowed(snapshot)) return false;
-        if (session.selectedRows.size() == snapshot.rows.size()) session.selectedRows.clear();
-        else for (int i = 0; i < snapshot.rows.size(); i++) session.selectedRows.add(i);
-        selectionDirty = true;
-        refresh();
-        return true;
+        session.copyRows(new int[] {index}, text -> copyValue(text, snapshot.numberMode));
     }
 
     private boolean executeSelectionAction(String key) {
@@ -349,13 +343,16 @@ public class MainActivity extends Activity {
         String action;
         switch (key) {
             case Command.UNDO:
-                toggleAllStackRows(session.display);
+                if (stackActionAllowed(session.display)) clearStackSelection(true);
                 return true;
             case "SMART_CLEAR":
             case "CLEAR":
-                action = "COPY";
-                break;
-            case "SWAP":
+                if (!stackActionAllowed(session.display)) return true;
+                for (int i = 0; i < session.display.rows.size(); i++) session.selectedRows.add(i);
+                selectionDirty = true;
+                refresh();
+                return true;
+            case Command.ENTER:
                 action = "PICK_ROWS:";
                 break;
             case "BACK":
@@ -373,19 +370,24 @@ public class MainActivity extends Activity {
             case "ROLL_UP":
                 return true;
             default:
+                Operation operation = Operation.find(key);
+                if (operation != null && operation.arity == 1) {
+                    action = "UNARY_ROWS:" + key + ":";
+                    break;
+                }
+                if (key.equals("Factor")
+                        || key.equals("SWAP")
+                        || operation != null && operation.arity == 2) {
+                    showNotice(getString(R.string.selection_operation_unavailable), true);
+                    return true;
+                }
                 return false;
         }
         if (!stackActionAllowed(session.display)) return true;
-        if (action.equals("COPY")) {
-            NumberMode mode = session.display.numberMode;
-            int[] rows = session.selectedRows.stream().mapToInt(Integer::intValue).toArray();
-            session.copyRows(rows, text -> copyValue(text, mode));
-        } else {
-            List<String> indices = new ArrayList<>();
-            for (int row : session.selectedRows) indices.add(Integer.toString(row));
-            session.enqueue(Command.parse(action + String.join(",", indices)));
-            refresh();
-        }
+        List<String> indices = new ArrayList<>();
+        for (int row : session.selectedRows) indices.add(Integer.toString(row));
+        session.enqueue(Command.parse(action + String.join(",", indices)));
+        refresh();
         return true;
     }
 
