@@ -95,6 +95,42 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void bottomIntegerFitsTheStackViewportBeforeAndAfterExpandingFunctions()
+            throws Exception {
+        MainActivity a = open();
+        CalculatorSession state = session(a);
+        try {
+            char[] digits = new char[600];
+            java.util.Arrays.fill(digits, '7');
+            instrumentation.runOnMainSync(
+                    () -> state.enqueue(Command.parse("PASTE_RAW:" + new String(digits))));
+            await(() -> !state.busy && state.display.editing);
+            key(a, "ENTER");
+            await(
+                    () -> {
+                        android.widget.TextView value =
+                                (android.widget.TextView) tagged(a, "stack-value:0");
+                        if (value == null) return false;
+                        View row = tagged(a, "stack-row:0");
+                        View viewport = (View) row.getParent().getParent();
+                        return value.getText().length() < 100
+                                && row.getHeight() <= viewport.getHeight();
+                    });
+            key(a, "FUNCTIONS");
+            await(
+                    () -> {
+                        View row = tagged(a, "stack-row:0");
+                        View viewport = (View) row.getParent().getParent();
+                        return row.getHeight() <= viewport.getHeight();
+                    });
+            RpnCalculator saved = RpnCalculator.load(state.checkpoint.bytes);
+            assertEquals(new String(digits), saved.values().get(0).bigIntegerValue().toString());
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
     public void cancelOverridesUnselectDuringASelectedUnaryOperation() throws Exception {
         MainActivity a = open();
         CalculatorSession state = session(a);

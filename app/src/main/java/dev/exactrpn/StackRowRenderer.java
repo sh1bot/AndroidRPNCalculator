@@ -92,6 +92,69 @@ final class StackRowRenderer {
         return context.getString(id, depth, value);
     }
 
+    private void fitBottomRow(
+            TextView value,
+            TextView label,
+            LinearLayout row,
+            LinearLayout stackRows,
+            Display display,
+            LocaleNumbers numbers,
+            int index,
+            int depth) {
+        View viewport = (View) stackRows.getParent();
+        String fullNumber = display.rows.get(index), compactNumber = display.compactRows.get(index);
+        CharSequence full = numbers.stack(withoutApproximation(fullNumber), colors.muted);
+        CharSequence compact = numbers.stack(withoutApproximation(compactNumber), colors.muted);
+        Runnable fit =
+                () -> {
+                    int width = value.getWidth() - value.getPaddingLeft() - value.getPaddingRight();
+                    int height =
+                            viewport.getHeight()
+                                    - viewport.getPaddingTop()
+                                    - viewport.getPaddingBottom();
+                    if (width <= 0 || height <= 0) return;
+                    android.text.StaticLayout layout =
+                            android.text.StaticLayout.Builder.obtain(
+                                            full, 0, full.length(), value.getPaint(), width)
+                                    .setIncludePad(value.getIncludeFontPadding())
+                                    .setBreakStrategy(value.getBreakStrategy())
+                                    .setHyphenationFrequency(value.getHyphenationFrequency())
+                                    .setLineSpacing(
+                                            value.getLineSpacingExtra(),
+                                            value.getLineSpacingMultiplier())
+                                    .build();
+                    boolean fits =
+                            layout.getHeight() + value.getPaddingTop() + value.getPaddingBottom()
+                                    <= height;
+                    CharSequence chosen = fits ? full : compact;
+
+                    value.setEllipsize(fits ? null : android.text.TextUtils.TruncateAt.END);
+                    int lines = fits ? layout.getLineCount() : 1;
+                    if (value.getMaxLines() != lines) value.setMaxLines(lines);
+                    if (!value.getText().toString().equals(chosen.toString()))
+                        value.setText(chosen);
+                    updateStackLabel(label, depth, fits ? fullNumber : compactNumber);
+                    row.setContentDescription(
+                            rowDescription(
+                                    false,
+                                    depth,
+                                    (fits ? fullNumber : compactNumber).startsWith("≈ "),
+                                    chosen));
+                };
+        View.OnLayoutChangeListener resized = (v, l, t, r, b, ol, ot, or, ob) -> fit.run();
+        value.addOnLayoutChangeListener(resized);
+        value.addOnAttachStateChangeListener(
+                new View.OnAttachStateChangeListener() {
+                    public void onViewAttachedToWindow(View v) {
+                        viewport.addOnLayoutChangeListener(resized);
+                    }
+
+                    public void onViewDetachedFromWindow(View v) {
+                        viewport.removeOnLayoutChangeListener(resized);
+                    }
+                });
+    }
+
     void render(
             LinearLayout stackRows,
             Display display,
@@ -205,6 +268,11 @@ final class StackRowRenderer {
                             if (value.getTextSize() != sp(size)) value.setTextSize(size);
                         });
             }
+            if (result
+                    && !(display.fractionMode == FractionMode.DECIMAL
+                            && display.rows.get(i).contains(".")
+                            && !display.rows.get(i).startsWith("≈")))
+                fitBottomRow(value, label, row, stackRows, display, numbers, i, depth);
             value.setTextIsSelectable(false);
             row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
             value.setTag("stack-value:" + i);
