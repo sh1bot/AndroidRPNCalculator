@@ -19,7 +19,6 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ServiceInfo;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.FileObserver;
 import android.os.ParcelFileDescriptor;
 import android.os.SystemClock;
@@ -244,9 +243,9 @@ public final class LockScreenTest {
             RemoteCalculator normalWorker = new RemoteCalculator(context);
             ExecutorService blockedWorker = Executors.newSingleThreadExecutor();
             try {
-                Bundle blocked = new Bundle();
-                blocked.putString("key", "RESTORE");
-                blocked.putString("input", saved.getAbsolutePath());
+                CalculationRequest blocked = new CalculationRequest("RESTORE");
+                blocked.input =
+                        saved.getAbsolutePath().getBytes(java.nio.charset.StandardCharsets.UTF_8);
                 try {
                     blockedWorker
                             .submit(() -> normalWorker.evaluate(blocked))
