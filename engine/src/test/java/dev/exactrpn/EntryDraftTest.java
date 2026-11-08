@@ -77,4 +77,22 @@ final class EntryDraftTest {
                 java.io.IOException.class,
                 () -> RpnCalculator.load(RpnCalculator.saveWithEntry(saved, engine)));
     }
+
+    @Test
+    void completedDraftKeepsAFullHistoryWithinItsStorageLimit() throws Exception {
+        RpnCalculator engine = new RpnCalculator(), draft = new RpnCalculator();
+        for (int i = 0; i < 110; i++) {
+            engine.paste(Integer.toString(i));
+            engine.key("ENTER");
+        }
+        assertEquals(100, engine.undoCount());
+        draft.key("7");
+        engine.useEntryEditor(draft.entryForCommit());
+        engine.key("ENTER");
+        RpnCalculator restored = RpnCalculator.load(engine.save());
+        assertEquals(100, restored.undoCount());
+        restored.key("UNDO");
+        assertEquals("7", restored.entry());
+        assertEquals(110, restored.values().size());
+    }
 }
