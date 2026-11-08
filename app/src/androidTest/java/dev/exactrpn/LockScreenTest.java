@@ -171,7 +171,6 @@ public final class LockScreenTest {
             observer.stopWatching();
             assertArrayEquals(before, Files.readAllBytes(saved.toPath()));
             store.clear();
-            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }
@@ -201,7 +200,6 @@ public final class LockScreenTest {
             worker.shutdownNow();
             observer.stopWatching();
             store.clear();
-            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }
@@ -314,7 +312,6 @@ public final class LockScreenTest {
                 observer.stopWatching();
                 assertArrayEquals(before, Files.readAllBytes(saved.toPath()));
                 store.clear();
-                store.removeLegacyWorkFiles();
                 seed.delete();
             }
         }

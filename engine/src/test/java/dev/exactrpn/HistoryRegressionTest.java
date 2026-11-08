@@ -227,40 +227,6 @@ final class HistoryRegressionTest extends RegressionSupport {
     }
 
     @Test
-    void legacyPersistence() throws Exception {
-        java.io.ByteArrayOutputStream legacyBytes = new java.io.ByteArrayOutputStream();
-        java.io.DataOutputStream legacy = new java.io.DataOutputStream(legacyBytes);
-        legacy.writeInt(0x52504e31);
-        legacy.writeUTF("RAD");
-        legacy.writeChar('.');
-        legacy.writeChar(',');
-        legacy.writeInt(3);
-        legacy.writeInt(3);
-        legacy.writeInt(0);
-        legacy.writeInt(1);
-        legacy.writeInt(0);
-        legacy.writeUTF("12.3");
-        legacy.writeBoolean(true);
-        legacy.writeBoolean(false);
-        legacy.writeInt(2);
-        legacy.writeInt(4);
-        legacy.writeChar('.');
-        legacy.writeChar(',');
-        legacy.writeInt(3);
-        legacy.writeInt(3);
-        RpnCalculator legacyRestored = RpnCalculator.load(legacyBytes.toByteArray());
-        assertTrue(
-                legacyRestored.entry().equals("12.3")
-                        && legacyRestored.selectionStart() == 2
-                        && legacyRestored.selectionEnd() == 4,
-                "restore previous saved-state format");
-        legacyRestored.key("ENTER");
-        assertTrue(
-                top(legacyRestored).definitelyEquals(RpnCalculator.parse("12.3")),
-                "legacy state remains usable");
-    }
-
-    @Test
     void safeClearAndNoOpHistory() throws Exception {
         RpnCalculator safeClear = new RpnCalculator();
         keys(safeClear, "9", "ENTER", "7", "SMART_CLEAR", "SMART_CLEAR");
@@ -323,18 +289,13 @@ final class HistoryRegressionTest extends RegressionSupport {
         RpnCalculator durable = new RpnCalculator();
         keys(durable, "π", "2", "√", "+");
         byte[] valid = durable.save();
-        try {
-            RpnCalculator.load(java.util.Arrays.copyOf(valid, valid.length - 1));
-            throw new AssertionError("truncated state accepted");
-        } catch (java.io.IOException expected) {
-            assertTrue(true, "reject truncated state");
-        }
-        valid[0] = 0;
-        try {
-            RpnCalculator.load(valid);
-            throw new AssertionError("unknown state version accepted");
-        } catch (java.io.IOException expected) {
-            assertTrue(true, "reject unknown saved state version");
+        assertThrows(
+                java.io.IOException.class,
+                () -> RpnCalculator.load(java.util.Arrays.copyOf(valid, valid.length - 1)));
+        for (int version : new int[] {0, 0x31, 0x32, 0x33, 0x34}) {
+            byte[] unsupported = valid.clone();
+            unsupported[3] = (byte) version;
+            assertThrows(java.io.IOException.class, () -> RpnCalculator.load(unsupported));
         }
     }
 }

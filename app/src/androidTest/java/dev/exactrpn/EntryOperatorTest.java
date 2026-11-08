@@ -211,7 +211,6 @@ public final class EntryOperatorTest {
                 session.awaitClosed(15, TimeUnit.SECONDS);
             }
             store.clear();
-            store.removeLegacyWorkFiles();
         }
     }
 

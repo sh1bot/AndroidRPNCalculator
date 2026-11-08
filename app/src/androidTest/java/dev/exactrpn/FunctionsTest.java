@@ -208,7 +208,6 @@ public final class FunctionsTest {
         } finally {
             remote.close();
             worker.shutdownNow();
-            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }
