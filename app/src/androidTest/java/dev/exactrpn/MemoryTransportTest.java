@@ -160,20 +160,23 @@ public final class MemoryTransportTest {
             Bundle accepted =
                     worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
                             .get(20, TimeUnit.SECONDS);
-            try {
-                worker.submit(() -> remote.evaluate(request("COPY_ROWS:999", accepted)))
-                        .get(15, TimeUnit.SECONDS);
-                fail("Missing row unexpectedly copied");
-            } catch (java.util.concurrent.ExecutionException expected) {
-                assertTrue(expected.getCause() instanceof RemoteCalculator.UserFailure);
+            for (String badCopy : new String[] {"COPY_ROWS:999", "COPY_ROWS:bad"}) {
+                try {
+                    worker.submit(() -> remote.evaluate(request(badCopy, accepted)))
+                            .get(15, TimeUnit.SECONDS);
+                    fail("Missing row unexpectedly copied");
+                } catch (java.util.concurrent.ExecutionException expected) {
+                    assertTrue(expected.getCause() instanceof RemoteCalculator.UserFailure);
+                }
+                var field = RemoteCalculator.class.getDeclaredField("remoteSnapshotId");
+                field.setAccessible(true);
+                assertEquals(accepted.getString("checkpoint"), field.get(remote));
+                Bundle next = request("COPY_ROWS:0", accepted);
+                next.remove("input");
+                Bundle copied =
+                        worker.submit(() -> remote.evaluate(next)).get(15, TimeUnit.SECONDS);
+                assertEquals("45", copied.getString("copyText"));
             }
-            var field = RemoteCalculator.class.getDeclaredField("remoteSnapshotId");
-            field.setAccessible(true);
-            assertEquals(accepted.getString("checkpoint"), field.get(remote));
-            Bundle next = request("COPY_ROWS:0", accepted);
-            next.remove("input");
-            Bundle copied = worker.submit(() -> remote.evaluate(next)).get(15, TimeUnit.SECONDS);
-            assertEquals("45", copied.getString("copyText"));
         } finally {
             remote.close();
             worker.shutdownNow();
