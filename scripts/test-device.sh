@@ -10,8 +10,10 @@ gradle --no-daemon --console=plain :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest || status=$?
 cp -R app/build/reports/androidTests/connected "$reports/ordinary"
 adb logcat -d -s GlyphProbe:I MenuTest:E "*:S"
+adb logcat -d -b crash
 gradle --no-daemon --console=plain :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.exactrpn.LockScreenTest#secureLockThenUnlockKeepsTheSameTemporarySession || status=$?
 cp -R app/build/reports/androidTests/connected "$reports/secure-lock"
 adb logcat -d -s LockTest:E "*:S"
+adb logcat -d -b crash
 exit "$status"
