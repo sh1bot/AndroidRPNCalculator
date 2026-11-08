@@ -66,7 +66,6 @@ public final class MemoryTransportTest {
         FileObserver cache = watch(context.getCacheDir(), accesses);
         try {
             RpnCalculator calculator = new RpnCalculator();
-            calculator.setInputProfile(new LocaleNumbers(java.util.Locale.US).profile());
             List<String> literals = new ArrayList<>();
             int depth = 1100;
             char[] digits = new char[990];
@@ -78,6 +77,9 @@ public final class MemoryTransportTest {
                 CalculatorTestSupport.paste(calculator, literal);
                 calculator.key("ENTER");
             }
+            // Canonical entry fixtures use computer mode; match this request's locale before
+            // saving.
+            calculator.setInputProfile(new LocaleNumbers(java.util.Locale.US).profile());
             calculator.clearUndo();
             byte[] state = calculator.save();
             assertTrue(state.length > 1024 * 1024);
