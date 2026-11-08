@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Insets;
 import android.graphics.Rect;
+import android.os.Build;
 import android.view.DisplayCutout;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -46,17 +47,21 @@ public final class WindowInsetsTest {
                         assertEquals(
                                 "Decor must not inset content before app padding", 0, location[1]);
                         WindowInsets insets =
-                                new WindowInsets.Builder()
-                                        .setSystemWindowInsets(Insets.of(0, status, 0, status))
-                                        .setDisplayCutout(
-                                                new DisplayCutout(
-                                                        new Rect(0, cutout, 0, 0),
-                                                        Collections.emptyList()))
-                                        .build();
+                                Build.VERSION.SDK_INT < 29
+                                        ? new WindowInsets(new Rect(0, status, 0, status))
+                                        : new WindowInsets.Builder()
+                                                .setSystemWindowInsets(
+                                                        Insets.of(0, status, 0, status))
+                                                .setDisplayCutout(
+                                                        new DisplayCutout(
+                                                                new Rect(0, cutout, 0, 0),
+                                                                Collections.emptyList()))
+                                                .build();
+                        int expectedTop = Build.VERSION.SDK_INT < 29 ? status : cutout;
                         root.dispatchApplyWindowInsets(insets);
                         assertEquals(
-                                "Camera clearance includes the status bar",
-                                cutout + Math.round(4 * density),
+                                "System clearance includes the status bar",
+                                expectedTop + Math.round(4 * density),
                                 root.getPaddingTop());
                         assertEquals(
                                 "Navigation bar clearance is applied once",
@@ -65,7 +70,7 @@ public final class WindowInsetsTest {
                         root.dispatchApplyWindowInsets(insets);
                         assertEquals(
                                 "Repeated inset dispatch must not accumulate padding",
-                                cutout + Math.round(4 * density),
+                                expectedTop + Math.round(4 * density),
                                 root.getPaddingTop());
                     });
         } finally {
