@@ -96,7 +96,6 @@ final class CalculatorSession {
         if (remote == null) {
             if (!policy.temporary) {
                 store = new CalculatorStore(context.getNoBackupFilesDir(), this::canUseSavedState);
-                store.removeLegacyWorkFiles();
             }
             remote = new RemoteCalculator(context, policy.temporary);
         }

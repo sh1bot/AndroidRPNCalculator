@@ -117,12 +117,6 @@ final class CalculatorStore {
         restoreAttempt.delete();
     }
 
-    void removeLegacyWorkFiles() {
-        if (!allowed.getAsBoolean()) return;
-        File[] files = directory.listFiles((dir, name) -> name.startsWith("calculation-"));
-        if (files != null) for (File temporary : files) temporary.delete();
-    }
-
     private void checkAccess() {
         if (!allowed.getAsBoolean()) throw new DeviceAccess.Locked();
     }

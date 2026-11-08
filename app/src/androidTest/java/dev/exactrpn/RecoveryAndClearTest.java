@@ -136,7 +136,6 @@ public final class RecoveryAndClearTest {
                 } finally {
                     StackSelectionTest.finish(activity);
                     store.clear();
-                    store.removeLegacyWorkFiles();
                     corrupt.delete();
                 }
             }

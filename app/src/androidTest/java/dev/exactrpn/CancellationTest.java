@@ -123,7 +123,6 @@ public final class CancellationTest {
             remote.close();
             worker.shutdownNow();
             store.clear();
-            store.removeLegacyWorkFiles();
             seed.delete();
         }
     }

@@ -248,32 +248,6 @@ public final class RpnCalculator {
         return this;
     }
 
-    // Read the already-shipped draft envelopes; new saves use only version 5.
-    private static RpnCalculator loadLegacyEntry(DataInputStream in, int version)
-            throws IOException {
-        byte[] calculation = readSection(in), draft = readSection(in);
-        boolean branch = version == 0x52504e34 && in.readBoolean();
-        if (in.available() != 0) throw new IOException("Trailing saved state data");
-        int cv = new DataInputStream(new ByteArrayInputStream(calculation)).readInt();
-        int dv = new DataInputStream(new ByteArrayInputStream(draft)).readInt();
-        if (cv != 0x52504e31 && cv != 0x52504e32 || dv != 0x52504e31 && dv != 0x52504e32)
-            throw new IOException("Invalid legacy entry sections");
-        RpnCalculator old = load(draft);
-        if (!old.stack.isEmpty()) throw new IOException("Invalid legacy entry values");
-        EntryEditor entry = new EntryEditor();
-        entry.inputProfile = old.editor.inputProfile;
-        entry.restore(new EntryEditor.State(old.editor));
-        for (State state : old.undo) {
-            if (!state.stack.isEmpty()) throw new IOException("Invalid legacy entry history");
-            entry.undo.addLast(state.entry);
-        }
-        for (State state : old.redo) {
-            if (!state.stack.isEmpty()) throw new IOException("Invalid legacy entry history");
-            entry.redo.addLast(state.entry);
-        }
-        return load(calculation).restoreEntry(entry, branch);
-    }
-
     private static byte[] readSection(DataInputStream in) throws IOException {
         int length = in.readInt();
         if (length < 0 || length > in.available()) throw new IOException("Invalid snapshot length");
@@ -748,18 +722,12 @@ public final class RpnCalculator {
     public static RpnCalculator load(byte[] bytes) throws IOException {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            int version = in.readInt();
-            if (version == 0x52504e33 || version == 0x52504e34) return loadLegacyEntry(in, version);
-            if (version == 0x52504e35) {
-                byte[] body = readSection(in), entry = readSection(in);
-                boolean branch = in.readBoolean();
-                if (in.available() != 0) throw new IOException("Trailing saved state data");
-                return readMath(new DataInputStream(new ByteArrayInputStream(body)), version)
-                        .restoreEntry(EntryEditor.load(entry), branch);
-            }
-            if (version != 0x52504e31 && version != 0x52504e32)
-                throw new IOException("Unknown saved state version");
-            return readMath(in, version);
+            if (in.readInt() != 0x52504e35) throw new IOException("Unknown saved state version");
+            byte[] body = readSection(in), entry = readSection(in);
+            boolean branch = in.readBoolean();
+            if (in.available() != 0) throw new IOException("Trailing saved state data");
+            return readMath(new DataInputStream(new ByteArrayInputStream(body)))
+                    .restoreEntry(EntryEditor.load(entry), branch);
         } catch (com.hp.creals.CR.AbortedException ex) {
             throw ex;
         } catch (RuntimeException ex) {
@@ -767,10 +735,9 @@ public final class RpnCalculator {
         }
     }
 
-    private static RpnCalculator readMath(DataInputStream in, int version) throws IOException {
+    private static RpnCalculator readMath(DataInputStream in) throws IOException {
         RpnCalculator c = new RpnCalculator();
         c.angleUnit = AngleUnit.valueOf(in.readUTF());
-        if (version != 0x52504e35) c.editor.inputProfile = EntryEditor.readProfile(in);
         int count = readCount(in, 1000000);
         List<SavedValue> nodes = new ArrayList<>();
         List<UnifiedReal> values = new ArrayList<>();
@@ -795,10 +762,9 @@ public final class RpnCalculator {
             values.add(value);
             c.savedValues.put(value, node);
         }
-        int undos = version != 0x52504e31 ? readCount(in, 100) : -1;
-        int redos = version != 0x52504e31 ? readCount(in, 100) : 0;
+        int undos = readCount(in, 100);
+        int redos = readCount(in, 100);
         int states = readCount(in, 101);
-        if (undos < 0) undos = states - 1;
         if (states != 1 + undos + redos) throw new IOException("Invalid undo/redo history");
         if (states == 0) throw new IOException("Missing current state");
         for (int i = 0; i < states; i++) {
@@ -809,11 +775,10 @@ public final class RpnCalculator {
                 if (id < 0 || id >= count) throw new IOException("Invalid stack reference");
                 stack.add(values.get(id));
             }
-            if (i == 0 && version == 0x52504e35) {
-                c.restore(new State(stack, new EntryEditor.State(c.editor)));
-                continue;
-            }
-            State state = new State(stack, EntryEditor.readState(in));
+            State state =
+                    new State(
+                            stack,
+                            i == 0 ? new EntryEditor.State(c.editor) : EntryEditor.readState(in));
             if (i == 0) c.restore(state);
             else if (i <= undos) c.undo.addLast(state);
             else c.redo.addLast(state);
