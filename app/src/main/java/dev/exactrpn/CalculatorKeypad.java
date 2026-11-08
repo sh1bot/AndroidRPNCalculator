@@ -31,7 +31,7 @@ public final class CalculatorKeypad extends ViewGroup {
     private final Button functions, complements;
     private final ThemeColors colors;
     private LocaleNumbers numbers;
-    private final String[] keyLabels, keyDescriptions;
+    private final String[] keyDescriptions;
     private final Map<String, Button> numberButtons = new HashMap<>();
     private final LinearLayout controls;
     private Button deleteButton,
@@ -58,7 +58,6 @@ public final class CalculatorKeypad extends ViewGroup {
             boolean expanded,
             BiConsumer<Boolean, Boolean> savePanel) {
         super(context);
-        keyLabels = getResources().getStringArray(R.array.key_labels);
         keyDescriptions = getResources().getStringArray(R.array.key_descriptions);
         this.command = command;
         this.expanded = expanded;
@@ -146,8 +145,17 @@ public final class CalculatorKeypad extends ViewGroup {
     private CharSequence functionLabel(String wire) {
         CalculatorKey key = CalculatorKey.find(wire);
         if (key == null) return wire;
-        String translated = keyLabels[key.ordinal()];
-        if (!translated.isEmpty()) return translated;
+        int resource =
+                switch (key) {
+                    case UNDO -> R.string.undo;
+                    case ENTER -> R.string.enter;
+                    case CLEAR -> R.string.clear;
+                    case SWAP -> R.string.swap;
+                    case DUP -> R.string.duplicate;
+                    case FACTOR -> R.string.factor;
+                    default -> 0;
+                };
+        if (resource != 0) return getContext().getString(resource);
         if (key == CalculatorKey.LOG10) {
             SpannableString logarithm = new SpannableString(key.label);
             logarithm.setSpan(new RelativeSizeSpan(.7f), 3, 5, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
