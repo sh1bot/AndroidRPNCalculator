@@ -192,7 +192,11 @@ public final class StackSelectionTest {
                                                     .getChildAt(3);
                             android.widget.TextView value =
                                     (android.widget.TextView) tagged(activity, "stack-value:0");
+                            android.widget.TextView label =
+                                    (android.widget.TextView) tagged(activity, "stack-label:0");
                             return expectedMode.contentEquals(modeButton.getText())
+                                    && label != null
+                                    && "x≈".contentEquals(label.getText())
                                     && value != null
                                     && value.getText().length() < 100
                                     && value.getLayout() != null
