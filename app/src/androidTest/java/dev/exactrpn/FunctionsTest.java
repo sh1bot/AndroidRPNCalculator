@@ -308,6 +308,41 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void gesturesUseTheFreshRoleWhenArithmeticFinishesBetweenFrames() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            AtomicReference<Command> command = new AtomicReference<>();
+                            CalculatorKeypad keypad =
+                                    new CalculatorKeypad(
+                                            context,
+                                            command::set,
+                                            false,
+                                            (expanded, inverse) -> {});
+                            keypad.setMode(InteractionMode.ENTRY);
+                            Button clear = (Button) keypad.findViewWithTag("CLEAR");
+                            assertEquals("CE", clear.getText().toString());
+                            keypad.setBeforeInput(() -> keypad.setMode(InteractionMode.STACK));
+                            clear.performClick();
+                            assertEquals("CLEAR", command.get().wire);
+                            assertEquals("AC", clear.getText().toString());
+                            keypad.setMode(InteractionMode.SELECT);
+                            keypad.setCalculating(true);
+                            keypad.setBeforeInput(() -> keypad.setCalculating(false));
+                            Button undo = (Button) keypad.findViewWithTag("UNDO");
+                            assertEquals("Cancel", undo.getText().toString());
+                            undo.performClick();
+                            assertEquals("UNDO", command.get().wire);
+                            assertFalse(undo.isLongClickable());
+                            keypad.setMode(InteractionMode.STACK);
+                            keypad.setCalculating(true);
+                            undo.performLongClick();
+                            assertEquals("REDO", command.get().wire);
+                        });
+    }
+
+    @Test
     public void remoteValidationUsesTheErrorCatalogue() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context);

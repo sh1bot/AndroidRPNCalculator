@@ -128,6 +128,7 @@ public class MainActivity extends Activity {
                             session.scientificExpanded = expanded;
                             session.inverse = inverse;
                         });
+        keys.setBeforeInput(this::refresh);
         keys.setInverse(session.inverse);
         keys.setTauPreference(
                 session.tauConstant,
