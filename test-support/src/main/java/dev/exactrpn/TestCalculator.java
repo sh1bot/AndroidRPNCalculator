@@ -80,6 +80,7 @@ final class TestCalculator {
             throw new AssertionError(ex);
         }
         EntryEditor oldEditor = editor;
+        List<UnifiedReal> oldStack = engine.values();
         boolean oldBranch = branch;
         if (branch) engine.discardRedo();
         engine.useEntryEditor(
@@ -88,8 +89,17 @@ final class TestCalculator {
                         : editor.entryForCommit());
         try {
             Command.parse(Command.entryKey(key, editor.isEditing())).apply(engine, locale);
-            editor = engine.detachEntryEditor();
-            branch = false;
+            EntryEditor incoming = engine.detachEntryEditor();
+            if (!command.is(Command.UNDO)
+                    && !command.is(Command.REDO)
+                    && engine.sameStack(oldStack)
+                    && new EntryEditor.State(oldEditor).same(incoming)) {
+                editor = oldEditor;
+                branch = oldBranch;
+            } else {
+                editor = incoming;
+                branch = false;
+            }
         } catch (RuntimeException failure) {
             EntryEditor incoming = engine.detachEntryEditor();
             if (incoming.entry().equals(oldEditor.entry())

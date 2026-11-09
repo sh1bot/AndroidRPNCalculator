@@ -48,6 +48,41 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void emptyStackNoOpsPreserveAnEntryRedo() throws Exception {
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL,
+                        true);
+        session.attach(instrumentation.getTargetContext());
+        try {
+            for (String command :
+                    new String[] {
+                        "RESTORE",
+                        "1",
+                        "ENTER",
+                        "UNDO",
+                        "UNDO",
+                        "BACK",
+                        "DELETE",
+                        "SMART_CLEAR",
+                        "REDO"
+                    }) key(session, command);
+            assertTrue(session.display.editing);
+            assertEquals("1", session.display.entry);
+            assertTrue(session.display.rows.isEmpty());
+            key(session, "REDO");
+            assertFalse(session.display.editing);
+            assertEquals(Arrays.asList("1"), session.display.rows);
+        } finally {
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     public void identicalDraftTextDoesNotHideARestoredUndoBoundary() throws Exception {
         CalculatorSession session =
                 new CalculatorSession(

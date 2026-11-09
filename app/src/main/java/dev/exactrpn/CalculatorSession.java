@@ -410,8 +410,10 @@ final class CalculatorSession {
                                         && (key.isDisplayOnly()
                                                 || !key.is(Command.UNDO)
                                                         && !key.is(Command.REDO)
-                                                        && nextDisplay.editing
-                                                        && editor.isEditing()
+                                                        && java.util.Objects.equals(
+                                                                nextDisplay.stackId,
+                                                                display.stackId)
+                                                        && nextDisplay.editing == editor.isEditing()
                                                         && nextDisplay.entry.equals(editor.entry())
                                                         && nextDisplay.raw == editor.rawEntry()
                                                         && nextDisplay.start
