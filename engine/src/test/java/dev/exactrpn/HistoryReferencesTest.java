@@ -6,15 +6,15 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 final class HistoryReferencesTest {
-    private int retainedValues(RpnCalculator calculator) throws Exception {
+    private int retainedValues(TestCalculator calculator) throws Exception {
         var field = RpnCalculator.class.getDeclaredField("savedValues");
         field.setAccessible(true);
-        return ((java.util.Map<?, ?>) field.get(calculator)).size();
+        return ((java.util.Map<?, ?>) field.get(calculator.engine)).size();
     }
 
     @Test
     void evictionBranchesAndClearReleaseOnlyUnreachableRoots() throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         CalculatorTestSupport.paste(calculator, "2");
         calculator.key("ENTER");
         for (int i = 0; i < 130; i++) {
@@ -24,7 +24,11 @@ final class HistoryReferencesTest {
         assertTrue(retainedValues(calculator) <= 201);
         assertEquals(
                 "132",
-                RpnCalculator.load(calculator.save()).values().get(0).bigIntegerValue().toString());
+                TestCalculator.load(calculator.save())
+                        .values()
+                        .get(0)
+                        .bigIntegerValue()
+                        .toString());
         calculator.key("UNDO");
         calculator.key("UNDO");
         CalculatorTestSupport.paste(calculator, "7");
@@ -33,7 +37,11 @@ final class HistoryReferencesTest {
         assertEquals(1, retainedValues(calculator));
         assertEquals(
                 "138",
-                RpnCalculator.load(calculator.save()).values().get(0).bigIntegerValue().toString());
+                TestCalculator.load(calculator.save())
+                        .values()
+                        .get(0)
+                        .bigIntegerValue()
+                        .toString());
         calculator.key("DROP");
         calculator.clearUndo();
         assertEquals(0, retainedValues(calculator));
@@ -41,7 +49,7 @@ final class HistoryReferencesTest {
 
     @Test
     void duplicateAliasesKeepTheirSharedExpressionUntilTheLastOwnerDisappears() throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         CalculatorTestSupport.paste(calculator, "17");
         calculator.key("ENTER");
         for (int i = 0; i < 130; i++) calculator.key("ENTER");
@@ -49,7 +57,7 @@ final class HistoryReferencesTest {
         calculator.key("DROP");
         calculator.clearUndo();
         assertEquals(1, retainedValues(calculator));
-        assertEquals(130, RpnCalculator.load(calculator.save()).values().size());
+        assertEquals(130, TestCalculator.load(calculator.save()).values().size());
         calculator.key("CLEAR");
         calculator.clearUndo();
         assertEquals(0, retainedValues(calculator));

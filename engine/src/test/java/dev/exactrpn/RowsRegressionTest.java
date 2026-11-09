@@ -30,11 +30,11 @@ final class RowsRegressionTest extends RegressionSupport {
         assertTrue(
                 rowDrop.undoCount() == beforeDropHistory + 1, "multi-row drop is one undo action");
         TestCalculator rowDropRestored = TestCalculator.load(rowDrop.save());
-        rowDropRestored.key("UNDO");
+        rowDropRestored.arithmeticKey("UNDO");
         assertTrue(
                 rowDropRestored.values().size() == 4 && rowDropRestored.entry().equals("1,234"),
                 "undo multi-row drop after restart");
-        rowDropRestored.key("REDO");
+        rowDropRestored.arithmeticKey("REDO");
         assertTrue(
                 rowDropRestored.values().size() == 2
                         && top(rowDropRestored).definitelyEquals(new UnifiedReal(4)),
@@ -78,9 +78,9 @@ final class RowsRegressionTest extends RegressionSupport {
                 "pick leaves unfinished entry and cursor intact");
         assertTrue(pickedRows.undoCount() == pickHistory + 1, "multi-pick is one undo action");
         TestCalculator pickedRestored = TestCalculator.load(pickedRows.save());
-        pickedRestored.key("UNDO");
+        pickedRestored.arithmeticKey("UNDO");
         assertTrue(pickedRestored.values().size() == 4, "undo pick after restore");
-        pickedRestored.key("REDO");
+        pickedRestored.arithmeticKey("REDO");
         assertTrue(
                 pickedRestored.values().size() == 6
                         && top(pickedRestored).definitelyEquals(new UnifiedReal(4)),
@@ -117,12 +117,12 @@ final class RowsRegressionTest extends RegressionSupport {
                 "roll up moves displayed values upward, wrapping top to X");
         assertTrue(rolled.undoCount() == rollHistory + 1, "roll is one undoable action");
         TestCalculator rollRestored = TestCalculator.load(rolled.save());
-        rollRestored.key("UNDO");
+        rollRestored.arithmeticKey("UNDO");
         assertTrue(
                 rollRestored.values().get(0).definitelyOne()
                         && top(rollRestored).definitelyEquals(new UnifiedReal(3)),
                 "undo roll after restore");
-        rollRestored.key("REDO");
+        rollRestored.arithmeticKey("REDO");
         assertTrue(top(rollRestored).definitelyOne(), "redo roll after restore");
         rolled.key("ROLL_DOWN");
         assertTrue(
@@ -151,7 +151,7 @@ final class RowsRegressionTest extends RegressionSupport {
                         && editRoll.values().size() == 2
                         && top(editRoll).definitelyOne(),
                 "roll commits entry before cycling");
-        editRoll.key("UNDO");
+        editRoll.arithmeticKey("UNDO");
         assertTrue(
                 editRoll.isEditing()
                         && editRoll.entry().equals("2")

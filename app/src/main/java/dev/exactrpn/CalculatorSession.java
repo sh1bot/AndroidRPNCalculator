@@ -236,9 +236,10 @@ final class CalculatorSession {
         }
     }
 
-    private byte[] completedDraft() throws java.io.IOException {
+    private byte[] completedDraft(Command key) throws java.io.IOException {
         if (editor == null) return null;
-        return editor.entryForCommit().save();
+        return (key.is(Command.UNDO) || key.is(Command.REDO) ? editor : editor.entryForCommit())
+                .save();
     }
 
     private synchronized PendingKey nextKey() {
@@ -300,7 +301,7 @@ final class CalculatorSession {
         if (!key.is(Command.RESTORE)
                 && !key.isDisplayOnly()
                 && key.kind != Command.Kind.COPY_ROWS) {
-            request.entryDraft = onMain(this::completedDraft);
+            request.entryDraft = onMain(() -> completedDraft(key));
             request.entryBranch = localBranch;
         }
         CalculationSnapshot input = checkpoint;

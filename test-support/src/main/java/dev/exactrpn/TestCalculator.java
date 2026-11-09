@@ -82,7 +82,10 @@ final class TestCalculator {
         EntryEditor oldEditor = editor;
         boolean oldBranch = branch;
         if (branch) engine.discardRedo();
-        engine.useEntryEditor(editor.entryForCommit());
+        engine.useEntryEditor(
+                command.is(Command.UNDO) || command.is(Command.REDO)
+                        ? editor
+                        : editor.entryForCommit());
         try {
             Command.parse(Command.entryKey(key, editor.isEditing())).apply(engine, locale);
             editor = engine.detachEntryEditor();
@@ -207,6 +210,17 @@ final class TestCalculator {
 
     void holdDigit(String digit) {
         key("HOLD_DIGIT:" + digit);
+    }
+
+    /**
+     * Test the arithmetic row-operation history directly; the UI disallows row selection in entry
+     * mode.
+     */
+    void arithmeticKey(String key) {
+        engine.useEntryEditor(editor);
+        engine.key(key);
+        editor = engine.detachEntryEditor();
+        branch = false;
     }
 
     private void rowAction(Runnable action) {

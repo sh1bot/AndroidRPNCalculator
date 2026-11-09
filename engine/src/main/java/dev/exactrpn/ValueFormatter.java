@@ -55,8 +55,12 @@ public final class ValueFormatter {
             if (rational != null && value.bigIntegerValue() == null) {
                 BigInteger[] parts = ExactFunctions.parts(value);
                 if (parts[0].abs().compareTo(INLINE_LIMIT) < 0
-                        && parts[1].abs().compareTo(INLINE_LIMIT) < 0)
-                    return fraction(rational, fractionMode == FractionMode.MIXED);
+                        && parts[1].abs().compareTo(INLINE_LIMIT) < 0) {
+                    String text = fraction(rational, fractionMode == FractionMode.MIXED);
+                    // Older rows have one line: use a decimal approximation instead of
+                    // letting the view clip a huge numerator or whole-number part.
+                    if (newest || text.length() <= DIGITS + 4) return text;
+                }
             }
         }
         return format(value, newest, notation);

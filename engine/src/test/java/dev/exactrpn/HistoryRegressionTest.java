@@ -125,7 +125,7 @@ final class HistoryRegressionTest extends RegressionSupport {
         editingHistory.key("REDO");
         assertEquals("123", editingHistory.entry(), "redo current entry edit");
         editingHistory.key("ENTER");
-        assertTrue(editingHistory.undoCount() == 2, "commit drops intermediate entry edits");
+        assertTrue(editingHistory.undoCount() == 1, "commit drops intermediate entry edits");
         editingHistory.key("UNDO");
         assertTrue(
                 editingHistory.entry().equals("123") && editingHistory.values().isEmpty(),
@@ -184,7 +184,7 @@ final class HistoryRegressionTest extends RegressionSupport {
         } catch (IllegalArgumentException expected) {
         }
         assertTrue(
-                failedCommit.undoCount() == 2,
+                failedCommit.undoCount() == 1,
                 "failed operation commits entry and collapses edit history");
         failedCommit.key("UNDO");
         assertEquals(
@@ -292,7 +292,7 @@ final class HistoryRegressionTest extends RegressionSupport {
         assertThrows(
                 java.io.IOException.class,
                 () -> TestCalculator.load(java.util.Arrays.copyOf(valid, valid.length - 1)));
-        for (int version : new int[] {0, 0x31, 0x32, 0x33, 0x34}) {
+        for (int version : new int[] {0, 0x31, 0x32, 0x33, 0x34, 0x35}) {
             byte[] unsupported = valid.clone();
             unsupported[3] = (byte) version;
             assertThrows(java.io.IOException.class, () -> TestCalculator.load(unsupported));

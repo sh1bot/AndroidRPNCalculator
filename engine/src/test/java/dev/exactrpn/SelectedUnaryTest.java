@@ -16,9 +16,9 @@ final class SelectedUnaryTest {
         assertEquals("2", c.values().get(0).bigIntegerValue().toString());
         assertEquals("9", c.values().get(1).bigIntegerValue().toString());
         c = TestCalculator.load(c.save());
-        c.key("UNDO");
+        c.arithmeticKey("UNDO");
         assertEquals("4", c.values().get(0).bigIntegerValue().toString());
-        c.key("REDO");
+        c.arithmeticKey("REDO");
         assertEquals("4", c.values().get(2).bigIntegerValue().toString());
     }
 

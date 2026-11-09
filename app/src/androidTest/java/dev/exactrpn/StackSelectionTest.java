@@ -95,6 +95,44 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void largeMixedAndImproperFractionsStayReadableOnEveryStackRow() throws Exception {
+        MainActivity a = open();
+        CalculatorSession state = session(a);
+        try {
+            for (String command :
+                    new String[] {"PASTE_RAW:1e999", "ENTER", "PASTE_RAW:7", "÷", "ENTER"}) {
+                instrumentation.runOnMainSync(() -> state.enqueue(Command.parse(command)));
+                await(() -> !state.busy);
+            }
+            for (int mode = 0; mode < 2; mode++) {
+                String expectedMode = mode == 0 ? "FRAC" : "IMPR";
+                instrumentation.runOnMainSync(() -> state.enqueue(Command.parse("FRACTION")));
+                await(() -> !state.busy);
+                await(
+                        () -> {
+                            android.widget.TextView modeButton =
+                                    (android.widget.TextView)
+                                            ((android.view.ViewGroup) tagged(a, "mode-row"))
+                                                    .getChildAt(3);
+                            if (!expectedMode.contentEquals(modeButton.getText())) return false;
+                            for (int row = 0; row < 2; row++) {
+                                android.widget.TextView value =
+                                        (android.widget.TextView) tagged(a, "stack-value:" + row);
+                                if (value == null
+                                        || value.getText().length() >= 100
+                                        || value.getLayout() == null) return false;
+                                for (int line = 0; line < value.getLayout().getLineCount(); line++)
+                                    if (value.getLayout().getEllipsisCount(line) != 0) return false;
+                            }
+                            return true;
+                        });
+            }
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
     public void bottomIntegerFitsTheStackViewportBeforeAndAfterExpandingFunctions()
             throws Exception {
         MainActivity a = open();
