@@ -170,7 +170,7 @@ public final class EntryOperatorTest {
             SystemClock.sleep(1100);
             assertNull("Foreground entry must not persist the calculation", store.checkpoint());
             session.background = true;
-            key(session, "CHECKPOINT");
+            session.saveForLifecycle();
             RpnCalculator stopped =
                     RpnCalculator.load(Files.readAllBytes(new File(store.checkpoint()).toPath()));
             assertEquals("12", stopped.entry());

@@ -233,7 +233,7 @@ public final class AdaptiveKeypadTest {
                             find(keypad, "0").performLongClick();
                             assertEquals("HOLD_DIGIT:0", command.get());
                             CalculatorTestSupport.paste(calculator, "4");
-                            keypad.setEditing(true);
+                            keypad.setMode(true, false);
                             find(keypad, "1").performLongClick();
                             Command.parse(command.get())
                                     .apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);

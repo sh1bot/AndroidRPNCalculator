@@ -12,6 +12,23 @@ import org.junit.jupiter.api.Test;
 
 final class CommandTest {
     @Test
+    void entryUpdatesStayLocalRatherThanBecomingArithmeticCommands() {
+        EntryEditor editor = new EntryEditor();
+        Command edit = Command.parse("EDIT:1:1:false:false:123");
+        edit.apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
+        Command.parse("SELECT:2:2").apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
+        Command.parse("BACK").apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
+        assertEquals("13", editor.entry());
+        RpnCalculator calculator = new RpnCalculator();
+        calculator.key("π");
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> edit.apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER));
+        assertEquals(1, calculator.values().size());
+        assertFalse(calculator.isEditing());
+    }
+
+    @Test
     void editRetainsEmbeddedPunctuation() {
         Command command = Command.parse("EDIT:1:2:true:false:1:234,5");
         assertEquals(Command.Kind.EDIT, command.kind);
@@ -128,12 +145,10 @@ final class CommandTest {
     }
 
     @Test
-    void modeStorageIdsStayStable() {
-        assertEquals(FractionMode.MIXED, FractionMode.fromId(2));
-        assertEquals(FractionMode.IMPROPER, FractionMode.fromId(1));
-        assertEquals(FractionMode.DECIMAL, FractionMode.fromId(-1));
-        assertEquals(NumberMode.DOT, NumberMode.fromId(1));
+    void modesFollowTheirDisplayCycle() {
         assertEquals(NumberMode.UNGROUPED, NumberMode.DOT.next());
         assertEquals(FractionMode.MIXED, FractionMode.DECIMAL.next());
+        assertEquals(FractionMode.IMPROPER, FractionMode.MIXED.next());
+        assertEquals(FractionMode.DECIMAL, FractionMode.IMPROPER.next());
     }
 }

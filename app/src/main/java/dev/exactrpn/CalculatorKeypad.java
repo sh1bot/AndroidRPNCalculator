@@ -44,7 +44,7 @@ public final class CalculatorKeypad extends ViewGroup {
             productButton;
     private boolean tau;
     private Consumer<Boolean> saveTau = enabled -> {};
-    private boolean calculating, editing, selecting, allSelected;
+    private boolean calculating, editing, selecting, modeDirty = true;
     private boolean expanded, inverse;
     private final Map<String, Button> inverseButtons = new HashMap<>();
     private final BiConsumer<Boolean, Boolean> savePanel;
@@ -131,7 +131,7 @@ public final class CalculatorKeypad extends ViewGroup {
                     }
                 },
                 primaryRows);
-        setEditing(false);
+        setMode(false, false);
         updateConstant();
         updateExpansion();
     }
@@ -172,21 +172,7 @@ public final class CalculatorKeypad extends ViewGroup {
             Button button = item.getValue();
             String effective = effectiveKey(key);
             button.setText(functionLabel(effective));
-            button.setContentDescription(
-                    key.equals(Command.INVERSE)
-                            ? getContext()
-                                    .getString(active ? R.string.inverse_on : R.string.inverse_off)
-                            : effective.equals("root")
-                                    ? getContext().getString(R.string.root_description)
-                                    : keyDescription(effective));
-            if (key.equals(Command.INVERSE)) {
-                button.setTextColor(active ? colors.accent : colors.text);
-                if (Build.VERSION.SDK_INT >= 30)
-                    button.setStateDescription(
-                            active
-                                    ? getContext().getString(R.string.on)
-                                    : getContext().getString(R.string.off));
-            }
+            button.setContentDescription(keyDescription(effective));
         }
         updateSelectionFunctions();
         updateExpansion();
@@ -212,12 +198,16 @@ public final class CalculatorKeypad extends ViewGroup {
     public void setNumberFormat(LocaleNumbers format) {
         if (numbers == format) return;
         numbers = format;
+        modeDirty = true;
         for (Map.Entry<String, Button> item : numberButtons.entrySet())
             item.getValue().setText(numbers.entry(item.getKey()));
     }
 
-    public void setEditing(boolean editing) {
+    public void setMode(boolean editing, boolean selecting) {
+        if (!modeDirty && this.editing == editing && this.selecting == selecting) return;
+        modeDirty = false;
         this.editing = editing;
+        this.selecting = selecting;
         for (Map.Entry<String, Button> item : numberButtons.entrySet()) {
             String digit = item.getKey();
             if (digit.equals(".")) {
@@ -243,12 +233,6 @@ public final class CalculatorKeypad extends ViewGroup {
                                                                 ? 10
                                                                 : Integer.parseInt(digit)));
         }
-        updateModeKeys();
-    }
-
-    public void setSelecting(boolean selecting, boolean allSelected) {
-        this.selecting = selecting;
-        this.allSelected = allSelected;
         updateModeKeys();
     }
 
@@ -307,22 +291,18 @@ public final class CalculatorKeypad extends ViewGroup {
                         !selecting
                                 || !key.equals("Factor")
                                         && (operation == null || operation.arity != 2));
-            }
-        }
-        for (LinearLayout row : scientificRows)
-            for (int i = 0; i < row.getChildCount(); i++) {
-                Button button = (Button) ((FrameLayout) row.getChildAt(i)).getChildAt(0);
                 button.setAlpha(button.isEnabled() ? 1f : .38f);
             }
+        }
         for (LinearLayout row : primaryRows)
             for (int i = 0; i < row.getChildCount(); i++) {
                 Button button = (Button) ((FrameLayout) row.getChildAt(i)).getChildAt(0);
                 String key = (String) button.getTag();
                 Operation operation = Operation.find(key);
-                if (operation != null && operation.arity == 2)
+                if (operation != null && operation.arity == 2) {
                     button.setEnabled(!selecting || key.equals("+") || key.equals("×"));
-                if (operation != null && operation.arity == 2)
                     button.setAlpha(button.isEnabled() ? 1f : .38f);
+                }
             }
     }
 
@@ -391,8 +371,7 @@ public final class CalculatorKeypad extends ViewGroup {
         if (key.equals(Command.ENTER)) enterButton = b;
         if (key.equals("π")) piButton = b;
         CalculatorKey definition = CalculatorKey.find(key);
-        if (definition.inverse() != null || definition == CalculatorKey.INVERSE)
-            inverseButtons.put(key, b);
+        if (definition.inverse() != null) inverseButtons.put(key, b);
     }
 
     private void labelButton(String key, Button button) {
@@ -545,7 +524,7 @@ public final class CalculatorKeypad extends ViewGroup {
 
     private int preferredLabelSize(String wire) {
         CalculatorKey key = CalculatorKey.find(wire);
-        return key == null || key == CalculatorKey.SWAP && selecting ? 16 : key.preferredSp;
+        return key == null ? 16 : key.preferredSp;
     }
 
     private void fitDeleteIcon(Button button, int width, int height, int maximum) {

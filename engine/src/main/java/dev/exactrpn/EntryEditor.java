@@ -109,14 +109,10 @@ public final class EntryEditor {
     }
 
     public boolean key(String key) {
-        if (key.equals("HOLD_DECIMAL") && !editing) return true;
-        if (key.equals("SMART_CLEAR")) key = editing ? "CE" : "CLEAR";
-        if (key.equals("HOLD_DROP")) key = editing ? "BACK" : "ROLL_DOWN";
-        String direction = key.startsWith("SELECT_") ? key.substring(7) : key;
-        if (direction.equals("LEFT")
-                || direction.equals("RIGHT")
-                || direction.equals("HOME")
-                || direction.equals("END")) {
+        key = Command.entryKey(key, editing);
+        if (key == null) return true;
+        String direction = Command.cursorDirection(key);
+        if (direction != null) {
             moveCursor(direction, key.startsWith("SELECT_"));
             return true;
         }
@@ -130,9 +126,7 @@ public final class EntryEditor {
             return true;
         }
         State before = new State(this);
-        boolean handled =
-                applyEntryKey(
-                        key, key.equals("CE") || key.equals("CLEAR") || key.equals("CANCEL_ENTRY"));
+        boolean handled = applyEntryKey(key, Command.clearsEntry(key));
         if (handled) remember(before);
         return handled;
     }
