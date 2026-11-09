@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 final class RowsRegressionTest extends RegressionSupport {
     @Test
     void dropRows() throws Exception {
-        RpnCalculator rowDrop = new RpnCalculator();
+        TestCalculator rowDrop = new TestCalculator();
         keys(rowDrop, "1", "ENTER", "2", "ENTER", "3", "ENTER", "4", "ENTER");
         rowDrop.pasteText("1,234", new NumberText.Profile('.', ',', 3, 3));
         rowDrop.select(1, 2);
@@ -29,7 +29,7 @@ final class RowsRegressionTest extends RegressionSupport {
                 "row drop preserves ambiguous entry and caret");
         assertTrue(
                 rowDrop.undoCount() == beforeDropHistory + 1, "multi-row drop is one undo action");
-        RpnCalculator rowDropRestored = RpnCalculator.load(rowDrop.save());
+        TestCalculator rowDropRestored = TestCalculator.load(rowDrop.save());
         rowDropRestored.key("UNDO");
         assertTrue(
                 rowDropRestored.values().size() == 4 && rowDropRestored.entry().equals("1,234"),
@@ -59,7 +59,7 @@ final class RowsRegressionTest extends RegressionSupport {
 
     @Test
     void pickRows() throws Exception {
-        RpnCalculator pickedRows = new RpnCalculator();
+        TestCalculator pickedRows = new TestCalculator();
         keys(pickedRows, "1", "ENTER", "2", "ENTER", "3", "ENTER", "4", "ENTER");
         pickedRows.pasteText("1,234", new NumberText.Profile('.', ',', 3, 3));
         pickedRows.select(1, 2);
@@ -77,7 +77,7 @@ final class RowsRegressionTest extends RegressionSupport {
                         && pickedRows.selectionEnd() == 2,
                 "pick leaves unfinished entry and cursor intact");
         assertTrue(pickedRows.undoCount() == pickHistory + 1, "multi-pick is one undo action");
-        RpnCalculator pickedRestored = RpnCalculator.load(pickedRows.save());
+        TestCalculator pickedRestored = TestCalculator.load(pickedRows.save());
         pickedRestored.key("UNDO");
         assertTrue(pickedRestored.values().size() == 4, "undo pick after restore");
         pickedRestored.key("REDO");
@@ -94,7 +94,7 @@ final class RowsRegressionTest extends RegressionSupport {
         int noPickHistory = pickedRows.undoCount();
         pickedRows.pickRows();
         assertTrue(pickedRows.undoCount() == noPickHistory, "empty pick does not add history");
-        RpnCalculator exactPick = new RpnCalculator();
+        TestCalculator exactPick = new TestCalculator();
         keys(exactPick, "π", "1", "ENTER", "3", "÷");
         exactPick.pickRows(0, 1);
         assertTrue(
@@ -106,7 +106,7 @@ final class RowsRegressionTest extends RegressionSupport {
 
     @Test
     void rollStack() throws Exception {
-        RpnCalculator rolled = new RpnCalculator();
+        TestCalculator rolled = new TestCalculator();
         keys(rolled, "1", "ENTER", "2", "ENTER", "3", "ENTER");
         int rollHistory = rolled.undoCount();
         rolled.key("ROLL_UP");
@@ -116,7 +116,7 @@ final class RowsRegressionTest extends RegressionSupport {
                         && top(rolled).definitelyOne(),
                 "roll up moves displayed values upward, wrapping top to X");
         assertTrue(rolled.undoCount() == rollHistory + 1, "roll is one undoable action");
-        RpnCalculator rollRestored = RpnCalculator.load(rolled.save());
+        TestCalculator rollRestored = TestCalculator.load(rolled.save());
         rollRestored.key("UNDO");
         assertTrue(
                 rollRestored.values().get(0).definitelyOne()
@@ -134,7 +134,7 @@ final class RowsRegressionTest extends RegressionSupport {
                 rolled.values().get(0).definitelyOne()
                         && top(rolled).definitelyEquals(new UnifiedReal(3)),
                 "full roll cycle restores original order");
-        RpnCalculator emptyRoll = new RpnCalculator();
+        TestCalculator emptyRoll = new TestCalculator();
         keys(emptyRoll, "ROLL_UP", "ROLL_DOWN");
         assertTrue(emptyRoll.isEmpty() && emptyRoll.undoCount() == 0, "empty roll is a no-op");
         keys(emptyRoll, "7", "ENTER");
@@ -144,7 +144,7 @@ final class RowsRegressionTest extends RegressionSupport {
                 top(emptyRoll).definitelyEquals(new UnifiedReal(7))
                         && emptyRoll.undoCount() == singleRollHistory,
                 "single-item roll is a no-op");
-        RpnCalculator editRoll = new RpnCalculator();
+        TestCalculator editRoll = new TestCalculator();
         keys(editRoll, "1", "ENTER", "2", "ROLL_UP");
         assertTrue(
                 !editRoll.isEditing()

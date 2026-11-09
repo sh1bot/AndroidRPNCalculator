@@ -8,13 +8,13 @@ import org.junit.jupiter.api.Test;
 final class EntryOperatorTest {
     @Test
     void underflowCommitsAndCanBeUndoneAndRedoneAfterRestore() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         CalculatorTestSupport.paste(c, "123");
         Exception failure = assertThrows(IllegalArgumentException.class, () -> c.key("+"));
         assertEquals(CalculationError.Code.NEED_VALUES, ((CalculationError) failure).code());
         assertFalse(c.isEditing());
         assertEquals("123", c.values().get(0).bigIntegerValue().toString());
-        RpnCalculator restored = RpnCalculator.load(c.save());
+        TestCalculator restored = TestCalculator.load(c.save());
         restored.key("UNDO");
         assertTrue(restored.isEditing());
         assertEquals("123", restored.entry());
@@ -29,7 +29,7 @@ final class EntryOperatorTest {
     @Test
     void ambiguousAndInvalidEntryNeverReachTheOperator() {
         for (String text : new String[] {"1,234", "abc"}) {
-            RpnCalculator c = new RpnCalculator();
+            TestCalculator c = new TestCalculator();
             c.pasteText(text, new NumberText.Profile('.', ',', 3, 3));
             assertThrows(IllegalArgumentException.class, () -> c.key("+"));
             assertTrue(c.isEditing());

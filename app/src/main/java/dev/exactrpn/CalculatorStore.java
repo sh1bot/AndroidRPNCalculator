@@ -27,21 +27,11 @@ final class CalculatorStore {
         restoreAttempt = new AtomicFile(new File(directory, "calculator-restore.bin"));
     }
 
-    String checkpoint() throws IOException {
-        checkAccess();
-        if (!file.getBaseFile().exists() && !new File(file.getBaseFile() + ".bak").exists())
-            return null;
-        try (FileInputStream ignored = file.openRead()) {
-            return file.getBaseFile().getAbsolutePath();
-        }
-    }
-
     byte[] load() throws IOException {
         checkAccess();
-        if (checkpoint() == null) return null;
-        checkSize(file.getBaseFile().length());
         try (FileInputStream in = file.openRead();
                 java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream()) {
+            checkSize(in.getChannel().size());
             byte[] buffer = new byte[8192];
             int count;
             while ((count = in.read(buffer)) != -1) {
@@ -49,12 +39,16 @@ final class CalculatorStore {
                 out.write(buffer, 0, count);
             }
             return out.toByteArray();
+        } catch (java.io.FileNotFoundException ex) {
+            if (file.getBaseFile().exists()) throw ex;
+            return null;
         }
     }
 
     /** Mutations reset this counter; two interrupted starts preserve the file for recovery. */
     byte[] beginRestore() throws IOException {
-        if (checkpoint() == null) {
+        byte[] saved = load();
+        if (saved == null) {
             finishRestore();
             return null;
         }
@@ -69,7 +63,7 @@ final class CalculatorStore {
             throw new IOException("Saved calculation repeatedly failed to restore");
         }
         write(restoreAttempt, new byte[] {(byte) (attempts + 1)});
-        return load();
+        return saved;
     }
 
     private static void checkSize(long length) {

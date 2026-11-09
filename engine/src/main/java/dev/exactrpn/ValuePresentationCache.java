@@ -8,30 +8,27 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Set;
 
-/** Formatting belongs to immutable value identities, not keypresses. Clipboard text is lazy. */
+/** Cache immutable values only for the active display mode. Clipboard formatting is on demand. */
 public final class ValuePresentationCache {
-    private static final int MODES = FractionMode.values().length;
-    private static final int SLOTS = ValueFormatter.Notation.values().length * MODES;
-
     private static final class Text {
-        String full, compact, clipboard;
+        String full, compact;
     }
 
-    private final IdentityHashMap<UnifiedReal, Text[]> values = new IdentityHashMap<>();
+    private final IdentityHashMap<UnifiedReal, Text> values = new IdentityHashMap<>();
+    private ValueFormatter.Notation notation;
+    private FractionMode fraction;
+    private UnifiedReal top;
+    private String compactTop;
 
-    private Text text(UnifiedReal value, ValueFormatter.Notation notation, FractionMode fraction) {
-        Text[] modes = values.computeIfAbsent(value, ignored -> new Text[SLOTS]);
-        int index = notation.ordinal() * MODES + fraction.ordinal();
-        if (modes[index] == null) modes[index] = new Text();
-        return modes[index];
+    public void setMode(ValueFormatter.Notation notation, FractionMode fraction) {
+        if (this.notation == notation && this.fraction == fraction) return;
+        clear();
+        this.notation = notation;
+        this.fraction = fraction;
     }
 
-    public String row(
-            UnifiedReal value,
-            boolean newest,
-            ValueFormatter.Notation notation,
-            FractionMode fraction) {
-        Text text = text(value, notation, fraction);
+    public String row(UnifiedReal value, boolean newest) {
+        Text text = values.computeIfAbsent(value, ignored -> new Text());
         if (newest) {
             if (text.full == null)
                 text.full = ValueFormatter.format(value, true, notation, fraction);
@@ -42,21 +39,27 @@ public final class ValuePresentationCache {
         return text.compact;
     }
 
-    public String clipboard(
-            UnifiedReal value, ValueFormatter.Notation notation, FractionMode fraction) {
-        Text text = text(value, notation, fraction);
-        if (text.clipboard == null)
-            text.clipboard = ValueFormatter.clipboard(value, notation, fraction);
-        return text.clipboard;
+    public String compactTop(UnifiedReal value) {
+        if (top != value) {
+            top = value;
+            compactTop = ValueFormatter.format(value, false, notation, FractionMode.DECIMAL);
+        }
+        return compactTop;
     }
 
     public void retain(List<UnifiedReal> live) {
         Set<UnifiedReal> identities = Collections.newSetFromMap(new IdentityHashMap<>());
         identities.addAll(live);
         values.keySet().retainAll(identities);
+        if (!identities.contains(top)) {
+            top = null;
+            compactTop = null;
+        }
     }
 
     public void clear() {
         values.clear();
+        top = null;
+        compactTop = null;
     }
 }

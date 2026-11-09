@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 final class SelectedSumTest {
     @Test
     void sumIsExactDeduplicatedAndPreservesOriginalsAndEntry() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         for (String text : new String[] {"0.1", "99", "0.2"}) {
             CalculatorTestSupport.paste(c, text);
             c.key("ENTER");
@@ -21,7 +21,7 @@ final class SelectedSumTest {
         assertTrue(command.preservesSelection());
         assertArrayEquals(new int[] {2, 0, 2}, command.rows());
         int history = c.undoCount();
-        command.apply(c, NumberText.COMPUTER, NumberText.COMPUTER);
+        c.apply(command, NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals(4, c.values().size());
         assertTrue(c.values().get(3).definitelyEquals(RpnCalculator.parse("0.3")));
         assertEquals("99", c.values().get(1).bigIntegerValue().toString());
@@ -29,7 +29,7 @@ final class SelectedSumTest {
         assertTrue(c.isEditing());
         assertEquals(1, c.selectionStart());
         assertEquals(history + 1, c.undoCount());
-        c = RpnCalculator.load(c.save());
+        c = TestCalculator.load(c.save());
         c.key("UNDO");
         assertEquals(3, c.values().size());
         assertEquals("45", c.entry());
@@ -39,11 +39,11 @@ final class SelectedSumTest {
 
     @Test
     void irrationalSumRetainsExactExpressionAcrossRestore() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         c.key("π");
         c.key("π");
         c.sumRows(0, 1);
-        RpnCalculator restored = RpnCalculator.load(c.save());
+        TestCalculator restored = TestCalculator.load(c.save());
         assertTrue(
                 restored.values()
                         .get(2)
@@ -54,7 +54,7 @@ final class SelectedSumTest {
 
     @Test
     void invalidRowsAreAtomicAndEmptySelectionIsANoop() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         c.key("π");
         byte[] before = c.save();
         assertThrows(IllegalArgumentException.class, () -> c.sumRows(0, 1));

@@ -33,7 +33,7 @@ public final class RestoreGuardTest {
     public void interruptedRestoresAcrossInstancesQuarantineOnlyTheRepeatedSnapshot()
             throws Exception {
         File directory = directory();
-        byte[] saved = new RpnCalculator().save();
+        byte[] saved = new TestCalculator().save();
         try {
             CalculatorStore store = new CalculatorStore(directory);
             store.save(saved);
@@ -44,7 +44,7 @@ public final class RestoreGuardTest {
                 fail("A third interrupted restore must be blocked");
             } catch (java.io.IOException expected) {
             }
-            assertNull(store.checkpoint());
+            assertNull(StoreTestSupport.checkpoint(store));
             assertArrayEquals(
                     saved,
                     Files.readAllBytes(new File(directory, "calculator-state.corrupt").toPath()));
@@ -59,7 +59,7 @@ public final class RestoreGuardTest {
         File directory = directory();
         try {
             CalculatorStore store = new CalculatorStore(directory);
-            RpnCalculator calculator = new RpnCalculator();
+            TestCalculator calculator = new TestCalculator();
             store.save(calculator.save());
             for (int i = 0; i < 5; i++) {
                 store.beginRestore();

@@ -16,8 +16,6 @@ final class StackRowRenderer {
     interface Actions {
         boolean toggle(int index, Display display);
 
-        void tap(int index, Display display);
-
         void copy(int index, Display display);
     }
 
@@ -50,18 +48,6 @@ final class StackRowRenderer {
                 context.getResources().getDisplayMetrics());
     }
 
-    private void keepStackRowHeight(TextView value) {
-        android.text.TextPaint previous = new android.text.TextPaint(value.getPaint());
-        previous.setTextSize(sp(21));
-        android.graphics.Paint.FontMetricsInt oldMetrics = previous.getFontMetricsInt();
-        android.graphics.Paint.FontMetricsInt newMetrics = value.getPaint().getFontMetricsInt();
-        int oldTextHeight = oldMetrics.bottom - oldMetrics.top;
-        int newTextHeight = newMetrics.bottom - newMetrics.top;
-        int padding = Math.max(0, 2 * dp(6) - (newTextHeight - oldTextHeight));
-        value.setPadding(dp(4), padding / 2, dp(4), padding - padding / 2);
-        value.setMinimumHeight(oldTextHeight + 2 * dp(6));
-    }
-
     private void digits(TextView value) {
         value.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         value.setFontFeatureSettings("tnum");
@@ -92,6 +78,15 @@ final class StackRowRenderer {
         return context.getString(id, depth, value);
     }
 
+    private int fittedSize(CharSequence text, android.text.TextPaint paint, int width) {
+        int size = 32;
+        for (; size > 22; size--) {
+            paint.setTextSize(sp(size));
+            if (android.text.Layout.getDesiredWidth(text, paint) <= width) break;
+        }
+        return size;
+    }
+
     private void fitBottomRow(
             TextView value,
             TextView label,
@@ -120,7 +115,12 @@ final class StackRowRenderer {
                     previousSize[0] = width;
                     previousSize[1] = height;
                     android.text.TextPaint measure = new android.text.TextPaint(value.getPaint());
-                    measure.setTextSize(sp(32));
+                    boolean singleLine =
+                            display.fractionMode == FractionMode.DECIMAL
+                                    && fullNumber.contains(".")
+                                    && !fullNumber.startsWith("≈");
+                    int fullSize = singleLine ? fittedSize(full, measure, width) : 32;
+                    measure.setTextSize(sp(fullSize));
                     android.text.StaticLayout layout =
                             android.text.StaticLayout.Builder.obtain(
                                             full, 0, full.length(), measure, width)
@@ -132,19 +132,15 @@ final class StackRowRenderer {
                                             value.getLineSpacingMultiplier())
                                     .build();
                     boolean fits =
-                            layout.getHeight() + value.getPaddingTop() + value.getPaddingBottom()
-                                    <= height;
+                            (!singleLine || layout.getLineCount() == 1)
+                                    && layout.getHeight()
+                                                    + value.getPaddingTop()
+                                                    + value.getPaddingBottom()
+                                            <= height;
                     for (int line = 0; fits && line < layout.getLineCount(); line++)
                         if (layout.getLineWidth(line) > width) fits = false;
                     CharSequence chosen = fits ? full : compact;
-                    int size = 32;
-                    if (!fits) {
-                        for (; size > 22; size--) {
-                            measure.setTextSize(sp(size));
-                            if (android.text.Layout.getDesiredWidth(compact, measure) <= width)
-                                break;
-                        }
-                    }
+                    int size = fits ? fullSize : fittedSize(compact, measure, width);
                     if (value.getTextSize() != sp(size)) value.setTextSize(size);
                     value.setEllipsize(fits ? null : android.text.TextUtils.TruncateAt.END);
                     int lines = fits ? layout.getLineCount() : 1;
@@ -225,7 +221,7 @@ final class StackRowRenderer {
             label.setSingleLine(true);
             updateStackLabel(label, depth, display.rows.get(i));
             label.setTag("stack-label:" + i);
-            if (!display.editing) label.setOnClickListener(v -> actions.tap(index, display));
+            if (!display.editing) label.setOnClickListener(v -> actions.toggle(index, display));
             label.setOnLongClickListener(
                     v -> {
                         actions.copy(index, display);
@@ -240,64 +236,19 @@ final class StackRowRenderer {
             value.setGravity(Gravity.END);
             value.setText(numbers.stack(withoutApproximation(display.rows.get(i)), colors.muted));
             if (!result) {
-                keepStackRowHeight(value);
+                value.setPadding(dp(4), dp(5), dp(4), dp(5));
                 value.setSingleLine(true);
                 value.setHorizontallyScrolling(false);
                 value.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 value.setAutoSizeTextTypeUniformWithConfiguration(
                         12, 22, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
             }
-            if (result
-                    && display.fractionMode == FractionMode.DECIMAL
-                    && display.rows.get(i).contains(".")
-                    && !display.rows.get(i).startsWith("≈")) {
-                final String fullNumber = display.rows.get(i),
-                        compactNumber = display.compactRows.get(i);
-                final CharSequence full =
-                        numbers.stack(withoutApproximation(fullNumber), colors.muted);
-                final CharSequence compact =
-                        numbers.stack(withoutApproximation(compactNumber), colors.muted);
-                value.setSingleLine(true);
-                value.setHorizontallyScrolling(false);
-                value.addOnLayoutChangeListener(
-                        (v, l, t, r, b, ol, ot, or, ob) -> {
-                            int available =
-                                    r - l - value.getPaddingLeft() - value.getPaddingRight();
-                            if (available <= 0) return;
-                            android.text.TextPaint measure =
-                                    new android.text.TextPaint(value.getPaint());
-                            int size = 32;
-                            for (; size > 22; size--) {
-                                measure.setTextSize(sp(size));
-                                if (android.text.Layout.getDesiredWidth(full, measure) <= available)
-                                    break;
-                            }
-                            measure.setTextSize(sp(size));
-                            boolean fits =
-                                    android.text.Layout.getDesiredWidth(full, measure) <= available;
-                            CharSequence chosen = fits ? full : compact;
-                            updateStackLabel(label, depth, fits ? fullNumber : compactNumber);
-                            row.setContentDescription(
-                                    rowDescription(
-                                            display.editing,
-                                            depth,
-                                            !fits && compactNumber.startsWith("≈ "),
-                                            chosen));
-                            if (!value.getText().toString().equals(chosen.toString()))
-                                value.setText(chosen);
-                            if (value.getTextSize() != sp(size)) value.setTextSize(size);
-                        });
-            }
-            if (result
-                    && !(display.fractionMode == FractionMode.DECIMAL
-                            && display.rows.get(i).contains(".")
-                            && !display.rows.get(i).startsWith("≈")))
-                fitBottomRow(value, label, row, stackRows, display, numbers, i, depth);
+            if (result) fitBottomRow(value, label, row, stackRows, display, numbers, i, depth);
             value.setTextIsSelectable(false);
             row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
             value.setTag("stack-value:" + i);
-            value.setOnClickListener(v -> actions.tap(index, display));
-            row.setOnClickListener(v -> actions.tap(index, display));
+            value.setOnClickListener(v -> actions.toggle(index, display));
+            row.setOnClickListener(v -> actions.toggle(index, display));
             value.setOnLongClickListener(
                     v -> {
                         actions.copy(index, display);

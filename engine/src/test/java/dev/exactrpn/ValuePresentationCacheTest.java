@@ -11,40 +11,33 @@ import java.util.List;
 
 final class ValuePresentationCacheTest {
     @Test
-    void cachedRowsKeepPrecisionModesAndValueIdentitySeparate() {
+    void activeModeKeepsLiveRowsAndReformatsAfterModeChanges() {
         ValuePresentationCache cache = new ValuePresentationCache();
-        UnifiedReal root = UnifiedReal.TWO.sqrt();
-        ValueFormatter.Notation sci = ValueFormatter.Notation.SCIENTIFIC;
-        String row = cache.row(root, false, sci, FractionMode.DECIMAL);
-        assertSame(row, cache.row(root, false, sci, FractionMode.DECIMAL));
-        cache.retain(List.of(root));
-        assertSame(row, cache.row(root, false, sci, FractionMode.DECIMAL));
-        assertEquals(
-                ValueFormatter.clipboard(root, sci),
-                cache.clipboard(root, sci, FractionMode.DECIMAL));
+        var sci = ValueFormatter.Notation.SCIENTIFIC;
         UnifiedReal third = UnifiedReal.ONE.divide(new UnifiedReal(3));
-        assertEquals("1/3", cache.row(third, true, sci, FractionMode.IMPROPER));
-        assertEquals("1/3", cache.clipboard(third, sci, FractionMode.IMPROPER));
-        assertNotEquals("1/3", cache.row(third, true, sci, FractionMode.DECIMAL));
-        UnifiedReal huge = RpnCalculator.parse("12345678901234567890");
-        assertEquals("12345678901234567890", cache.row(huge, true, sci, FractionMode.DECIMAL));
-        assertTrue(cache.row(huge, false, sci, FractionMode.DECIMAL).contains("e"));
-        assertEquals(
-                ValueFormatter.format(huge, false, ValueFormatter.Notation.ENGINEERING),
-                cache.row(huge, false, ValueFormatter.Notation.ENGINEERING, FractionMode.DECIMAL));
+        cache.setMode(sci, FractionMode.IMPROPER);
+        String fraction = cache.row(third, true);
+        assertEquals("1/3", fraction);
+        assertNotEquals(fraction, cache.compactTop(third));
+        assertSame(fraction, cache.row(third, true));
+        cache.retain(List.of(third));
+        assertSame(fraction, cache.row(third, true));
+        cache.setMode(sci, FractionMode.DECIMAL);
+        assertNotEquals(fraction, cache.row(third, true));
+        cache.setMode(sci, FractionMode.IMPROPER);
+        assertEquals(fraction, cache.row(third, true));
     }
 
     @Test
     void removedValuesAreReleasedButLiveRowsRemainCached() {
         ValuePresentationCache cache = new ValuePresentationCache();
+        cache.setMode(ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL);
         UnifiedReal a = UnifiedReal.TWO.sqrt(), b = new UnifiedReal(3).sqrt();
-        ValueFormatter.Notation sci = ValueFormatter.Notation.SCIENTIFIC;
-        String first = cache.row(a, false, sci, FractionMode.DECIMAL);
-        String second = cache.row(b, false, sci, FractionMode.DECIMAL);
+        String first = cache.row(a, false), second = cache.row(b, false);
         cache.retain(List.of(a));
-        assertSame(first, cache.row(a, false, sci, FractionMode.DECIMAL));
-        assertEquals(second, cache.row(b, false, sci, FractionMode.DECIMAL));
+        assertSame(first, cache.row(a, false));
+        assertEquals(second, cache.row(b, false));
         cache.clear();
-        assertEquals(first, cache.row(a, false, sci, FractionMode.DECIMAL));
+        assertEquals(first, cache.row(a, false));
     }
 }

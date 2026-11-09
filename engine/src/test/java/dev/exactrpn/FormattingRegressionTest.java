@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 final class FormattingRegressionTest extends RegressionSupport {
     @Test
     void decimalFormattingAndPrecision() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         assertEquals(
                 "0.3",
                 ValueFormatter.format(RpnCalculator.parse("0.3"), true, sci),
@@ -53,7 +53,7 @@ final class FormattingRegressionTest extends RegressionSupport {
                 "56565642624.456",
                 ValueFormatter.format(RpnCalculator.parse("56565642624.456"), true, sci),
                 "newest terminating decimal stays exact");
-        RpnCalculator toggled = new RpnCalculator();
+        TestCalculator toggled = new TestCalculator();
         number(toggled, "56565642624.456");
         toggled.key("ENTER");
         for (int i = 0; i < 10; i++) {
@@ -152,7 +152,7 @@ final class FormattingRegressionTest extends RegressionSupport {
                 ValueFormatter.format(
                         RpnCalculator.parse("1e-20"), true, eng, FractionMode.IMPROPER),
                 "tiny rational remains exact fraction");
-        RpnCalculator fractions = new RpnCalculator();
+        TestCalculator fractions = new TestCalculator();
         keys(fractions, "1", "ENTER", "3", "÷");
         assertEquals(
                 "1/3",
@@ -230,7 +230,7 @@ final class FormattingRegressionTest extends RegressionSupport {
                     {"5.5", "2", "1.5"},
                     {"0.3", "0.1", "0"}
                 }) {
-            RpnCalculator remainder = new RpnCalculator();
+            TestCalculator remainder = new TestCalculator();
             CalculatorTestSupport.paste(remainder, example[0]);
             remainder.key("ENTER");
             CalculatorTestSupport.paste(remainder, example[1]);
@@ -238,12 +238,12 @@ final class FormattingRegressionTest extends RegressionSupport {
             assertTrue(
                     top(remainder).definitelyEquals(RpnCalculator.parse(example[2])),
                     "exact remainder " + example[0] + " rem " + example[1]);
-            RpnCalculator remainderSaved = RpnCalculator.load(remainder.save());
+            TestCalculator remainderSaved = TestCalculator.load(remainder.save());
             assertTrue(
                     top(remainderSaved).definitelyEquals(top(remainder)),
                     "remainder survives restore");
         }
-        RpnCalculator modular = new RpnCalculator();
+        TestCalculator modular = new TestCalculator();
         CalculatorTestSupport.paste(modular, "-7");
         modular.key("ENTER");
         CalculatorTestSupport.paste(modular, "3");
@@ -255,14 +255,14 @@ final class FormattingRegressionTest extends RegressionSupport {
                 "remainder undo restores pending divisor");
         modular.key("REDO");
         assertTrue(top(modular).definitelyEquals(UnifiedReal.TWO), "remainder redo");
-        RpnCalculator negativeMod = new RpnCalculator();
+        TestCalculator negativeMod = new TestCalculator();
         CalculatorTestSupport.paste(negativeMod, "7");
         negativeMod.key("ENTER");
         CalculatorTestSupport.paste(negativeMod, "-3");
         negativeMod.key("mod");
         assertTrue(
                 top(negativeMod).definitelyEquals(new UnifiedReal(-2)), "negative-divisor modulo");
-        RpnCalculator zeroDivisor = new RpnCalculator();
+        TestCalculator zeroDivisor = new TestCalculator();
         keys(zeroDivisor, "7", "ENTER", "0");
         try {
             zeroDivisor.key("rem");
@@ -274,7 +274,7 @@ final class FormattingRegressionTest extends RegressionSupport {
                         && zeroDivisor.values().size() == 2
                         && !zeroDivisor.isEditing(),
                 "zero-divisor remainder leaves state intact");
-        RpnCalculator irrationalRem = new RpnCalculator();
+        TestCalculator irrationalRem = new TestCalculator();
         keys(irrationalRem, "π", "2");
         try {
             irrationalRem.key("rem");

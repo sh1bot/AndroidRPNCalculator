@@ -38,7 +38,7 @@ final class LocaleRegressionTest extends RegressionSupport {
         assertTrue(
                 !NumberText.analyze("hello", us).valid(),
                 "invalid pasted text has no guessed value");
-        RpnCalculator cursor = new RpnCalculator();
+        TestCalculator cursor = new TestCalculator();
         keys(cursor, "9", "ENTER");
         cursor.pasteText("1,234", us);
         assertTrue(
@@ -135,7 +135,7 @@ final class LocaleRegressionTest extends RegressionSupport {
                 !cursor.rawEntry() && cursor.entry().equals("1.234"),
                 "native single-decimal edit resolves meaning");
         cursor.pasteText("1,234", us);
-        RpnCalculator cursorCopy = CalculatorTestSupport.copy(cursor);
+        TestCalculator cursorCopy = CalculatorTestSupport.copy(cursor);
         cursorCopy.select(1, 2);
         cursorCopy.key(".");
         assertTrue(
@@ -152,7 +152,7 @@ final class LocaleRegressionTest extends RegressionSupport {
         cursor.key("ENTER");
         cursor.key("DELETE");
         assertTrue(!cursor.isEditing(), "Delete in stack mode drops without opening entry");
-        RpnCalculator accept = new RpnCalculator();
+        TestCalculator accept = new TestCalculator();
         keys(accept, "2", "ENTER");
         accept.pasteText("12.34", us);
         assertTrue(
@@ -177,14 +177,14 @@ final class LocaleRegressionTest extends RegressionSupport {
         assertTrue(
                 !accept.isEditing() && top(accept).definitelyEquals(new UnifiedReal(3)),
                 "function accepts safe pasted number");
-        RpnCalculator commaPaste = new RpnCalculator();
+        TestCalculator commaPaste = new TestCalculator();
         keys(commaPaste, "2", "ENTER");
         commaPaste.pasteText("9,5", us);
         commaPaste.key("+");
         assertTrue(
                 top(commaPaste).definitelyEquals(RpnCalculator.parse("11.5")),
                 "safe comma decimal accepted by operator");
-        RpnCalculator blocked = new RpnCalculator();
+        TestCalculator blocked = new TestCalculator();
         keys(blocked, "9", "ENTER");
         blocked.pasteText("1,234", us);
         for (String operation :
@@ -206,7 +206,7 @@ final class LocaleRegressionTest extends RegressionSupport {
         assertTrue(
                 top(blocked).definitelyEquals(RpnCalculator.parse("10.234")),
                 "corrected decimal can proceed with operator");
-        RpnCalculator localized = new RpnCalculator();
+        TestCalculator localized = new TestCalculator();
         localized.setInputProfile(de);
         keys(localized, "2", "ENTER");
         localized.pasteText("1.234", de);
@@ -244,7 +244,7 @@ final class LocaleRegressionTest extends RegressionSupport {
         assertEquals(
                 "HOME", KeyboardInput.command(122, 0, true, false, false), "Ctrl Home mapping");
         assertEquals("END", KeyboardInput.command(123, 0, true, false, false), "Ctrl End mapping");
-        RpnCalculator nav = new RpnCalculator();
+        TestCalculator nav = new TestCalculator();
         CalculatorTestSupport.paste(nav, "123.45");
         nav.key("LEFT");
         assertTrue(nav.selectionEnd() == 5, "left moves one character");

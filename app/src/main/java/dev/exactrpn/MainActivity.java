@@ -99,10 +99,6 @@ public class MainActivity extends Activity {
                                 return toggleStackRow(index, display);
                             }
 
-                            public void tap(int index, Display display) {
-                                toggleStackRow(index, display);
-                            }
-
                             public void copy(int index, Display display) {
                                 stackRowTapped(index, display);
                             }
@@ -249,7 +245,7 @@ public class MainActivity extends Activity {
                         ? RpnCalculator.MAX_PASTE_LENGTH
                         : text.toString().split("\\R", -1).length > 1
                                 ? RpnCalculator.MAX_PASTE_LENGTH
-                                : RpnCalculator.MAX_ENTRY_LENGTH;
+                                : EntryEditor.MAX_ENTRY_LENGTH;
         if (text.length() > limit) {
             showNotice(getString(R.string.clipboard_too_long, limit), true);
             return;
@@ -488,7 +484,7 @@ public class MainActivity extends Activity {
     protected void onStop() {
         if (!isChangingConfigurations()) {
             session.background = true;
-            if (!session.policy.temporary && DeviceAccess.locked(this)) session.pauseForLock();
+            if (!session.temporary && DeviceAccess.locked(this)) session.pauseForLock();
             else session.saveForLifecycle();
         }
         super.onStop();
@@ -899,18 +895,18 @@ public class MainActivity extends Activity {
                                                         ? R.string.stack_status
                                                         : R.string.select_status));
         CharSequence calculationStatus = status.getText();
-        boolean temporarySelection = session.policy.temporary && !session.selectedRows.isEmpty();
+        boolean temporarySelection = session.temporary && !session.selectedRows.isEmpty();
         if (status.getMaxLines() != (temporarySelection ? 2 : 1)) {
             status.setSingleLine(!temporarySelection);
             if (temporarySelection) status.setMaxLines(2);
         }
-        if (session.policy.temporary)
+        if (session.temporary)
             status.setText(
                     getString(R.string.temporary_status)
                             + (temporarySelection ? "\n" + getString(R.string.select_status) : ""));
-        status.setTextColor(session.policy.temporary ? colors.accent : colors.text);
+        status.setTextColor(session.temporary ? colors.accent : colors.text);
         status.setContentDescription(
-                session.policy.temporary
+                session.temporary
                         ? getString(R.string.temporary_description, calculationStatus)
                         : status.getText());
         long errorRevision = session.errorRevision;

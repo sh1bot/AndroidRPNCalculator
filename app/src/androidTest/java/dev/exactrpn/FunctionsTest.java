@@ -28,9 +28,16 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class FunctionsTest {
-    private CalculationRequest request(String key, byte[] input, FractionMode fractionMode) {
+    private CalculationRequest request(String key, byte[] input, FractionMode fractionMode)
+            throws java.io.IOException {
         CalculationRequest request = new CalculationRequest(key);
         request.input = input;
+        if (input != null
+                && !key.equals("RESTORE")
+                && !key.startsWith("COPY_ROWS")
+                && !Command.parse(key).isDisplayOnly())
+            request.entryDraft =
+                    RpnCalculator.load(input).detachEntryEditor().entryForCommit().save();
         request.angle = RpnCalculator.AngleUnit.RAD;
         request.notation = ValueFormatter.Notation.SCIENTIFIC;
         request.locale = "en-US";
@@ -113,7 +120,7 @@ public final class FunctionsTest {
         File seed = File.createTempFile("functions-test-", ".state", context.getNoBackupFilesDir());
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
         try {
-            RpnCalculator calculator = new RpnCalculator();
+            TestCalculator calculator = new TestCalculator();
             for (String key : new String[] {"7", "ENTER", "3", "÷"}) calculator.key(key);
             Files.write(seed.toPath(), calculator.save());
             Bundle improper =
@@ -191,12 +198,12 @@ public final class FunctionsTest {
                                     longFraction.getSpanEnd(fullDenominator[0]))
                             .toString());
             assertTrue(
-                    RpnCalculator.load(mixed.getByteArray("state"))
+                    TestCalculator.load(mixed.getByteArray("state"))
                             .values()
                             .get(0)
                             .multiply(new com.android.calculator2.UnifiedReal(3))
                             .definitelyEquals(new com.android.calculator2.UnifiedReal(7)));
-            calculator = new RpnCalculator();
+            calculator = new TestCalculator();
             CalculatorTestSupport.paste(calculator, "84");
             Files.write(seed.toPath(), calculator.save());
             Bundle factored =
@@ -218,7 +225,7 @@ public final class FunctionsTest {
                                                             factored.getByteArray("state"),
                                                             FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("84", undone.getString("entry"));
+            assertEquals("84", EntryEditor.load(undone.getByteArray("entryState")).entry());
             assertTrue(undone.getStringArrayList("rows").isEmpty());
         } finally {
             remote.close();

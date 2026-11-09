@@ -12,7 +12,7 @@ import java.math.BigInteger;
 final class FunctionsRegressionTest extends RegressionSupport {
     @Test
     void factorialAndPrimeFactorisation() throws Exception {
-        RpnCalculator factorial = new RpnCalculator();
+        TestCalculator factorial = new TestCalculator();
         keys(factorial, "0", "!");
         assertTrue(top(factorial).definitelyOne(), "zero factorial");
         keys(factorial, "CLEAR", "2", "0", "!");
@@ -28,7 +28,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                 top(factorial).bigIntegerValue().toString(),
                 "factorial redo");
         for (String invalid : new String[] {"-1", "1.5"}) {
-            RpnCalculator rejected = new RpnCalculator();
+            TestCalculator rejected = new TestCalculator();
             CalculatorTestSupport.paste(rejected, invalid);
             try {
                 rejected.key("!");
@@ -41,7 +41,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                             && top(rejected).definitelyEquals(RpnCalculator.parse(invalid)),
                     "invalid factorial leaves entry intact");
         }
-        RpnCalculator largeFactorial = new RpnCalculator();
+        TestCalculator largeFactorial = new TestCalculator();
         CalculatorTestSupport.paste(largeFactorial, "20000");
         largeFactorial.key("!");
         assertTrue(
@@ -49,7 +49,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                 "large factorial exceeds legacy UTF literal limit");
         assertEquals(
                 top(largeFactorial).bigIntegerValue(),
-                top(RpnCalculator.load(largeFactorial.save())).bigIntegerValue(),
+                top(TestCalculator.load(largeFactorial.save())).bigIntegerValue(),
                 "large factorial saves as exact expression");
         for (String[] example :
                 new String[][] {
@@ -61,7 +61,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                     {"18446744073709551615", "3,5,17,257,641,65537,6700417"},
                     {"1208925819614629174706176", "2"}
                 }) {
-            RpnCalculator factorised = new RpnCalculator();
+            TestCalculator factorised = new TestCalculator();
             CalculatorTestSupport.paste(factorised, example[0]);
             factorised.key("Factor");
             java.math.BigInteger product = java.math.BigInteger.ONE,
@@ -86,7 +86,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
             else
                 assertTrue(
                         actual.size() == 80, "large integer factorisation preserves multiplicity");
-            RpnCalculator factorRestored = RpnCalculator.load(factorised.save());
+            TestCalculator factorRestored = TestCalculator.load(factorised.save());
             assertTrue(
                     factorRestored.values().size() == factorised.values().size(),
                     "factor stack survives restore");
@@ -100,7 +100,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                     "factor redo restores all factors");
         }
         for (String invalid : new String[] {"0", "1", "-12", "1.5"}) {
-            RpnCalculator rejected = new RpnCalculator();
+            TestCalculator rejected = new TestCalculator();
             CalculatorTestSupport.paste(rejected, invalid);
             try {
                 rejected.key("Factor");
@@ -113,7 +113,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                             && top(rejected).definitelyEquals(RpnCalculator.parse(invalid)),
                     "invalid factorisation is transactional");
         }
-        RpnCalculator interruptedFactors = new RpnCalculator();
+        TestCalculator interruptedFactors = new TestCalculator();
         CalculatorTestSupport.paste(interruptedFactors, "170141183460469231731687303715884105727");
         int factorUndo = interruptedFactors.undoCount();
         Thread.currentThread().interrupt();
@@ -133,7 +133,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
 
     @Test
     void inverseFunctionsAndAnglePersistence() throws Exception {
-        RpnCalculator inverseTrig = new RpnCalculator();
+        TestCalculator inverseTrig = new TestCalculator();
         inverseTrig.setAngleUnit(RpnCalculator.AngleUnit.DEG);
         CalculatorTestSupport.paste(inverseTrig, "0.5");
         inverseTrig.key("asin");
@@ -150,18 +150,18 @@ final class FunctionsRegressionTest extends RegressionSupport {
         assertTrue(top(inverseTrig).definitelyZero(), "asin radians");
         CalculatorTestSupport.paste(inverseTrig, "0.25");
         inverseTrig.key("asin");
-        RpnCalculator inverseSaved = RpnCalculator.load(inverseTrig.save());
+        TestCalculator inverseSaved = TestCalculator.load(inverseTrig.save());
         assertEquals(
                 top(inverseTrig).toStringTruncated(60),
                 top(inverseSaved).toStringTruncated(60),
                 "inverse trig expression survives restore");
-        RpnCalculator square = new RpnCalculator();
+        TestCalculator square = new TestCalculator();
         keys(square, "π", "x²");
         assertEquals(
                 top(square).toStringTruncated(60),
-                top(RpnCalculator.load(square.save())).toStringTruncated(60),
+                top(TestCalculator.load(square.save())).toStringTruncated(60),
                 "square expression survives restore");
-        RpnCalculator root = new RpnCalculator();
+        TestCalculator root = new TestCalculator();
         keys(root, "9", "ENTER", "2", "root");
         assertTrue(top(root).definitelyEquals(new UnifiedReal(3)), "Xth root of Y operand order");
         assertEquals(
@@ -180,16 +180,16 @@ final class FunctionsRegressionTest extends RegressionSupport {
 
     @Test
     void exactRootsAndLargePrimeProofs() throws Exception {
-        RpnCalculator rationalRoot = new RpnCalculator();
+        TestCalculator rationalRoot = new TestCalculator();
         keys(rationalRoot, "8", "ENTER", "2", "7", "÷", "3", "root");
         assertTrue(
                 top(rationalRoot).multiply(new UnifiedReal(3)).definitelyEquals(UnifiedReal.TWO),
                 "perfect rational cube root stays exact");
-        RpnCalculator cubeZero = new RpnCalculator();
+        TestCalculator cubeZero = new TestCalculator();
         keys(cubeZero, "2", "7", "ENTER", "3", "root", "3", "−");
         assertTrue(top(cubeZero).definitelyZero(), "cube root subtraction gives exact zero");
         for (String[] invalid : new String[][] {{"-8", "2"}, {"9", "0"}, {"0", "-3"}}) {
-            RpnCalculator rejected = new RpnCalculator();
+            TestCalculator rejected = new TestCalculator();
             CalculatorTestSupport.paste(rejected, invalid[0]);
             rejected.key("ENTER");
             CalculatorTestSupport.paste(rejected, invalid[1]);

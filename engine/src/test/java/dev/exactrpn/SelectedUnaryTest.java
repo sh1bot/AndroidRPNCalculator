@@ -7,15 +7,15 @@ import org.junit.jupiter.api.Test;
 final class SelectedUnaryTest {
     @Test
     void atomicInPlaceUndoRedoAndReplay() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         for (String n : new String[] {"4", "9", "16"}) {
             CalculatorTestSupport.paste(c, n);
             c.key("ENTER");
         }
-        Command.parse("UNARY_ROWS:√:0,2").apply(c, NumberText.COMPUTER, NumberText.COMPUTER);
+        c.apply(Command.parse("UNARY_ROWS:√:0,2"), NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals("2", c.values().get(0).bigIntegerValue().toString());
         assertEquals("9", c.values().get(1).bigIntegerValue().toString());
-        c = RpnCalculator.load(c.save());
+        c = TestCalculator.load(c.save());
         c.key("UNDO");
         assertEquals("4", c.values().get(0).bigIntegerValue().toString());
         c.key("REDO");
@@ -24,7 +24,7 @@ final class SelectedUnaryTest {
 
     @Test
     void failureOnLaterRowChangesNothing() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         CalculatorTestSupport.paste(c, "4");
         c.key("ENTER");
         CalculatorTestSupport.paste(c, "-1");

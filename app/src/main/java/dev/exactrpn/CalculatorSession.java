@@ -52,7 +52,7 @@ final class CalculatorSession {
     final SortedSet<Integer> selectedRows = new TreeSet<>();
     volatile boolean busy, cancelRequested, background, operationPending;
     private CalculatorStore store;
-    final SessionPolicy policy;
+    final boolean temporary;
     private volatile boolean restorePending;
     boolean tauConstant;
     private volatile boolean loaded;
@@ -77,7 +77,7 @@ final class CalculatorSession {
             NumberMode numberMode,
             FractionMode fractionMode,
             boolean temporary) {
-        policy = new SessionPolicy(temporary);
+        this.temporary = temporary;
         notation = n;
         this.numberMode = numberMode;
         this.fractionMode = fractionMode;
@@ -93,15 +93,15 @@ final class CalculatorSession {
         inputProfiles.clear();
         localeTag = context.getResources().getConfiguration().getLocales().get(0).toLanguageTag();
         if (remote == null) {
-            if (!policy.temporary) {
+            if (!temporary) {
                 store = new CalculatorStore(context.getNoBackupFilesDir(), this::canUseSavedState);
             }
-            remote = new RemoteCalculator(context, policy.temporary);
+            remote = new RemoteCalculator(context, temporary);
         }
     }
 
     boolean canUseSavedState() {
-        return !policy.temporary && policy.canUseSavedState(DeviceAccess.locked(context));
+        return !temporary && !DeviceAccess.locked(context);
     }
 
     void onForeground() {
@@ -125,7 +125,7 @@ final class CalculatorSession {
 
     private void enqueue(Command command, java.util.function.Consumer<String> copy) {
         if (closing) return;
-        if (!policy.temporary && DeviceAccess.locked(context)) {
+        if (!temporary && DeviceAccess.locked(context)) {
             if (command.is(Command.RESTORE)) restorePending = true;
             return;
         }
@@ -162,7 +162,8 @@ final class CalculatorSession {
         String wire = key.wire;
         boolean local =
                 key.isEntryUpdate()
-                        || RpnCalculator.isEntryKey(wire)
+                        || Command.cursorDirection(wire) != null
+                        || EntryEditor.isEntryKey(wire)
                         || key.is("CE")
                         || key.is("CANCEL_ENTRY")
                         || key.is("HOLD_DECIMAL")
@@ -264,7 +265,7 @@ final class CalculatorSession {
         long generation = input.generation;
         try {
             checkCancelled();
-            if (!policy.temporary && DeviceAccess.locked(context)) {
+            if (!temporary && DeviceAccess.locked(context)) {
                 if (key.is(Command.RESTORE)) restorePending = true;
                 synchronized (this) {
                     pending.clear();
@@ -278,8 +279,14 @@ final class CalculatorSession {
                     handler.post(() -> input.copy.accept(result.getString("copyText")));
                 return;
             }
-            publishResult(result, new Display(result), key, generation);
-            if (key.is(Command.RESTORE) && !policy.temporary) acknowledgeRestore();
+            EntryEditor incoming;
+            try {
+                incoming = EntryEditor.load(result.getByteArray("entryState"));
+            } catch (java.io.IOException ex) {
+                throw new IllegalStateException("Invalid entry response", ex);
+            }
+            publishResult(result, new Display(result, incoming), incoming, key, generation);
+            if (key.is(Command.RESTORE) && !temporary) acknowledgeRestore();
             if (background) saveForLifecycle();
         } catch (RuntimeException ex) {
             handleFailure(key, generation, ex);
@@ -289,7 +296,9 @@ final class CalculatorSession {
     }
 
     private CalculationRequest request(Command key) {
-        CalculationRequest request = new CalculationRequest(key.wire);
+        CalculationRequest request =
+                new CalculationRequest(
+                        Command.entryKey(key.wire, editor != null && editor.isEditing()));
         if (!key.is(Command.RESTORE)
                 && !key.isDisplayOnly()
                 && key.kind != Command.Kind.COPY_ROWS) {
@@ -297,7 +306,7 @@ final class CalculatorSession {
             request.entryBranch = localBranch;
         }
         CalculationSnapshot input = checkpoint;
-        if (key.is(Command.RESTORE) && !policy.temporary) {
+        if (key.is(Command.RESTORE) && !temporary) {
             try {
                 byte[] saved = store.beginRestore();
                 input =
@@ -341,7 +350,7 @@ final class CalculatorSession {
                         && ((CalculationError) ex).code()
                                 == CalculationError.Code.TRANSFER_TOO_LARGE;
         if (ex instanceof DeviceAccess.Locked
-                || (!policy.temporary
+                || (!temporary
                         && (DeviceAccess.locked(context)
                                 || (restorePending && key.is(Command.RESTORE))))) {
             if (key.is(Command.RESTORE)) restorePending = true;
@@ -351,7 +360,7 @@ final class CalculatorSession {
             if (key.is(Command.RESTORE)) {
                 checkpoint = null;
                 remote.cancel();
-                if (!policy.temporary
+                if (!temporary
                         && (ex instanceof RemoteCalculator.InvalidCheckpoint
                                 || cancelRequested
                                 || ex instanceof com.hp.creals.CR.AbortedException
@@ -373,7 +382,12 @@ final class CalculatorSession {
         }
     }
 
-    private void publishResult(Bundle result, Display nextDisplay, Command key, long generation) {
+    private void publishResult(
+            Bundle result,
+            Display nextDisplay,
+            EntryEditor incoming,
+            Command key,
+            long generation) {
         Runnable accept =
                 () -> {
                     synchronized (this) {
@@ -407,11 +421,7 @@ final class CalculatorSession {
                                                         && nextDisplay.end
                                                                 == editor.selectionEnd());
                         if (!keepEdits) {
-                            try {
-                                editor = EntryEditor.load(result.getByteArray("entryState"));
-                            } catch (java.io.IOException ex) {
-                                throw new IllegalStateException("Invalid entry response", ex);
-                            }
+                            editor = incoming;
                             editorDirty = editor.undoCount() > 0 || editor.redoCount() > 0;
                             localBranch = false;
                             editRevision++;

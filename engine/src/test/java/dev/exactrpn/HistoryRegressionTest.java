@@ -10,13 +10,13 @@ import org.junit.jupiter.api.Test;
 final class HistoryRegressionTest extends RegressionSupport {
     @Test
     void persistenceAndBudget() throws Exception {
-        RpnCalculator durable = new RpnCalculator();
+        TestCalculator durable = new TestCalculator();
         number(durable, "56565642624.456");
         keys(durable, "ENTER", "π", "2", "√", "+", "1", "ENTER", "3", "÷");
         durable.key("ANGLE");
         CalculatorTestSupport.paste(durable, "12.345");
         durable.select(2, 5);
-        RpnCalculator restored = RpnCalculator.load(durable.save());
+        TestCalculator restored = TestCalculator.load(durable.save());
         assertTrue(restored.values().size() == 3, "restore full stack");
         assertTrue(
                 restored.values().get(0).definitelyEquals(RpnCalculator.parse("56565642624.456")),
@@ -40,7 +40,7 @@ final class HistoryRegressionTest extends RegressionSupport {
                 restored.entry().equals("") && restored.values().size() == 3,
                 "restore undo history");
         restored.key("CLEAR");
-        RpnCalculator cleared = RpnCalculator.load(restored.save());
+        TestCalculator cleared = TestCalculator.load(restored.save());
         assertTrue(
                 cleared.isEmpty() && cleared.undoCount() > 0,
                 "empty foreground state retains undo");
@@ -53,10 +53,10 @@ final class HistoryRegressionTest extends RegressionSupport {
                 "empty background state discards undo");
         cleared.key("UNDO");
         assertTrue(cleared.isEmpty(), "discarded undo cannot resurrect cleared values");
-        RpnCalculator rawSaved = new RpnCalculator();
+        TestCalculator rawSaved = new TestCalculator();
         rawSaved.pasteText("1,234", new NumberText.Profile('.', ',', 3, 3));
         rawSaved.select(1, 2);
-        RpnCalculator rawRestored = RpnCalculator.load(rawSaved.save());
+        TestCalculator rawRestored = TestCalculator.load(rawSaved.save());
         assertTrue(
                 rawRestored.rawEntry()
                         && rawRestored.entryProblem().equals("Ambiguous")
@@ -65,37 +65,37 @@ final class HistoryRegressionTest extends RegressionSupport {
         assertTrue(
                 rawRestored.selectionStart() == 1 && rawRestored.selectionEnd() == 2,
                 "restore raw cursor selection");
-        RpnCalculator angleSaved = new RpnCalculator();
+        TestCalculator angleSaved = new TestCalculator();
         angleSaved.setAngleUnit(RpnCalculator.AngleUnit.GRAD);
         number(angleSaved, "12.34");
         angleSaved.key("sin");
         angleSaved.setAngleUnit(RpnCalculator.AngleUnit.RAD);
-        RpnCalculator angleRestored = RpnCalculator.load(angleSaved.save());
+        TestCalculator angleRestored = TestCalculator.load(angleSaved.save());
         assertEquals(
                 ValueFormatter.format(top(angleSaved), true, sci),
                 ValueFormatter.format(top(angleRestored), true, sci),
                 "restore trig expression with original angle unit");
-        RpnCalculator bounded = new RpnCalculator();
+        TestCalculator bounded = new TestCalculator();
         for (int i = 0; i < 150; i++) CalculatorTestSupport.paste(bounded, Integer.toString(i));
         assertTrue(
-                bounded.undoCount() == 100 && RpnCalculator.load(bounded.save()).undoCount() == 100,
+                bounded.undoCount() == 100
+                        && TestCalculator.load(bounded.save()).undoCount() == 100,
                 "undo count is bounded across persistence");
         String longRaw = "字".repeat(4095);
         for (int i = 0; i < 110; i++)
             bounded.pasteText(longRaw + (i % 10), new NumberText.Profile('.', ',', 3, 3));
         byte[] boundedBytes = bounded.save();
         assertTrue(
-                boundedBytes.length <= CalculationLimits.ARITHMETIC_BYTES
-                        && bounded.undoCount() < 100,
+                boundedBytes.length <= CalculationLimits.SAVED_BYTES && bounded.undoCount() < 100,
                 "saved undo history respects byte budget");
         assertEquals(
                 longRaw + "9",
-                RpnCalculator.load(boundedBytes).entry(),
+                TestCalculator.load(boundedBytes).entry(),
                 "undo eviction preserves current entry");
         for (String operation : new String[] {"±", "√", "1/x", "ln", "eˣ", "sin", "cos", "tan"}) {
-            RpnCalculator expression = new RpnCalculator();
+            TestCalculator expression = new TestCalculator();
             keys(expression, "π", operation);
-            RpnCalculator loaded = RpnCalculator.load(expression.save());
+            TestCalculator loaded = TestCalculator.load(expression.save());
             assertEquals(
                     top(expression).toStringTruncated(60),
                     top(loaded).toStringTruncated(60),
@@ -106,9 +106,9 @@ final class HistoryRegressionTest extends RegressionSupport {
                     "restore unary undo " + operation);
         }
         for (String operation : new String[] {"+", "−", "×", "÷", "xʸ"}) {
-            RpnCalculator expression = new RpnCalculator();
+            TestCalculator expression = new TestCalculator();
             keys(expression, "π", "2", "√", operation);
-            RpnCalculator loaded = RpnCalculator.load(expression.save());
+            TestCalculator loaded = TestCalculator.load(expression.save());
             assertEquals(
                     top(expression).toStringTruncated(60),
                     top(loaded).toStringTruncated(60),
@@ -118,7 +118,7 @@ final class HistoryRegressionTest extends RegressionSupport {
 
     @Test
     void undoAndRedo() throws Exception {
-        RpnCalculator editingHistory = new RpnCalculator();
+        TestCalculator editingHistory = new TestCalculator();
         number(editingHistory, "123");
         editingHistory.key("UNDO");
         assertEquals("12", editingHistory.entry(), "current entry edits undo individually");
@@ -139,7 +139,7 @@ final class HistoryRegressionTest extends RegressionSupport {
                 top(editingHistory).definitelyEquals(new UnifiedReal(123))
                         && !editingHistory.isEditing(),
                 "redo commit");
-        RpnCalculator operationHistory = new RpnCalculator();
+        TestCalculator operationHistory = new TestCalculator();
         number(operationHistory, "12");
         operationHistory.key("ENTER");
         number(operationHistory, "345");
@@ -176,7 +176,7 @@ final class HistoryRegressionTest extends RegressionSupport {
         assertTrue(operationHistory.redoCount() == 0, "new edit discards redo branch");
         operationHistory.key("REDO");
         assertEquals("9", operationHistory.entry(), "discarded redo cannot replay stale Clear");
-        RpnCalculator failedCommit = new RpnCalculator();
+        TestCalculator failedCommit = new TestCalculator();
         number(failedCommit, "123");
         try {
             failedCommit.key("+");
@@ -189,7 +189,7 @@ final class HistoryRegressionTest extends RegressionSupport {
         failedCommit.key("UNDO");
         assertEquals(
                 "123", failedCommit.entry(), "undo restores complete entry after failed operation");
-        RpnCalculator failedRedo = new RpnCalculator();
+        TestCalculator failedRedo = new TestCalculator();
         keys(failedRedo, "π", "UNDO");
         try {
             failedRedo.key("+");
@@ -201,9 +201,9 @@ final class HistoryRegressionTest extends RegressionSupport {
         assertTrue(
                 top(failedRedo).definitelyEquals(UnifiedReal.PI),
                 "redo exact constant after failure");
-        RpnCalculator redoSaved = new RpnCalculator();
+        TestCalculator redoSaved = new TestCalculator();
         keys(redoSaved, "π", "2", "√", "+", "UNDO");
-        RpnCalculator redoRestored = RpnCalculator.load(redoSaved.save());
+        TestCalculator redoRestored = TestCalculator.load(redoSaved.save());
         assertTrue(
                 redoRestored.redoCount() == 1 && redoRestored.entry().isEmpty(),
                 "restore redo history");
@@ -213,7 +213,7 @@ final class HistoryRegressionTest extends RegressionSupport {
                 top(redoRestored).toStringTruncated(80),
                 "redo exact irrational operation after restart");
         redoRestored.key("UNDO");
-        RpnCalculator redoCopy = CalculatorTestSupport.copy(redoRestored);
+        TestCalculator redoCopy = CalculatorTestSupport.copy(redoRestored);
         redoCopy.key("REDO");
         assertTrue(
                 redoRestored.redoCount() == 1 && redoCopy.redoCount() == 0,
@@ -228,7 +228,7 @@ final class HistoryRegressionTest extends RegressionSupport {
 
     @Test
     void safeClearAndNoOpHistory() throws Exception {
-        RpnCalculator safeClear = new RpnCalculator();
+        TestCalculator safeClear = new TestCalculator();
         keys(safeClear, "9", "ENTER", "7", "SMART_CLEAR", "SMART_CLEAR");
         assertTrue(
                 safeClear.isEditing()
@@ -251,7 +251,7 @@ final class HistoryRegressionTest extends RegressionSupport {
         assertTrue(
                 safeClear.undoCount() == remainingUndo && safeClear.redoCount() == remainingRedo,
                 "no-op clear preserves undo and redo");
-        RpnCalculator noOps = new RpnCalculator();
+        TestCalculator noOps = new TestCalculator();
         keys(noOps, "1", "ENTER", "CLEAR");
         int realHistory = noOps.undoCount();
         for (int i = 0; i < 150; i++) keys(noOps, "CLEAR", "CE", "BACK", "DELETE");
@@ -270,7 +270,7 @@ final class HistoryRegressionTest extends RegressionSupport {
                     {"0", "3", "0"},
                     {"1", "999", "1"}
                 }) {
-            RpnCalculator rooted = new RpnCalculator();
+            TestCalculator rooted = new TestCalculator();
             CalculatorTestSupport.paste(rooted, example[0]);
             rooted.key("ENTER");
             CalculatorTestSupport.paste(rooted, example[1]);
@@ -279,23 +279,23 @@ final class HistoryRegressionTest extends RegressionSupport {
                     top(rooted).definitelyEquals(RpnCalculator.parse(example[2])),
                     "exact root " + example[0] + " degree " + example[1]);
             assertTrue(
-                    top(RpnCalculator.load(rooted.save())).definitelyEquals(top(rooted)),
+                    top(TestCalculator.load(rooted.save())).definitelyEquals(top(rooted)),
                     "root exactness survives restart");
         }
     }
 
     @Test
     void corruptSnapshots() throws Exception {
-        RpnCalculator durable = new RpnCalculator();
+        TestCalculator durable = new TestCalculator();
         keys(durable, "π", "2", "√", "+");
         byte[] valid = durable.save();
         assertThrows(
                 java.io.IOException.class,
-                () -> RpnCalculator.load(java.util.Arrays.copyOf(valid, valid.length - 1)));
+                () -> TestCalculator.load(java.util.Arrays.copyOf(valid, valid.length - 1)));
         for (int version : new int[] {0, 0x31, 0x32, 0x33, 0x34}) {
             byte[] unsupported = valid.clone();
             unsupported[3] = (byte) version;
-            assertThrows(java.io.IOException.class, () -> RpnCalculator.load(unsupported));
+            assertThrows(java.io.IOException.class, () -> TestCalculator.load(unsupported));
         }
     }
 }

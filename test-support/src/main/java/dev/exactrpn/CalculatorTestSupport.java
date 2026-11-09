@@ -8,15 +8,15 @@ import java.util.List;
 
 /** Shared JVM/device fixtures; never included in the application. */
 final class CalculatorTestSupport {
-    static RpnCalculator copy(RpnCalculator calculator) {
+    static TestCalculator copy(TestCalculator calculator) {
         try {
-            return RpnCalculator.load(calculator.save());
+            return TestCalculator.load(calculator.save());
         } catch (java.io.IOException ex) {
             throw new AssertionError("Could not restore test fixture", ex);
         }
     }
 
-    static void paste(RpnCalculator calculator, String canonical) {
+    static void paste(TestCalculator calculator, String canonical) {
         RpnCalculator.parse(canonical);
         calculator.editText(
                 canonical,
@@ -27,8 +27,20 @@ final class CalculatorTestSupport {
                 NumberText.COMPUTER);
     }
 
+    static void paste(RpnCalculator calculator, String canonical) {
+        EntryEditor draft = new EntryEditor();
+        draft.editText(
+                canonical,
+                canonical.length(),
+                canonical.length(),
+                false,
+                false,
+                NumberText.COMPUTER);
+        calculator.useEntryEditor(draft.entryForCommit());
+    }
+
     static List<String> formattedValues(
-            RpnCalculator calculator, ValueFormatter.Notation notation, FractionMode fractions) {
+            TestCalculator calculator, ValueFormatter.Notation notation, FractionMode fractions) {
         List<UnifiedReal> values = calculator.values();
         List<String> result = new ArrayList<>();
         for (int i = 0; i < values.size(); i++)

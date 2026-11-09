@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 final class ExponentEntryTest {
     @Test
     void exponentEntryCommitsExactlyAndUndoRestoresTheCompleteEntry() {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         CalculatorTestSupport.paste(c, "1.23");
         c.key("HOLD_DECIMAL");
         assertEquals("1.23e", c.entry());
@@ -22,7 +22,7 @@ final class ExponentEntryTest {
 
     @Test
     void insertionUsesCursorAndSelectionAndDoesNotDuplicateTheExponent() {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         CalculatorTestSupport.paste(c, "1234");
         c.select(2, 2);
         c.key("HOLD_DECIMAL");
@@ -41,7 +41,7 @@ final class ExponentEntryTest {
 
     @Test
     void longPressDoesNothingInStackModeAndAcceptsLocaleEntry() {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         c.key("π");
         int history = c.undoCount();
         c.key("HOLD_DECIMAL");

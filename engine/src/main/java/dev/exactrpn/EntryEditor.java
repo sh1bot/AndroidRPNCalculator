@@ -15,15 +15,6 @@ public final class EntryEditor {
     NumberText.Profile inputProfile = new NumberText.Profile('.', ',', 3, 3);
     NumberText.Profile rawProfile = inputProfile;
     final Deque<State> undo = new ArrayDeque<>(), redo = new ArrayDeque<>();
-    private final boolean history;
-
-    public EntryEditor() {
-        this(true);
-    }
-
-    EntryEditor(boolean history) {
-        this.history = history;
-    }
 
     static final class State {
         final String entry;
@@ -70,7 +61,7 @@ public final class EntryEditor {
     }
 
     private void remember(State before) {
-        if (!history || before.same(this)) return;
+        if (before.same(this)) return;
         redo.clear();
         undo.push(before);
         if (undo.size() > 100) undo.removeLast();

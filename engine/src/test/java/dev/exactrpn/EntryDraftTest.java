@@ -27,7 +27,7 @@ final class EntryDraftTest {
         engine.useEntryEditor(resumed.entryForCommit());
         engine.key("REDO");
         assertEquals("123", engine.values().get(0).bigIntegerValue().toString());
-        assertFalse(engine.isEditing());
+        assertFalse(engine.detachEntryEditor().isEditing());
     }
 
     @Test
@@ -43,8 +43,8 @@ final class EntryDraftTest {
         byte[] calculation = engine.save();
         RpnCalculator restored =
                 RpnCalculator.load(RpnCalculator.saveWithEntry(calculation, draft));
-        assertEquals("12", restored.entry());
         EntryEditor editor = restored.detachEntryEditor();
+        assertEquals("12", editor.entry());
         assertEquals(1, restored.values().size());
         assertEquals(2, editor.undoCount());
         editor.key("REDO");
@@ -98,7 +98,7 @@ final class EntryDraftTest {
         RpnCalculator restored = RpnCalculator.load(engine.save());
         assertEquals(100, restored.undoCount());
         restored.key("UNDO");
-        assertEquals("7", restored.entry());
+        assertEquals("7", restored.detachEntryEditor().entry());
         assertEquals(110, restored.values().size());
     }
 
@@ -114,7 +114,7 @@ final class EntryDraftTest {
         RpnCalculator restored =
                 RpnCalculator.load(RpnCalculator.saveWithEntry(engine.save(), draft, true));
         restored.key("REDO");
-        assertEquals("9", restored.entry());
+        assertEquals("9", restored.detachEntryEditor().entry());
         assertTrue(restored.values().isEmpty());
     }
 }

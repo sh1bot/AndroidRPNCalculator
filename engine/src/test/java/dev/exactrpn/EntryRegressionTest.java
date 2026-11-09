@@ -16,7 +16,7 @@ final class EntryRegressionTest extends RegressionSupport {
         assertTrue(
                 (FractionMode.IMPROPER).next() == FractionMode.DECIMAL,
                 "improper cycles to decimal");
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         number(c, "0.1");
         c.key("ENTER");
         number(c, "0.2");
@@ -85,9 +85,9 @@ final class EntryRegressionTest extends RegressionSupport {
 
     @Test
     void copyAndCancellation() throws Exception {
-        RpnCalculator original = new RpnCalculator();
+        TestCalculator original = new TestCalculator();
         keys(original, "1", "ENTER", "2");
-        RpnCalculator candidate = CalculatorTestSupport.copy(original);
+        TestCalculator candidate = CalculatorTestSupport.copy(original);
         candidate.key("+");
         assertTrue(
                 original.entry().equals("2") && original.values().size() == 1,
@@ -159,7 +159,7 @@ final class EntryRegressionTest extends RegressionSupport {
         assertTrue(
                 original.entry().isEmpty() && top(original).definitelyEquals(new UnifiedReal(3)),
                 "clear entry preserves stack");
-        RpnCalculator branch = CalculatorTestSupport.copy(original);
+        TestCalculator branch = CalculatorTestSupport.copy(original);
         branch.key("UNDO");
         branch.key("ENTER");
         original.key("UNDO");
@@ -170,7 +170,7 @@ final class EntryRegressionTest extends RegressionSupport {
 
     @Test
     void stackAndEditModes() throws Exception {
-        RpnCalculator hp = new RpnCalculator();
+        TestCalculator hp = new TestCalculator();
         assertTrue(!hp.isEditing() && hp.entry().isEmpty(), "initial stack mode");
         hp.key("BACK");
         assertTrue(hp.values().isEmpty() && !hp.isEditing(), "drop on empty stack");
@@ -213,7 +213,7 @@ final class EntryRegressionTest extends RegressionSupport {
         assertTrue(
                 hp.isEditing() && hp.entry().isEmpty(),
                 "undo restores explicitly empty editing mode");
-        RpnCalculator editCopy = CalculatorTestSupport.copy(hp);
+        TestCalculator editCopy = CalculatorTestSupport.copy(hp);
         editCopy.key("6");
         assertTrue(
                 hp.isEditing() && hp.entry().isEmpty() && editCopy.entry().equals("6"),
@@ -333,7 +333,7 @@ final class EntryRegressionTest extends RegressionSupport {
 
     @Test
     void canonicalPaste() throws Exception {
-        RpnCalculator pasted = new RpnCalculator();
+        TestCalculator pasted = new TestCalculator();
         keys(pasted, "7", "ENTER", "8");
         CalculatorTestSupport.paste(pasted, normalize("1.234,56", ',', '.', 3, 3));
         assertTrue(

@@ -91,7 +91,7 @@ public final class EntryOperatorTest {
             assertEquals(
                     "Mode changes must not submit the draft",
                     "",
-                    RpnCalculator.load(session.checkpoint.bytes).entry());
+                    TestCalculator.load(session.checkpoint.bytes).entry());
             key(session, "UNDO");
             assertEquals("12.", session.display.entry);
             key(session, "REDO");
@@ -163,24 +163,31 @@ public final class EntryOperatorTest {
             key(session, "√");
             SystemClock.sleep(1100); // Longer than the former foreground save delay.
             assertNull(
-                    "Foreground arithmetic must not persist the calculation", store.checkpoint());
+                    "Foreground arithmetic must not persist the calculation",
+                    StoreTestSupport.checkpoint(store));
             key(session, "CLEAR");
             key(session, "1");
             key(session, "2");
             SystemClock.sleep(1100);
-            assertNull("Foreground entry must not persist the calculation", store.checkpoint());
+            assertNull(
+                    "Foreground entry must not persist the calculation",
+                    StoreTestSupport.checkpoint(store));
             session.background = true;
             session.saveForLifecycle();
-            RpnCalculator stopped =
-                    RpnCalculator.load(Files.readAllBytes(new File(store.checkpoint()).toPath()));
+            TestCalculator stopped =
+                    TestCalculator.load(
+                            Files.readAllBytes(
+                                    new File(StoreTestSupport.checkpoint(store)).toPath()));
             assertEquals("12", stopped.entry());
             session.background = false;
             key(session, "3");
             session.close();
             closed = true;
             assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
-            RpnCalculator restored =
-                    RpnCalculator.load(Files.readAllBytes(new File(store.checkpoint()).toPath()));
+            TestCalculator restored =
+                    TestCalculator.load(
+                            Files.readAllBytes(
+                                    new File(StoreTestSupport.checkpoint(store)).toPath()));
             assertEquals("123", restored.entry());
             restored.key("UNDO");
             assertEquals("12", restored.entry());
@@ -304,11 +311,11 @@ public final class EntryOperatorTest {
                         session.saveForLifecycle();
                     });
             assertTrue(session.busy);
-            assertEquals(2, RpnCalculator.load(store.load()).values().size());
+            assertEquals(2, TestCalculator.load(store.load()).values().size());
             release.countDown();
             calculations.submit(() -> {}).get(15, TimeUnit.SECONDS);
             assertEquals(Arrays.asList("3"), session.display.rows);
-            RpnCalculator saved = RpnCalculator.load(store.load());
+            TestCalculator saved = TestCalculator.load(store.load());
             assertEquals(1, saved.values().size());
             assertTrue(
                     saved.values()
@@ -560,7 +567,7 @@ public final class EntryOperatorTest {
             assertFalse(session.display.editing);
             assertEquals(Arrays.asList("1"), session.display.rows);
             assertEquals("Error: Enter another value first, then the operator", session.error);
-            RpnCalculator saved = RpnCalculator.load(session.checkpoint.bytes);
+            TestCalculator saved = TestCalculator.load(session.checkpoint.bytes);
             assertFalse(saved.isEditing());
             assertEquals("1", saved.values().get(0).bigIntegerValue().toString());
             key(session, "0");
