@@ -50,7 +50,6 @@
         <item>""</item> <!-- ESCAPE -->
         <item>@string/decimal_separator</item> <!-- DECIMAL -->
         <item>@string/factor_description</item> <!-- FACTOR -->
-        <item>@string/inverse_off</item> <!-- INVERSE -->
         <item>""</item> <!-- FUNCTIONS -->
         <item>""</item> <!-- COMPLEMENTS -->
         <item>""</item> <!-- ROLL_UP -->

@@ -82,15 +82,16 @@ public class CalculationService extends Service {
             readOnly = false;
             loadCheckpoint(request, response);
             readOnly = command.kind == Command.Kind.COPY_ROWS;
-            Bundle display;
+            byte[] display;
             if (readOnly) {
-                display = new Bundle();
-                display.putString("copyText", copyRows(request, command));
+                Bundle copy = new Bundle();
+                copy.putString("copyText", copyRows(request, command));
+                display = DisplayResult.encode(copy, null);
             } else {
                 display = arithmeticResult(request);
             }
             checkAccess();
-            response.putByteArray("payload", DisplayResult.encode(display));
+            response.putByteArray("payload", display);
         } catch (OutOfMemoryError ex) {
             android.os.Process.killProcess(android.os.Process.myPid());
             return;
@@ -119,7 +120,7 @@ public class CalculationService extends Service {
         }
     }
 
-    private Bundle arithmeticResult(CalculationRequest request) throws IOException {
+    private byte[] arithmeticResult(CalculationRequest request) throws IOException {
         Evaluation evaluation = new Evaluation(request);
         EntryEditor entry = evaluation.candidate.detachEntryEditor();
         byte[] state = evaluation.candidate.save();
@@ -127,13 +128,10 @@ public class CalculationService extends Service {
         String id = UUID.randomUUID().toString();
         display.putString("checkpoint", id);
         display.putByteArray("state", state);
-        display.putByteArray("entryState", new byte[0]);
-        int fixedSize = DisplayResult.encode(display).length;
-        display.putByteArray(
-                "entryState", entry.save(CalculationLimits.TRANSFER_BYTES - fixedSize));
+        byte[] encoded = DisplayResult.encode(display, entry);
         cachedId = id;
         cachedStackId = evaluation.stackId;
-        return display;
+        return encoded;
     }
 
     private String copyRows(CalculationRequest request, Command command) {
@@ -206,7 +204,7 @@ public class CalculationService extends Service {
             LocaleNumbers local = profile(locale, NumberMode.LOCALE);
             LocaleNumbers format = profile(locale, numberMode);
             candidate.setInputProfile(format.profile());
-            if (key.is(Command.RESTORE) || key.is(Command.CHECKPOINT)) {
+            if (key.is(Command.RESTORE)) {
                 /* No arithmetic operation. */
             } else if (key.is("FORMAT"))
                 notation =
@@ -231,23 +229,18 @@ public class CalculationService extends Service {
             List<UnifiedReal> values = candidate.values();
             texts.retain(values);
             ArrayList<String> rows = new ArrayList<>(values.size());
-            ArrayList<String> compact = new ArrayList<>(values.size());
+            String compactTop = "";
             for (int i = 0; i < values.size(); i++) {
                 UnifiedReal value = values.get(i);
                 boolean newest = i == values.size() - 1;
                 rows.add(texts.row(value, newest, notation, fractionMode));
-                compact.add(
-                        texts.row(
-                                value,
-                                false,
-                                notation,
-                                newest ? FractionMode.DECIMAL : fractionMode));
+                if (newest) compactTop = texts.row(value, false, notation, FractionMode.DECIMAL);
             }
             Bundle display = new Bundle();
             display.putString("operationError", operationError);
             display.putString("stackId", stackId);
             display.putStringArrayList("rows", rows);
-            display.putStringArrayList("compactRows", compact);
+            display.putString("compactTop", compactTop);
             display.putString("entry", candidate.entry());
             display.putString("problem", candidate.entryProblem());
             display.putBoolean("editing", candidate.isEditing());
@@ -256,8 +249,8 @@ public class CalculationService extends Service {
             display.putInt("end", candidate.selectionEnd());
             display.putString("angle", candidate.angleUnit().name());
             display.putString("notation", notation.name());
-            display.putInt("numberMode", numberMode.id);
-            display.putInt("fractionMode", fractionMode.id);
+            display.putInt("numberMode", numberMode.ordinal());
+            display.putInt("fractionMode", fractionMode.ordinal());
             return display;
         }
     }

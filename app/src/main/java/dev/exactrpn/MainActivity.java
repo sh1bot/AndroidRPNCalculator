@@ -216,12 +216,7 @@ public class MainActivity extends Activity {
 
     private void execute(String wire) {
         Command key = Command.parse(wire);
-        if (!key.is(Command.RESTORE) && !key.is(Command.CHECKPOINT)) dismissErrorNotice();
-        if (key.is(Command.INVERSE)) {
-            session.inverse = !session.inverse;
-            keys.setInverse(session.inverse);
-            return;
-        }
+        if (!key.is(Command.RESTORE)) dismissErrorNotice();
         if (key.is(Command.PASTE)) {
             pasteClipboard();
             return;
@@ -406,12 +401,12 @@ public class MainActivity extends Activity {
             editor.putBoolean("engineering", engineering);
             changed = true;
         }
-        if (preferences.getInt("fractionMode", -1) != display.fractionMode.id) {
-            editor.putInt("fractionMode", display.fractionMode.id);
+        if (preferences.getInt("fractionMode", -1) != display.fractionMode.ordinal()) {
+            editor.putInt("fractionMode", display.fractionMode.ordinal());
             changed = true;
         }
-        if (preferences.getInt("numberMode", -1) != display.numberMode.id) {
-            editor.putInt("numberMode", display.numberMode.id);
+        if (preferences.getInt("numberMode", -1) != display.numberMode.ordinal()) {
+            editor.putInt("numberMode", display.numberMode.ordinal());
             changed = true;
         }
         if (changed) editor.apply();
@@ -582,25 +577,8 @@ public class MainActivity extends Activity {
                                         : ValueFormatter.Notation.SCIENTIFIC,
                                 RpnCalculator.AngleUnit.valueOf(
                                         getPreferences(0).getString("angleUnit", "RAD")),
-                                NumberMode.fromId(
-                                        getPreferences(0)
-                                                .getInt(
-                                                        "numberMode",
-                                                        getPreferences(0)
-                                                                        .getBoolean(
-                                                                                "computerNumbers",
-                                                                                false)
-                                                                ? 1
-                                                                : 0)),
-                                FractionMode.fromId(
-                                        getPreferences(0)
-                                                .getInt(
-                                                        "fractionMode",
-                                                        getPreferences(0)
-                                                                        .getBoolean(
-                                                                                "fractions", false)
-                                                                ? 1
-                                                                : 0)));
+                                NumberMode.values()[getPreferences(0).getInt("numberMode", 0)],
+                                FractionMode.values()[getPreferences(0).getInt("fractionMode", 0)]);
                 session.tauConstant = getPreferences(0).getBoolean("tauConstant", false);
             }
         }
@@ -864,10 +842,7 @@ public class MainActivity extends Activity {
     }
 
     private void refreshModes(Display display) {
-        keys.setEditing(display.editing);
-        keys.setSelecting(
-                !session.selectedRows.isEmpty(),
-                session.selectedRows.size() == display.rows.size());
+        keys.setMode(display.editing, !session.selectedRows.isEmpty());
         angleButton.setText(display.angleUnit.name());
         angleButton.setContentDescription(
                 getString(R.string.angle_description, display.angleUnit.name()));
@@ -880,22 +855,24 @@ public class MainActivity extends Activity {
                                 display.notation == ValueFormatter.Notation.ENGINEERING
                                         ? R.string.engineering
                                         : R.string.scientific)));
-        fractionButton.setText(new String[] {"DEC", "IMPR", "FRAC"}[display.fractionMode.id]);
+        fractionButton.setText(
+                new String[] {"DEC", "FRAC", "IMPR"}[display.fractionMode.ordinal()]);
         fractionButton.setContentDescription(
                 new String[] {
                             getString(R.string.decimal_description),
-                            getString(R.string.improper_description),
-                            getString(R.string.mixed_description)
+                            getString(R.string.mixed_description),
+                            getString(R.string.improper_description)
                         }
-                        [display.fractionMode.id]);
-        numberFormatButton.setText(new String[] {"LOC", "DOT", "NONE"}[display.numberMode.id]);
+                        [display.fractionMode.ordinal()]);
+        numberFormatButton.setText(
+                new String[] {"LOC", "DOT", "NONE"}[display.numberMode.ordinal()]);
         numberFormatButton.setContentDescription(
                 new String[] {
                             getString(R.string.locale_description),
                             getString(R.string.dot_description),
                             getString(R.string.ungrouped_description)
                         }
-                        [display.numberMode.id]);
+                        [display.numberMode.ordinal()]);
     }
 
     private void refreshProgress(Display display) {

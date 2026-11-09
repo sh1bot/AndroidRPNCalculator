@@ -40,13 +40,10 @@ public final class Command {
             UNDO = "UNDO",
             REDO = "REDO",
             RESTORE = "RESTORE",
-            CHECKPOINT = "CHECKPOINT",
             CANCEL = "CANCEL",
-            INVERSE = "INVERSE",
             PASTE = "PASTE";
     private static final Set<String> PRESENTATION =
-            new HashSet<>(
-                    Arrays.asList("FORMAT", "NUMBER_FORMAT", "FRACTION", "ANGLE", CHECKPOINT));
+            new HashSet<>(Arrays.asList("FORMAT", "NUMBER_FORMAT", "FRACTION", "ANGLE"));
     public final Kind kind;
     public final String wire;
     public final String text;
@@ -128,11 +125,33 @@ public final class Command {
         return kind == Kind.KEY && wire.equals(key);
     }
 
+    public static String entryKey(String key, boolean editing) {
+        return switch (key) {
+            case "HOLD_DECIMAL" -> editing ? key : null;
+            case "SMART_CLEAR" -> editing ? "CE" : "CLEAR";
+            case "HOLD_DROP" -> editing ? "BACK" : "ROLL_DOWN";
+            default -> key;
+        };
+    }
+
+    public static String cursorDirection(String key) {
+        String direction = key.startsWith("SELECT_") ? key.substring(7) : key;
+        return switch (direction) {
+            case "LEFT", "RIGHT", "HOME", "END" -> direction;
+            default -> null;
+        };
+    }
+
+    public static boolean clearsEntry(String key) {
+        return key.equals("CE") || key.equals("CLEAR") || key.equals("CANCEL_ENTRY");
+    }
+
+    public boolean isDisplayOnly() {
+        return kind == Kind.KEY && PRESENTATION.contains(wire);
+    }
+
     public boolean preservesSelection() {
-        return PRESENTATION.contains(wire)
-                || kind == Kind.SELECT
-                || kind.takesRows
-                || kind == Kind.HOLD_DIGIT;
+        return isDisplayOnly() || kind == Kind.SELECT || kind.takesRows || kind == Kind.HOLD_DIGIT;
     }
 
     public boolean isEntryUpdate() {
@@ -177,11 +196,8 @@ public final class Command {
                 calculator.pasteClipboard(text, locale);
                 break;
             case SELECT:
-                calculator.select(start, end);
-                break;
             case EDIT:
-                calculator.editText(text, start, end, raw, explicitDecimal, format);
-                break;
+                throw new IllegalArgumentException("Entry updates belong to the UI editor");
             default:
                 calculator.key(wire);
         }

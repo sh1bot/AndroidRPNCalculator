@@ -3,6 +3,7 @@ package dev.exactrpn;
 
 import android.os.Bundle;
 
+import java.util.AbstractList;
 import java.util.Collections;
 import java.util.List;
 
@@ -34,14 +35,25 @@ final class Display {
 
     Display(Bundle result) {
         fullRows = Collections.unmodifiableList(result.getStringArrayList("rows"));
-        compactRows = Collections.unmodifiableList(result.getStringArrayList("compactRows"));
+        String top = result.getString("compactTop");
+        compactRows =
+                new AbstractList<String>() {
+                    public int size() {
+                        return fullRows.size();
+                    }
+
+                    public String get(int index) {
+                        String value = fullRows.get(index);
+                        return index == size() - 1 ? top : value;
+                    }
+                };
         stackId = result.getString("stackId");
         entry = result.getString("entry");
         problem = result.getString("problem");
         notation = ValueFormatter.Notation.valueOf(result.getString("notation"));
         angleUnit = RpnCalculator.AngleUnit.valueOf(result.getString("angle"));
-        numberMode = NumberMode.fromId(result.getInt("numberMode"));
-        fractionMode = FractionMode.fromId(result.getInt("fractionMode"));
+        numberMode = NumberMode.values()[result.getInt("numberMode")];
+        fractionMode = FractionMode.values()[result.getInt("fractionMode")];
         editing = result.getBoolean("editing");
         rows = editing ? compactRows : fullRows;
         raw = result.getBoolean("raw");

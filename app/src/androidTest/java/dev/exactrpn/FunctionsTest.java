@@ -28,13 +28,13 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class FunctionsTest {
-    private CalculationRequest request(String key, byte[] input, int fractionMode) {
+    private CalculationRequest request(String key, byte[] input, FractionMode fractionMode) {
         CalculationRequest request = new CalculationRequest(key);
         request.input = input;
         request.angle = RpnCalculator.AngleUnit.RAD;
         request.notation = ValueFormatter.Notation.SCIENTIFIC;
         request.locale = "en-US";
-        request.fractionMode = FractionMode.fromId(fractionMode);
+        request.fractionMode = fractionMode;
         return request;
     }
 
@@ -123,7 +123,7 @@ public final class FunctionsTest {
                                                     request(
                                                             "RESTORE",
                                                             Files.readAllBytes(seed.toPath()),
-                                                            1)))
+                                                            FractionMode.IMPROPER)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("7/3", improper.getStringArrayList("rows").get(0));
             Bundle mixed =
@@ -133,9 +133,9 @@ public final class FunctionsTest {
                                                     request(
                                                             "FRACTION",
                                                             improper.getByteArray("state"),
-                                                            0)))
+                                                            FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals(2, mixed.getInt("fractionMode"));
+            assertEquals(FractionMode.MIXED.ordinal(), mixed.getInt("fractionMode"));
             assertEquals("2 1/3", mixed.getStringArrayList("rows").get(0));
             Bundle copied =
                     worker.submit(
@@ -144,7 +144,7 @@ public final class FunctionsTest {
                                                     request(
                                                             "COPY_ROWS:0",
                                                             mixed.getByteArray("state"),
-                                                            2)))
+                                                            FractionMode.MIXED)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("2 1/3", copied.getString("copyText"));
             android.text.Spanned styled =
@@ -206,7 +206,7 @@ public final class FunctionsTest {
                                                     request(
                                                             "Factor",
                                                             Files.readAllBytes(seed.toPath()),
-                                                            0)))
+                                                            FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals(Arrays.asList("2", "2", "3", "7"), factored.getStringArrayList("rows"));
             Bundle undone =
@@ -216,7 +216,7 @@ public final class FunctionsTest {
                                                     request(
                                                             "UNDO",
                                                             factored.getByteArray("state"),
-                                                            0)))
+                                                            FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("84", undone.getString("entry"));
             assertTrue(undone.getStringArrayList("rows").isEmpty());
@@ -267,7 +267,7 @@ public final class FunctionsTest {
                             assertEquals("SWAP", command.get());
                             Button decimal = (Button) keypad.findViewWithTag(".");
                             assertTrue(!decimal.isLongClickable());
-                            keypad.setEditing(true);
+                            keypad.setMode(true, false);
                             assertTrue(decimal.isLongClickable());
                             decimal.performLongClick();
                             assertEquals("HOLD_DECIMAL", command.get());
@@ -303,7 +303,7 @@ public final class FunctionsTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
             Bundle result =
-                    worker.submit(() -> remote.evaluate(request("+", null, 0)))
+                    worker.submit(() -> remote.evaluate(request("+", null, FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals(
                     context.getString(R.string.error_need_values, 2),

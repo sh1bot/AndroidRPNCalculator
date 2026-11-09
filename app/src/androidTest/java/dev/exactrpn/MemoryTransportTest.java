@@ -50,6 +50,47 @@ public final class MemoryTransportTest {
     }
 
     @Test
+    public void displayPacketSharesRowsAndBudgetsEntryHistoryWithoutTruncatingValues()
+            throws Exception {
+        Bundle result = new Bundle();
+        String row = String.join("", java.util.Collections.nCopies(9, "1234567890")) + "/7";
+        result.putStringArrayList(
+                "rows", new java.util.ArrayList<>(java.util.Collections.nCopies(2000, row)));
+        result.putString("compactTop", "1.76e+88");
+        result.putString("stackId", "stack");
+        result.putString("checkpoint", "checkpoint");
+        result.putString("angle", "RAD");
+        result.putString("notation", "SCIENTIFIC");
+        result.putString("entry", "");
+        result.putString("problem", "");
+        result.putByteArray("state", new RpnCalculator().save());
+        EntryEditor editor = new EntryEditor();
+        for (int i = 0; i < 1000; i++) editor.key("9");
+        byte[] packet = DisplayResult.encode(result, editor);
+        assertTrue(packet.length <= CalculationLimits.TRANSFER_BYTES);
+        Bundle decoded = DisplayResult.decode(packet);
+        assertFalse(decoded.containsKey("compactRows"));
+        assertEquals(result.getStringArrayList("rows"), decoded.getStringArrayList("rows"));
+        EntryEditor restored = EntryEditor.load(decoded.getByteArray("entryState"));
+        assertEquals(String.join("", java.util.Collections.nCopies(1000, "9")), restored.entry());
+        assertTrue(restored.undoCount() > 0 && restored.undoCount() < 100);
+        Display full = new Display(decoded);
+        Display editing = new Display(full, restored);
+        assertEquals(row, full.rows.get(1999));
+        assertEquals(row, editing.rows.get(1998));
+        assertEquals("1.76e+88", editing.rows.get(1999));
+        assertThrows(UnsupportedOperationException.class, () -> editing.rows.set(0, "changed"));
+        assertThrows(
+                java.io.IOException.class,
+                () -> DisplayResult.decode(java.util.Arrays.copyOf(packet, packet.length - 1)));
+        Bundle copy = new Bundle();
+        copy.putString("copyText", "7/3");
+        assertEquals(
+                "7/3",
+                DisplayResult.decode(DisplayResult.encode(copy, null)).getString("copyText"));
+    }
+
+    @Test
     public void oversizedCopiesAndRequestsPreserveTheAcceptedCalculation() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context, true);

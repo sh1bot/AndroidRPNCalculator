@@ -1,23 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-/** IDs are a persistence contract; the user-facing cycle has its own order. */
+/** Display modes in their user-facing cycle order. */
 public enum FractionMode {
-    DECIMAL(0),
-    MIXED(2),
-    IMPROPER(1);
-    public final int id;
-
-    FractionMode(int id) {
-        this.id = id;
-    }
+    DECIMAL,
+    MIXED,
+    IMPROPER;
 
     public FractionMode next() {
         return values()[(ordinal() + 1) % values().length];
-    }
-
-    public static FractionMode fromId(int id) {
-        for (FractionMode mode : values()) if (mode.id == id) return mode;
-        return DECIMAL;
     }
 }

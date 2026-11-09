@@ -62,7 +62,6 @@
     <string name="undo_description">Undo; long press to redo</string>
     <string name="enter_description">Enter; long press to paste</string>
     <string name="swap_description">Swap X and Y; long press to roll the top displayed value to X</string>
-    <string name="inverse_off">Inverse functions off</string>
     <string name="factorial_description">Factorial of X</string>
     <string name="factor_description">Replace X with prime factors, smallest first</string>
     <string name="remainder_description">Y remainder X</string>
@@ -80,9 +79,6 @@
     <string name="show_functions">Show scientific functions</string>
     <string name="expanded">Expanded</string>
     <string name="collapsed">Collapsed</string>
-    <string name="on">On</string>
-    <string name="off">Off</string>
-    <string name="inverse_on">Inverse functions on</string>
     <string name="backspace_roll_description">Backspace; long press to roll X to the top displayed row</string>
     <string name="drop_roll_description">Drop X; long press to roll X to the top displayed row</string>
     <string name="factor">Factorise</string>

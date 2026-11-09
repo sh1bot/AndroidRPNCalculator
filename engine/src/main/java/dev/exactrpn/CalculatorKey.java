@@ -54,7 +54,6 @@ public enum CalculatorKey {
     ESCAPE,
     DECIMAL,
     FACTOR,
-    INVERSE,
     FUNCTIONS,
     COMPLEMENTS,
     ROLL_UP,
@@ -161,7 +160,6 @@ public enum CalculatorKey {
                 ESCAPE|||16||||111
                 DECIMAL|.||||.||158
                 FACTOR|Factor||16||f
-                INVERSE||INV|16
                 FUNCTIONS||f()|16
                 COMPLEMENTS||f⁻¹()|16
                 ROLL_UP|||16
