@@ -7,6 +7,20 @@ import org.junit.jupiter.api.Test;
 
 final class RedoBoundaryTest {
     @Test
+    void emptyStackNoOpsDoNotSkipThePendingEntryRedo() {
+        for (String noOp : new String[] {"BACK", "DELETE", "CLEAR"}) {
+            TestCalculator c = new TestCalculator();
+            for (String key : new String[] {"1", "ENTER", "UNDO", "UNDO", noOp, "REDO"}) c.key(key);
+            assertTrue(c.isEditing(), "Pending entry redo lost after " + noOp);
+            assertEquals("1", c.entry());
+            assertTrue(c.values().isEmpty());
+            c.key("REDO");
+            assertFalse(c.isEditing());
+            assertEquals("1", c.values().get(0).bigIntegerValue().toString());
+        }
+    }
+
+    @Test
     void redoRestoresEveryUndoneEntryAndOperationInOrder() throws Exception {
         for (boolean restart : new boolean[] {false, true}) {
             TestCalculator c = new TestCalculator();
