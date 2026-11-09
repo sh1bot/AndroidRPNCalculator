@@ -48,6 +48,38 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void identicalDraftTextDoesNotHideARestoredUndoBoundary() throws Exception {
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL,
+                        true);
+        session.attach(instrumentation.getTargetContext());
+        try {
+            key(session, "RESTORE");
+            String value = String.join("", java.util.Collections.nCopies(101, "7"));
+            key(session, "PASTE_RAW:" + value);
+            key(session, "ENTER");
+            for (int i = 0; i < 101; i++) key(session, "7");
+            key(session, "ENTER");
+            key(session, "UNDO");
+            assertEquals(value, session.display.entry);
+            assertEquals(1, session.display.rows.size());
+            key(session, "UNDO");
+            assertEquals(value, session.display.entry);
+            assertTrue(session.display.rows.isEmpty());
+            key(session, "UNDO");
+            assertFalse(session.display.editing);
+            assertEquals("", session.display.entry);
+        } finally {
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     public void undoAndRedoCrossEntryBoundariesWithoutSkippingTheRestoredDraft() throws Exception {
         CalculatorSession session =
                 new CalculatorSession(

@@ -408,7 +408,9 @@ final class CalculatorSession {
                         boolean keepEdits =
                                 editor != null
                                         && (key.isDisplayOnly()
-                                                || nextDisplay.editing
+                                                || !key.is(Command.UNDO)
+                                                        && !key.is(Command.REDO)
+                                                        && nextDisplay.editing
                                                         && editor.isEditing()
                                                         && nextDisplay.entry.equals(editor.entry())
                                                         && nextDisplay.raw == editor.rawEntry()
