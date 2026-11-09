@@ -63,7 +63,7 @@ public final class MemoryTransportTest {
         result.putString("notation", "SCIENTIFIC");
         result.putString("entry", "");
         result.putString("problem", "");
-        result.putByteArray("state", new RpnCalculator().save());
+        result.putByteArray("state", new TestCalculator().save());
         EntryEditor editor = new EntryEditor();
         for (int i = 0; i < 1000; i++) editor.key("9");
         byte[] packet = DisplayResult.encode(result, editor);
@@ -74,7 +74,7 @@ public final class MemoryTransportTest {
         EntryEditor restored = EntryEditor.load(decoded.getByteArray("entryState"));
         assertEquals(String.join("", java.util.Collections.nCopies(1000, "9")), restored.entry());
         assertTrue(restored.undoCount() > 0 && restored.undoCount() < 100);
-        Display full = new Display(decoded);
+        Display full = new Display(decoded, new EntryEditor());
         Display editing = new Display(full, restored);
         assertEquals(row, full.rows.get(1999));
         assertEquals(row, editing.rows.get(1998));
@@ -97,9 +97,13 @@ public final class MemoryTransportTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
             Bundle accepted = null;
-            for (String key :
-                    new String[] {"RESTORE", "PASTE_RAW:65536", "10ˣ", "ENTER", "ENTER", "ENTER"}) {
+            for (String key : new String[] {"RESTORE", "10ˣ", "ENTER", "ENTER", "ENTER"}) {
                 CalculationRequest next = request(key, accepted);
+                if (key.equals("10ˣ")) {
+                    EntryEditor draft = new EntryEditor();
+                    draft.pasteText("65536", NumberText.COMPUTER);
+                    next.entryDraft = draft.entryForCommit().save();
+                }
                 accepted = worker.submit(() -> remote.evaluate(next)).get(30, TimeUnit.SECONDS);
             }
             CalculationRequest copy = request("COPY_ROWS:0,1,2,3", accepted);
@@ -143,7 +147,7 @@ public final class MemoryTransportTest {
         RemoteCalculator remote = new RemoteCalculator(context, true);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
-            RpnCalculator calculator = new RpnCalculator();
+            TestCalculator calculator = new TestCalculator();
             CalculatorTestSupport.paste(calculator, "42");
             calculator.key("ENTER");
             Bundle seed = new Bundle();
@@ -175,7 +179,7 @@ public final class MemoryTransportTest {
         RemoteCalculator remote = new RemoteCalculator(context, true);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
-            RpnCalculator calculator = new RpnCalculator();
+            TestCalculator calculator = new TestCalculator();
             CalculatorTestSupport.paste(calculator, "45");
             calculator.key("ENTER");
             Bundle seed = new Bundle();

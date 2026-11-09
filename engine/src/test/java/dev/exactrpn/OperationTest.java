@@ -54,7 +54,7 @@ final class OperationTest {
 
     @Test
     void typedErrorKeepsItsArgument() {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         CalculationError error =
                 (CalculationError)
                         assertThrows(IllegalArgumentException.class, () -> calculator.key("+"));

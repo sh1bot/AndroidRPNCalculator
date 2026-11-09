@@ -16,21 +16,14 @@ import java.util.ArrayList;
 /** Explicit, transient display protocol; contains no Parcelable or Java object serialization. */
 final class DisplayResult {
     private static final String[] TEXT = {
-        "stackId",
-        "entry",
-        "problem",
-        "angle",
-        "notation",
-        "checkpoint",
-        "operationError",
-        "compactTop"
+        "stackId", "angle", "notation", "checkpoint", "operationError", "compactTop"
     };
-    private static final String[] INTS = {"numberMode", "fractionMode", "start", "end"};
+    private static final String[] INTS = {"numberMode", "fractionMode"};
 
     static byte[] encode(Bundle result, EntryEditor editor) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
-            out.writeInt(0x44525035);
+            out.writeInt(0x44525036);
             boolean copy = result.containsKey("copyText");
             out.writeBoolean(copy);
             if (copy) {
@@ -45,8 +38,6 @@ final class DisplayResult {
             out.writeInt(list.size());
             for (String value : list) writeText(out, value);
             for (String key : INTS) out.writeInt(result.getInt(key));
-            out.writeBoolean(result.getBoolean("editing"));
-            out.writeBoolean(result.getBoolean("raw"));
             Transfer.writeBytes(
                     out, editor.save(CalculationLimits.TRANSFER_BYTES - bytes.size() - 4));
         }
@@ -56,7 +47,7 @@ final class DisplayResult {
     static Bundle decode(byte[] bytes) throws IOException {
         try (DataInputStream in =
                 new DataInputStream(new ByteArrayInputStream(Transfer.require(bytes)))) {
-            if (in.readInt() != 0x44525035) throw new IOException("Unknown display protocol");
+            if (in.readInt() != 0x44525036) throw new IOException("Unknown display protocol");
             Bundle result = new Bundle();
             if (in.readBoolean()) {
                 result.putString("copyText", readText(in));
@@ -76,8 +67,6 @@ final class DisplayResult {
             for (int i = 0; i < count; i++) list.add(readText(in));
             result.putStringArrayList("rows", list);
             for (String key : INTS) result.putInt(key, in.readInt());
-            result.putBoolean("editing", in.readBoolean());
-            result.putBoolean("raw", in.readBoolean());
             result.putByteArray("entryState", Transfer.readBytes(in));
             if (in.read() != -1) throw new IOException("Trailing display data");
             return result;

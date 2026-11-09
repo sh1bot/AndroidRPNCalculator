@@ -217,13 +217,15 @@ public final class AdaptiveKeypadTest {
                             assertEquals(drop.top, swap.top);
                             assertTrue(clear.right <= drop.left);
                             assertTrue(drop.right <= swap.left);
-                            RpnCalculator calculator = new RpnCalculator();
+                            TestCalculator calculator = new TestCalculator();
                             for (String key : new String[] {"1", "ENTER", "2", "ENTER"})
                                 calculator.key(key);
                             find(keypad, "2").performLongClick();
                             assertEquals("HOLD_DIGIT:2", command.get());
-                            Command.parse(command.get())
-                                    .apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+                            calculator.apply(
+                                    Command.parse(command.get()),
+                                    NumberText.COMPUTER,
+                                    NumberText.COMPUTER);
                             assertEquals(
                                     java.util.Arrays.asList("1", "2", "1"),
                                     CalculatorTestSupport.formattedValues(
@@ -235,8 +237,10 @@ public final class AdaptiveKeypadTest {
                             CalculatorTestSupport.paste(calculator, "4");
                             keypad.setMode(true, false);
                             find(keypad, "1").performLongClick();
-                            Command.parse(command.get())
-                                    .apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+                            calculator.apply(
+                                    Command.parse(command.get()),
+                                    NumberText.COMPUTER,
+                                    NumberText.COMPUTER);
                             assertEquals("41", calculator.entry());
                             assertEquals(3, calculator.values().size());
                             assertNotNull(find(keypad, "CE"));

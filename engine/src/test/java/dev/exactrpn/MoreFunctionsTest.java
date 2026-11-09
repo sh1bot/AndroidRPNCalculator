@@ -11,7 +11,7 @@ import java.math.BigInteger;
 
 final class MoreFunctionsTest {
     private UnifiedReal apply(String value, String operation) {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         CalculatorTestSupport.paste(calculator, value);
         calculator.key(operation);
         return calculator.values().get(0);
@@ -63,13 +63,13 @@ final class MoreFunctionsTest {
 
     @Test
     void tauRetainsPiIdentitiesAndRestoresExactly() throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         calculator.key("τ");
         UnifiedReal tau = calculator.values().get(0);
         assertTrue(tau.divide(UnifiedReal.TWO).definitelyEquals(UnifiedReal.PI));
         assertTrue(tau.sin().definitelyZero());
         assertTrue(tau.cos().definitelyOne());
-        UnifiedReal restored = RpnCalculator.load(calculator.save()).values().get(0);
+        UnifiedReal restored = TestCalculator.load(calculator.save()).values().get(0);
         assertTrue(restored.divide(UnifiedReal.TWO).definitelyEquals(UnifiedReal.PI));
         assertTrue(restored.sin().definitelyZero());
         assertTrue(restored.cos().definitelyOne());
@@ -81,13 +81,13 @@ final class MoreFunctionsTest {
 
     @Test
     void goldenRatioIsExactAndSurvivesRestore() throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         calculator.key("φ");
         UnifiedReal phi = calculator.values().get(0);
         assertEquals(
                 "1.61803398874989484820458683436563811772",
                 ValueFormatter.clipboard(phi, ValueFormatter.Notation.SCIENTIFIC));
-        UnifiedReal restored = RpnCalculator.load(calculator.save()).values().get(0);
+        UnifiedReal restored = TestCalculator.load(calculator.save()).values().get(0);
         assertEquals(
                 ValueFormatter.clipboard(phi, ValueFormatter.Notation.SCIENTIFIC),
                 ValueFormatter.clipboard(restored, ValueFormatter.Notation.SCIENTIFIC));
@@ -99,15 +99,15 @@ final class MoreFunctionsTest {
 
     @Test
     void newFunctionsAreTransactionalAndUndoable() throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         CalculatorTestSupport.paste(calculator, "2.9");
         calculator.key("floor");
         assertEquals("2", calculator.values().get(0).bigIntegerValue().toString());
-        calculator = RpnCalculator.load(calculator.save());
+        calculator = TestCalculator.load(calculator.save());
         calculator.key("UNDO");
         assertEquals("2.9", calculator.entry());
         assertTrue(calculator.values().isEmpty());
-        RpnCalculator invalid = new RpnCalculator();
+        TestCalculator invalid = new TestCalculator();
         CalculatorTestSupport.paste(invalid, "-1");
         assertThrows(ArithmeticException.class, () -> invalid.key("log10"));
         assertFalse(invalid.isEditing());

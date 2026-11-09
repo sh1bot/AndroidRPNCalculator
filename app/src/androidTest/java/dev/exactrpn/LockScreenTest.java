@@ -110,7 +110,7 @@ public final class LockScreenTest {
     }
 
     private File seed(Context context, CalculatorStore store) throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         CalculatorTestSupport.paste(calculator, "99");
         calculator.key("ENTER");
         File seed = File.createTempFile("locked-test-", ".state", context.getNoBackupFilesDir());
@@ -137,7 +137,7 @@ public final class LockScreenTest {
     public void temporaryActivityNeverRestoresOrChangesTheSavedCalculation() throws Exception {
         Context context = instrumentation.getTargetContext();
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
-        File seed = seed(context, store), saved = new File(store.checkpoint());
+        File seed = seed(context, store), saved = new File(StoreTestSupport.checkpoint(store));
         byte[] before = Files.readAllBytes(saved.toPath());
         AtomicInteger accesses = new AtomicInteger();
         FileObserver observer = watch(context, accesses);
@@ -146,14 +146,14 @@ public final class LockScreenTest {
             activity = open(context);
             CalculatorSession session = StackSelectionTest.session(activity);
             await(() -> !session.busy);
-            assertTrue(session.policy.temporary);
+            assertTrue(session.temporary);
             assertFalse(session.canUseSavedState());
             assertTrue(session.display.rows.isEmpty());
             enter(activity, "7");
             enter(activity, "ENTER");
             assertEquals(Arrays.asList("7"), session.display.rows);
             assertTrue(session.checkpoint.bytes.length > 0);
-            assertEquals(1, RpnCalculator.load(session.checkpoint.bytes).values().size());
+            assertEquals(1, TestCalculator.load(session.checkpoint.bytes).values().size());
             enter(activity, "CLEAR");
             enter(activity, "UNDO");
             assertEquals(Arrays.asList("7"), session.display.rows);
@@ -180,7 +180,7 @@ public final class LockScreenTest {
         Context context = instrumentation.getTargetContext();
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
         File seed = seed(context, store);
-        String saved = store.checkpoint();
+        String saved = StoreTestSupport.checkpoint(store);
         AtomicInteger accesses = new AtomicInteger();
         FileObserver observer = watch(context, accesses);
         ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -214,7 +214,7 @@ public final class LockScreenTest {
                 Build.HARDWARE.contains("ranchu") || Build.HARDWARE.contains("goldfish"));
         assumeFalse("Do not alter an existing credential", manager.isDeviceSecure());
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
-        File seed = seed(context, store), saved = new File(store.checkpoint());
+        File seed = seed(context, store), saved = new File(StoreTestSupport.checkpoint(store));
         byte[] before = Files.readAllBytes(saved.toPath());
         AtomicInteger accesses = new AtomicInteger();
         FileObserver observer = watch(context, accesses);
@@ -246,7 +246,7 @@ public final class LockScreenTest {
                     new CalculatorStore(
                             context.getNoBackupFilesDir(), () -> !DeviceAccess.locked(context));
             try {
-                guarded.checkpoint();
+                guarded.load();
                 fail("Saved state read allowed while locked");
             } catch (DeviceAccess.Locked expected) {
             }

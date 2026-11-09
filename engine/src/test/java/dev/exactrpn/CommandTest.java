@@ -19,11 +19,11 @@ final class CommandTest {
         Command.parse("SELECT:2:2").apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
         Command.parse("BACK").apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals("13", editor.entry());
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         calculator.key("π");
         assertThrows(
                 IllegalArgumentException.class,
-                () -> edit.apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER));
+                () -> edit.apply(calculator.engine, NumberText.COMPUTER));
         assertEquals(1, calculator.values().size());
         assertFalse(calculator.isEditing());
     }
@@ -61,7 +61,7 @@ final class CommandTest {
 
     @Test
     void holdDropEditsWithoutCommittingOrMovingTheStack() {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"})
             calculator.key(key);
         CalculatorTestSupport.paste(calculator, "45");
@@ -91,7 +91,7 @@ final class CommandTest {
     @Test
     void heldDigitsPickOneBasedLevelsAndZeroPicksTen() throws Exception {
         for (int depth = 1; depth <= 10; depth++) {
-            RpnCalculator calculator = new RpnCalculator();
+            TestCalculator calculator = new TestCalculator();
             for (int n = 101; n <= 110; n++) {
                 CalculatorTestSupport.paste(calculator, Integer.toString(n));
                 calculator.key("ENTER");
@@ -101,11 +101,11 @@ final class CommandTest {
             String digit = depth == 10 ? "0" : Integer.toString(depth);
             Command hold = Command.parse("HOLD_DIGIT:" + digit);
             assertTrue(hold.preservesSelection());
-            hold.apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+            calculator.apply(hold, NumberText.COMPUTER, NumberText.COMPUTER);
             assertEquals(11, calculator.values().size());
             assertSame(original, calculator.values().get(10));
             assertEquals(history + 1, calculator.undoCount());
-            calculator = RpnCalculator.load(calculator.save());
+            calculator = TestCalculator.load(calculator.save());
             assertEquals(original.bigIntegerValue(), calculator.values().get(10).bigIntegerValue());
             calculator.key("UNDO");
             assertEquals(10, calculator.values().size());
@@ -116,11 +116,11 @@ final class CommandTest {
 
     @Test
     void heldDigitsEditAtTheCursorWithoutPickingOrCommitting() {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         calculator.key("π");
         CalculatorTestSupport.paste(calculator, "45");
         calculator.select(1, 1);
-        Command.parse("HOLD_DIGIT:7").apply(calculator, NumberText.COMPUTER, NumberText.COMPUTER);
+        calculator.apply(Command.parse("HOLD_DIGIT:7"), NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals("475", calculator.entry());
         assertEquals(1, calculator.values().size());
         assertTrue(calculator.isEditing());
@@ -132,7 +132,7 @@ final class CommandTest {
 
     @Test
     void unavailableLevelsDoNotChangeStackOrHistory() {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         calculator.key("π");
         int history = calculator.undoCount();
         assertThrows(IllegalArgumentException.class, () -> calculator.holdDigit("0"));

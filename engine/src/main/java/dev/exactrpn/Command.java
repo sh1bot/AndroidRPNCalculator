@@ -170,8 +170,7 @@ public final class Command {
         }
     }
 
-    public void apply(
-            RpnCalculator calculator, NumberText.Profile locale, NumberText.Profile format) {
+    public void apply(RpnCalculator calculator, NumberText.Profile locale) {
         switch (kind) {
             case UNARY_ROWS:
                 calculator.transformRows(

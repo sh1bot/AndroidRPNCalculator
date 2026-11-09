@@ -33,7 +33,7 @@ final class Display {
         start = end = 0;
     }
 
-    Display(Bundle result) {
+    Display(Bundle result, EntryEditor editor) {
         fullRows = Collections.unmodifiableList(result.getStringArrayList("rows"));
         String top = result.getString("compactTop");
         compactRows =
@@ -48,17 +48,17 @@ final class Display {
                     }
                 };
         stackId = result.getString("stackId");
-        entry = result.getString("entry");
-        problem = result.getString("problem");
+        entry = editor.entry();
+        problem = editor.entryProblem();
         notation = ValueFormatter.Notation.valueOf(result.getString("notation"));
         angleUnit = RpnCalculator.AngleUnit.valueOf(result.getString("angle"));
         numberMode = NumberMode.values()[result.getInt("numberMode")];
         fractionMode = FractionMode.values()[result.getInt("fractionMode")];
-        editing = result.getBoolean("editing");
+        editing = editor.isEditing();
         rows = editing ? compactRows : fullRows;
-        raw = result.getBoolean("raw");
-        start = result.getInt("start");
-        end = result.getInt("end");
+        raw = editor.rawEntry();
+        start = editor.selectionStart();
+        end = editor.selectionEnd();
     }
 
     Display(Display stack, EntryEditor editor) {

@@ -19,15 +19,15 @@ abstract class RegressionSupport {
                 .canonical();
     }
 
-    static void keys(RpnCalculator c, String... keys) {
-        for (String k : keys) Command.parse(k).apply(c, NumberText.COMPUTER, NumberText.COMPUTER);
+    static void keys(TestCalculator c, String... keys) {
+        for (String k : keys) c.apply(Command.parse(k), NumberText.COMPUTER, NumberText.COMPUTER);
     }
 
-    static UnifiedReal top(RpnCalculator c) {
+    static UnifiedReal top(TestCalculator c) {
         return c.values().get(c.values().size() - 1);
     }
 
-    static void number(RpnCalculator c, String n) {
+    static void number(TestCalculator c, String n) {
         for (char ch : n.toCharArray()) c.key(String.valueOf(ch));
     }
 }

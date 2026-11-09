@@ -29,12 +29,15 @@ public class CalculationService extends Service {
     private RpnCalculator cached;
     private String cachedId, cachedSession, cachedStackId;
     private final ValuePresentationCache texts = new ValuePresentationCache();
-    private final java.util.Map<String, LocaleNumbers> profiles = new java.util.HashMap<>();
+    private Locale profileLocale;
+    private LocaleNumbers localeNumbers;
 
-    private LocaleNumbers profile(Locale locale, NumberMode mode) {
-        String key = locale.toLanguageTag() + ":" + mode.name();
-        if (profiles.size() > 12) profiles.clear();
-        return profiles.computeIfAbsent(key, ignored -> new LocaleNumbers(locale, mode));
+    private LocaleNumbers profile(Locale locale) {
+        if (!locale.equals(profileLocale)) {
+            profileLocale = locale;
+            localeNumbers = new LocaleNumbers(locale, NumberMode.LOCALE);
+        }
+        return localeNumbers;
     }
 
     private final Messenger messenger =
@@ -139,7 +142,7 @@ public class CalculationService extends Service {
         FractionMode fraction = request.fractionMode;
         java.util.StringJoiner result = new java.util.StringJoiner("\n");
         for (UnifiedReal value : cached.selectedValues(command.rows()))
-            result.add(texts.clipboard(value, notation, fraction));
+            result.add(ValueFormatter.clipboard(value, notation, fraction));
         return result.toString();
     }
 
@@ -201,9 +204,7 @@ public class CalculationService extends Service {
             numberMode = request.numberMode;
             fractionMode = request.fractionMode;
             notation = request.notation;
-            LocaleNumbers local = profile(locale, NumberMode.LOCALE);
-            LocaleNumbers format = profile(locale, numberMode);
-            candidate.setInputProfile(format.profile());
+            LocaleNumbers local = profile(locale);
             if (key.is(Command.RESTORE)) {
                 /* No arithmetic operation. */
             } else if (key.is("FORMAT"))
@@ -215,7 +216,7 @@ public class CalculationService extends Service {
             else if (key.is("FRACTION")) fractionMode = fractionMode.next();
             else {
                 try {
-                    key.apply(candidate, local.profile(), format.profile());
+                    key.apply(candidate, local.profile());
                 } catch (IllegalArgumentException | ArithmeticException ex) {
                     // The engine may have committed valid entry before the operator failed.
                     // Publish that state together with the error, rather than losing the entry.
@@ -227,26 +228,21 @@ public class CalculationService extends Service {
 
         Bundle presentation() {
             List<UnifiedReal> values = candidate.values();
+            texts.setMode(notation, fractionMode);
             texts.retain(values);
             ArrayList<String> rows = new ArrayList<>(values.size());
             String compactTop = "";
             for (int i = 0; i < values.size(); i++) {
                 UnifiedReal value = values.get(i);
                 boolean newest = i == values.size() - 1;
-                rows.add(texts.row(value, newest, notation, fractionMode));
-                if (newest) compactTop = texts.row(value, false, notation, FractionMode.DECIMAL);
+                rows.add(texts.row(value, newest));
+                if (newest) compactTop = texts.compactTop(value);
             }
             Bundle display = new Bundle();
             display.putString("operationError", operationError);
             display.putString("stackId", stackId);
             display.putStringArrayList("rows", rows);
             display.putString("compactTop", compactTop);
-            display.putString("entry", candidate.entry());
-            display.putString("problem", candidate.entryProblem());
-            display.putBoolean("editing", candidate.isEditing());
-            display.putBoolean("raw", candidate.rawEntry());
-            display.putInt("start", candidate.selectionStart());
-            display.putInt("end", candidate.selectionEnd());
             display.putString("angle", candidate.angleUnit().name());
             display.putString("notation", notation.name());
             display.putInt("numberMode", numberMode.ordinal());

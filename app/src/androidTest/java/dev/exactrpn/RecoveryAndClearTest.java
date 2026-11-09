@@ -80,7 +80,7 @@ public final class RecoveryAndClearTest {
                                     !session.busy
                                             && session.checkpoint == null
                                             && session.error.contains("restore"));
-                    assertNull(store.checkpoint());
+                    assertNull(StoreTestSupport.checkpoint(store));
                     assertArrayEquals(bad, Files.readAllBytes(corrupt.toPath()));
                     instrumentation.runOnMainSync(() -> button(root, "9").performClick());
                     await(

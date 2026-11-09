@@ -353,7 +353,7 @@ public final class CalculatorKeypad extends ViewGroup {
         button.setOnClickListener(
                 v -> command.accept(key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
         boolean longPressKey =
-                RpnCalculator.isEntryKey(key)
+                EntryEditor.isEntryKey(key)
                         || switch (key) {
                             case "π", Command.UNDO, "BACK", "SWAP", Command.ENTER -> true;
                             default -> false;
@@ -381,8 +381,8 @@ public final class CalculatorKeypad extends ViewGroup {
             fraction.setSpan(new ReciprocalSpan(), 0, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             button.setText(fraction);
         } else
-            button.setText(RpnCalculator.isEntryKey(key) ? numbers.entry(label.toString()) : label);
-        if (RpnCalculator.isEntryKey(key)) {
+            button.setText(EntryEditor.isEntryKey(key) ? numbers.entry(label.toString()) : label);
+        if (EntryEditor.isEntryKey(key)) {
             button.setFontFeatureSettings("tnum");
             numberButtons.put(key, button);
         }
@@ -401,7 +401,7 @@ public final class CalculatorKeypad extends ViewGroup {
         b.setPadding(dp(2), 0, dp(2), 0);
         b.setElevation(0);
         b.setStateListAnimator(null);
-        boolean number = RpnCalculator.isEntryKey(key);
+        boolean number = EntryEditor.isEntryKey(key);
         int color =
                 key.equals(Command.ENTER)
                         ? colors.enterKey

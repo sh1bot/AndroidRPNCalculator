@@ -7,12 +7,12 @@ import org.junit.jupiter.api.Test;
 
 final class SnapshotTest {
     @Test
-    void ordinaryEngineSnapshotsExposeTheirEditHistoryToTheLocalEditor() throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+    void draftSnapshotsRestoreTheLocalEditHistory() throws Exception {
+        TestCalculator calculator = new TestCalculator();
         calculator.key("1");
         calculator.key("2");
         calculator.key("3");
-        EntryEditor editor = RpnCalculator.load(calculator.save()).detachEntryEditor();
+        EntryEditor editor = TestCalculator.load(calculator.save()).detachEntryEditor();
         editor.key("UNDO");
         assertEquals("12", editor.entry());
         editor.key("REDO");
@@ -21,7 +21,7 @@ final class SnapshotTest {
 
     @Test
     void replacingAnEntryDoesNotNestOrGrowTheArithmeticSection() throws Exception {
-        RpnCalculator calculator = new RpnCalculator();
+        TestCalculator calculator = new TestCalculator();
         calculator.key("π");
         byte[] first = calculator.save();
         EntryEditor entry = new EntryEditor();
@@ -29,7 +29,7 @@ final class SnapshotTest {
         byte[] second = RpnCalculator.saveWithEntry(first, entry);
         byte[] third = RpnCalculator.saveWithEntry(second, entry);
         assertArrayEquals(second, third);
-        assertEquals("7", RpnCalculator.load(third).entry());
-        assertEquals(calculator.values().size(), RpnCalculator.load(third).values().size());
+        assertEquals("7", TestCalculator.load(third).entry());
+        assertEquals(calculator.values().size(), TestCalculator.load(third).values().size());
     }
 }

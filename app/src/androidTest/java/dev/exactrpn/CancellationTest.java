@@ -69,7 +69,7 @@ public final class CancellationTest {
         File seed = File.createTempFile("cancel-test-", ".state", context.getNoBackupFilesDir());
         try {
             // Equal expressions whose equality the constructive-real engine cannot establish.
-            RpnCalculator calculator = new RpnCalculator();
+            TestCalculator calculator = new TestCalculator();
             for (String key : new String[] {"π", "e", "+", "e", "π", "+", "−"}) calculator.key(key);
             assertFalse(calculator.values().get(0).definitelyZero());
             Files.write(seed.toPath(), calculator.save());
@@ -85,7 +85,8 @@ public final class CancellationTest {
                             + " ms");
             byte[] accepted = initial.getByteArray("state");
             store.save(accepted);
-            byte[] committed = Files.readAllBytes(new File(store.checkpoint()).toPath());
+            byte[] committed =
+                    Files.readAllBytes(new File(StoreTestSupport.checkpoint(store)).toPath());
             Future<Bundle> stuck = worker.submit(() -> remote.evaluate(request("1/x", accepted)));
             SystemClock.sleep(300);
             assertFalse("Reciprocal of unknown zero should still be calculating", stuck.isDone());
@@ -102,7 +103,7 @@ public final class CancellationTest {
             assertArrayEquals(
                     "Cancelled work cannot replace committed storage",
                     committed,
-                    Files.readAllBytes(new File(store.checkpoint()).toPath()));
+                    Files.readAllBytes(new File(StoreTestSupport.checkpoint(store)).toPath()));
             Bundle cleared =
                     worker.submit(() -> remote.evaluate(request("CLEAR", accepted)))
                             .get(15, TimeUnit.SECONDS);

@@ -149,7 +149,7 @@ public final class StackSelectionTest {
                         View viewport = (View) row.getParent().getParent();
                         return row.getHeight() <= viewport.getHeight();
                     });
-            RpnCalculator saved = RpnCalculator.load(state.checkpoint.bytes);
+            TestCalculator saved = TestCalculator.load(state.checkpoint.bytes);
             assertEquals(new String(digits), saved.values().get(0).bigIntegerValue().toString());
         } finally {
             finish(a);

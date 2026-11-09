@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 final class SelectedProductTest {
     @Test
     void exactProductPreservesEntryAndOriginalsAndSurvivesUndoRedoAndRestore() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         for (String text : new String[] {"0.1", "99", "0.2"}) {
             CalculatorTestSupport.paste(c, text);
             c.key("ENTER");
@@ -20,13 +20,13 @@ final class SelectedProductTest {
         Command command = Command.parse("PRODUCT_ROWS:2,0,2");
         assertTrue(command.preservesSelection());
         assertArrayEquals(new int[] {2, 0, 2}, command.rows());
-        command.apply(c, NumberText.COMPUTER, NumberText.COMPUTER);
+        c.apply(command, NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals(4, c.values().size());
         assertTrue(c.values().get(3).definitelyEquals(RpnCalculator.parse("0.02")));
         assertTrue(c.isEditing());
         assertEquals("45", c.entry());
         assertEquals(1, c.selectionStart());
-        c = RpnCalculator.load(c.save());
+        c = TestCalculator.load(c.save());
         c.key("UNDO");
         assertEquals(3, c.values().size());
         c.key("REDO");
@@ -35,12 +35,12 @@ final class SelectedProductTest {
 
     @Test
     void irrationalProductRetainsItsExactExpression() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         c.key("π");
         CalculatorTestSupport.paste(c, "2");
         c.key("ENTER");
         c.productRows(0, 1);
-        RpnCalculator restored = RpnCalculator.load(c.save());
+        TestCalculator restored = TestCalculator.load(c.save());
         assertTrue(
                 restored.values()
                         .get(2)
@@ -51,7 +51,7 @@ final class SelectedProductTest {
 
     @Test
     void invalidProductSelectionDoesNotChangeStateAndEmptySelectionDoesNothing() throws Exception {
-        RpnCalculator c = new RpnCalculator();
+        TestCalculator c = new TestCalculator();
         c.key("π");
         byte[] before = c.save();
         assertThrows(IllegalArgumentException.class, () -> c.productRows(0, 1));
