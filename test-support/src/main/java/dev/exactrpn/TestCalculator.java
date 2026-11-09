@@ -30,7 +30,7 @@ final class TestCalculator {
     }
 
     void key(String key) {
-        apply(Command.parse(key), NumberText.COMPUTER, editor.inputProfile);
+        apply(Command.key(key), NumberText.COMPUTER, editor.inputProfile);
     }
 
     void apply(Command command, NumberText.Profile locale, NumberText.Profile format) {
@@ -88,7 +88,7 @@ final class TestCalculator {
                         ? editor
                         : editor.entryForCommit());
         try {
-            Command.parse(Command.entryKey(key, editor.isEditing())).apply(engine, locale);
+            command.forEntry(editor.isEditing()).apply(engine, locale);
             EntryEditor incoming = engine.detachEntryEditor();
             if (!command.is(Command.UNDO)
                     && !command.is(Command.REDO)
@@ -156,7 +156,7 @@ final class TestCalculator {
     }
 
     void pasteText(String text, NumberText.Profile locale) {
-        apply(Command.parse("PASTE_RAW:" + text), locale, editor.inputProfile);
+        apply(Command.paste(text), locale, editor.inputProfile);
     }
 
     void pasteClipboard(String text, NumberText.Profile locale) {
@@ -170,10 +170,7 @@ final class TestCalculator {
             boolean raw,
             boolean decimal,
             NumberText.Profile profile) {
-        apply(
-                Command.parse("EDIT:" + start + ":" + end + ":" + raw + ":" + decimal + ":" + text),
-                profile,
-                profile);
+        apply(Command.edit(text, start, end, raw, decimal), profile, profile);
     }
 
     void useEntryEditor(EntryEditor entry) {
@@ -219,7 +216,7 @@ final class TestCalculator {
     }
 
     void holdDigit(String digit) {
-        key("HOLD_DIGIT:" + digit);
+        apply(Command.holdDigit(digit), NumberText.COMPUTER, editor.inputProfile);
     }
 
     /**

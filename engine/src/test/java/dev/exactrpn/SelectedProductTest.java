@@ -17,7 +17,7 @@ final class SelectedProductTest {
         }
         CalculatorTestSupport.paste(c, "45");
         c.select(1, 1);
-        Command command = Command.parse("PRODUCT_ROWS:2,0,2");
+        Command command = Command.rows(Command.Kind.PRODUCT_ROWS, 2, 0, 2);
         assertTrue(command.preservesSelection());
         assertArrayEquals(new int[] {2, 0, 2}, command.rows());
         c.apply(command, NumberText.COMPUTER, NumberText.COMPUTER);

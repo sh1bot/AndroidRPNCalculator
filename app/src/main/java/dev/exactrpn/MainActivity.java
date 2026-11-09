@@ -22,8 +22,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
@@ -210,8 +208,11 @@ public class MainActivity extends Activity {
         if (noticeView != null) noticeView.setVisibility(View.GONE);
     }
 
-    private void execute(String wire) {
-        Command key = Command.parse(wire);
+    private void execute(String key) {
+        execute(Command.key(key));
+    }
+
+    private void execute(Command key) {
         if (!key.is(Command.RESTORE)) dismissErrorNotice();
         if (key.is(Command.PASTE)) {
             pasteClipboard();
@@ -225,7 +226,7 @@ public class MainActivity extends Activity {
             cancelCalculation();
             return;
         }
-        if (executeSelectionAction(wire)) return;
+        if (key.kind == Command.Kind.KEY && executeSelectionAction(key.wire)) return;
         if (!key.preservesSelection()) clearStackSelection(false);
         session.enqueue(key);
         if (!key.isEntryUpdate()) refresh();
@@ -250,7 +251,7 @@ public class MainActivity extends Activity {
             showNotice(getString(R.string.clipboard_too_long, limit), true);
             return;
         }
-        execute("PASTE_RAW:" + text.toString());
+        execute(Command.paste(text.toString()));
     }
 
     private void copyValue(String text, NumberMode mode) {
@@ -332,7 +333,8 @@ public class MainActivity extends Activity {
 
     private boolean executeSelectionAction(String key) {
         if (session.selectedRows.isEmpty()) return false;
-        String action;
+        Command.Kind action;
+        Operation operation = Operation.find(key);
         switch (key) {
             case Command.UNDO:
                 if (stackActionAllowed(session.display)) clearStackSelection(true);
@@ -345,26 +347,25 @@ public class MainActivity extends Activity {
                 refresh();
                 return true;
             case Command.ENTER:
-                action = "PICK_ROWS:";
+                action = Command.Kind.PICK_ROWS;
                 break;
             case "BACK":
             case "DROP":
             case "DELETE":
-                action = "DROP_ROWS:";
+                action = Command.Kind.DROP_ROWS;
                 break;
             case "+":
-                action = "SUM_ROWS:";
+                action = Command.Kind.SUM_ROWS;
                 break;
             case "×":
-                action = "PRODUCT_ROWS:";
+                action = Command.Kind.PRODUCT_ROWS;
                 break;
             case "HOLD_DROP":
             case "ROLL_UP":
                 return true;
             default:
-                Operation operation = Operation.find(key);
                 if (operation != null && operation.arity == 1) {
-                    action = "UNARY_ROWS:" + key + ":";
+                    action = Command.Kind.UNARY_ROWS;
                     break;
                 }
                 if (key.equals("Factor")
@@ -376,9 +377,11 @@ public class MainActivity extends Activity {
                 return false;
         }
         if (!stackActionAllowed(session.display)) return true;
-        List<String> indices = new ArrayList<>();
-        for (int row : session.selectedRows) indices.add(Integer.toString(row));
-        session.enqueue(Command.parse(action + String.join(",", indices)));
+        int[] rows = session.selectedRows.stream().mapToInt(Integer::intValue).toArray();
+        session.enqueue(
+                action == Command.Kind.UNARY_ROWS
+                        ? Command.unaryRows(operation, rows)
+                        : Command.rows(action, rows));
         refresh();
         return true;
     }
@@ -742,7 +745,7 @@ public class MainActivity extends Activity {
         entryView.selectionChanged =
                 (start, end) -> {
                     if (!changingEntry && start >= 0 && end >= 0)
-                        execute("SELECT:" + start + ":" + end);
+                        execute(Command.select(start, end));
                 };
         entryView.addTextChangedListener(
                 new android.text.TextWatcher() {
@@ -771,16 +774,12 @@ public class MainActivity extends Activity {
                                         ? text.toString()
                                         : numbers.canonicalEntry(text.toString());
                         execute(
-                                "EDIT:"
-                                        + Math.max(0, entryView.getSelectionStart())
-                                        + ":"
-                                        + Math.max(0, entryView.getSelectionEnd())
-                                        + ":"
-                                        + entryShowsRaw
-                                        + ":"
-                                        + explicit
-                                        + ":"
-                                        + value);
+                                Command.edit(
+                                        value,
+                                        Math.max(0, entryView.getSelectionStart()),
+                                        Math.max(0, entryView.getSelectionEnd()),
+                                        entryShowsRaw,
+                                        explicit));
                     }
                 });
         root.addView(entryView);
@@ -838,7 +837,7 @@ public class MainActivity extends Activity {
     }
 
     private void refreshModes(Display display) {
-        keys.setMode(display.editing, !session.selectedRows.isEmpty());
+        keys.setMode(session.mode(display));
         angleButton.setText(display.angleUnit.name());
         angleButton.setContentDescription(
                 getString(R.string.angle_description, display.angleUnit.name()));
@@ -888,14 +887,15 @@ public class MainActivity extends Activity {
                                         display.problem.equals("Ambiguous")
                                                 ? R.string.ambiguous_status
                                                 : R.string.invalid_status)
-                                : display.editing
-                                        ? getString(R.string.entry_status)
-                                        : getString(
-                                                session.selectedRows.isEmpty()
-                                                        ? R.string.stack_status
-                                                        : R.string.select_status));
+                                : getString(
+                                        switch (session.mode(display)) {
+                                            case ENTRY -> R.string.entry_status;
+                                            case STACK -> R.string.stack_status;
+                                            case SELECT -> R.string.select_status;
+                                        }));
         CharSequence calculationStatus = status.getText();
-        boolean temporarySelection = session.temporary && !session.selectedRows.isEmpty();
+        boolean temporarySelection =
+                session.temporary && session.mode(display) == InteractionMode.SELECT;
         if (status.getMaxLines() != (temporarySelection ? 2 : 1)) {
             status.setSingleLine(!temporarySelection);
             if (temporarySelection) status.setMaxLines(2);

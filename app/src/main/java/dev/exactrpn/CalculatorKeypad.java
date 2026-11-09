@@ -18,7 +18,6 @@ import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -32,29 +31,21 @@ public final class CalculatorKeypad extends ViewGroup {
     private final ThemeColors colors;
     private LocaleNumbers numbers;
     private final String[] keyDescriptions;
-    private final Map<String, Button> numberButtons = new HashMap<>();
+    private final Map<CalculatorKey, Button> buttons = new java.util.EnumMap<>(CalculatorKey.class);
     private final LinearLayout controls;
-    private Button deleteButton,
-            undoButton,
-            enterButton,
-            clearButton,
-            piButton,
-            swapButton,
-            sumButton,
-            productButton;
     private boolean tau;
     private Consumer<Boolean> saveTau = enabled -> {};
-    private boolean calculating, editing, selecting, modeDirty = true;
+    private boolean calculating;
+    private InteractionMode mode = InteractionMode.STACK;
     private boolean expanded, inverse;
-    private final Map<String, Button> inverseButtons = new HashMap<>();
     private final BiConsumer<Boolean, Boolean> savePanel;
     private boolean functionsBeside;
     private int primaryWidth;
-    private final Consumer<String> command;
+    private final Consumer<Command> command;
 
     public CalculatorKeypad(
             Context context,
-            Consumer<String> command,
+            Consumer<Command> command,
             boolean expanded,
             BiConsumer<Boolean, Boolean> savePanel) {
         super(context);
@@ -68,8 +59,6 @@ public final class CalculatorKeypad extends ViewGroup {
         controls.addView(button(CalculatorKey.UNDO), new LinearLayout.LayoutParams(0, dp(44), 1));
         functions = button(CalculatorKey.FUNCTIONS);
         complements = button(CalculatorKey.COMPLEMENTS);
-        functions.setOnClickListener(v -> togglePanel(false));
-        complements.setOnClickListener(v -> togglePanel(true));
         controls.addView(functions, new LinearLayout.LayoutParams(0, dp(44), 2));
         controls.addView(complements, new LinearLayout.LayoutParams(0, dp(44), 2));
         addView(controls);
@@ -131,8 +120,7 @@ public final class CalculatorKeypad extends ViewGroup {
                     }
                 },
                 primaryRows);
-        setMode(false, false);
-        updateConstant();
+        bindButtons();
         updateExpansion();
     }
 
@@ -167,143 +155,200 @@ public final class CalculatorKeypad extends ViewGroup {
 
     public void setInverse(boolean active) {
         inverse = active;
-        for (Map.Entry<String, Button> item : inverseButtons.entrySet()) {
-            String key = item.getKey();
-            Button button = item.getValue();
-            String effective = effectiveKey(key);
-            button.setText(functionLabel(effective));
-            button.setContentDescription(keyDescription(effective));
-        }
-        updateSelectionFunctions();
+        bindButtons();
         updateExpansion();
     }
 
     public void setTauPreference(boolean enabled, Consumer<Boolean> save) {
         tau = enabled;
         saveTau = save;
-        updateConstant();
-    }
-
-    private void updateConstant() {
-        piButton.setText(tau ? "τ" : "π");
-        piButton.setContentDescription(
-                getContext()
-                        .getString(
-                                tau
-                                        ? R.string.tau_toggle_description
-                                        : R.string.pi_toggle_description));
-        requestLayout();
+        bindButtons();
     }
 
     public void setNumberFormat(LocaleNumbers format) {
         if (numbers == format) return;
         numbers = format;
-        modeDirty = true;
-        for (Map.Entry<String, Button> item : numberButtons.entrySet())
-            item.getValue().setText(numbers.entry(item.getKey()));
+        bindButtons();
     }
 
-    public void setMode(boolean editing, boolean selecting) {
-        if (!modeDirty && this.editing == editing && this.selecting == selecting) return;
-        modeDirty = false;
-        this.editing = editing;
-        this.selecting = selecting;
-        for (Map.Entry<String, Button> item : numberButtons.entrySet()) {
-            String digit = item.getKey();
-            if (digit.equals(".")) {
-                item.getValue().setLongClickable(editing);
-                item.getValue()
-                        .setContentDescription(
-                                getContext()
+    public void setMode(InteractionMode mode) {
+        if (this.mode == mode) return;
+        this.mode = mode;
+        bindButtons();
+    }
+
+    private void bindButtons() {
+        for (Map.Entry<CalculatorKey, Button> item : buttons.entrySet())
+            bindButton(item.getKey(), item.getValue());
+    }
+
+    // Presentation and both gestures are assigned together for the button's current role.
+    private void bindButton(CalculatorKey definition, Button button) {
+        String key = effectiveKey(definition.wire);
+        CharSequence label = functionLabel(key);
+        String description = keyDescription(key);
+        int icon = 0;
+        boolean editing = mode == InteractionMode.ENTRY, selecting = mode == InteractionMode.SELECT;
+        Runnable click = () -> command.accept(Command.key(key));
+        Runnable hold = null;
+        Operation operation = Operation.find(key);
+        boolean enabled =
+                !selecting || !key.equals("Factor") && (operation == null || operation.arity != 2);
+        if (EntryEditor.isEntryKey(key)) {
+            label = numbers.entry(label.toString());
+            if (key.equals(".")) {
+                description =
+                        getContext()
+                                .getString(
+                                        editing
+                                                ? R.string.decimal_exponent_description
+                                                : R.string.decimal_separator);
+                if (editing) hold = () -> command.accept(Command.key("HOLD_DECIMAL"));
+            } else {
+                description =
+                        editing
+                                ? label.toString()
+                                : getContext()
                                         .getString(
-                                                editing
-                                                        ? R.string.decimal_exponent_description
-                                                        : R.string.decimal_separator));
-            }
-            if (digit.matches("[0-9]"))
-                item.getValue()
-                        .setContentDescription(
-                                editing
-                                        ? numbers.entry(digit)
-                                        : getContext()
-                                                .getString(
-                                                        R.string.digit_pick_description,
-                                                        numbers.entry(digit),
-                                                        digit.equals("0")
-                                                                ? 10
-                                                                : Integer.parseInt(digit)));
-        }
-        updateModeKeys();
-    }
-
-    private void updateModeKeys() {
-        clearButton.setText(
-                selecting ? "" : editing ? "CE" : getContext().getString(R.string.clear));
-        clearButton.setContentDescription(
-                getContext()
-                        .getString(
-                                selecting
-                                        ? R.string.select_all_description
-                                        : editing ? R.string.clear_entry : R.string.clear_stack));
-        setButtonIcon(clearButton, selecting ? R.drawable.ic_select_all : 0);
-        deleteButton.setText(!selecting && editing ? "⌫" : "");
-        setButtonIcon(deleteButton, !selecting && editing ? 0 : R.drawable.ic_delete);
-        deleteButton.setContentDescription(
-                getContext()
-                        .getString(
-                                selecting
-                                        ? R.string.drop_selected
-                                        : editing
-                                                ? R.string.backspace
-                                                : R.string.drop_roll_description));
-        deleteButton.setLongClickable(!selecting);
-        swapButton.setText("⇅");
-        swapButton.setEnabled(!selecting);
-        swapButton.setAlpha(selecting ? .38f : 1f);
-        setButtonIcon(swapButton, 0);
-        swapButton.setContentDescription(
-                getContext()
-                        .getString(selecting ? R.string.pick_selected : R.string.swap_description));
-        swapButton.setLongClickable(!selecting);
-        sumButton.setText(selecting ? "Σ" : "+");
-        sumButton.setContentDescription(
-                selecting ? getContext().getString(R.string.sum_selected) : "+");
-        productButton.setText(selecting ? "Π" : "×");
-        productButton.setContentDescription(
-                selecting ? getContext().getString(R.string.product_selected) : "×");
-        enterButton.setText(getContext().getString(selecting ? R.string.pick : R.string.enter));
-        enterButton.setContentDescription(
-                getContext()
-                        .getString(
-                                selecting ? R.string.pick_selected : R.string.enter_description));
-        enterButton.setLongClickable(!selecting);
-        updateSelectionFunctions();
-        updateUndoButton();
-    }
-
-    private void updateSelectionFunctions() {
-        for (LinearLayout row : scientificRows) {
-            for (int i = 0; i < row.getChildCount(); i++) {
-                Button button = (Button) ((FrameLayout) row.getChildAt(i)).getChildAt(0);
-                String key = effectiveKey((String) button.getTag());
-                Operation operation = Operation.find(key);
-                button.setEnabled(
-                        !selecting
-                                || !key.equals("Factor")
-                                        && (operation == null || operation.arity != 2));
-                button.setAlpha(button.isEnabled() ? 1f : .38f);
+                                                R.string.digit_pick_description,
+                                                label,
+                                                key.equals("0") ? 10 : Integer.parseInt(key));
+                hold = () -> command.accept(Command.holdDigit(key));
             }
         }
-        for (LinearLayout row : primaryRows)
-            for (int i = 0; i < row.getChildCount(); i++) {
-                Button button = (Button) ((FrameLayout) row.getChildAt(i)).getChildAt(0);
-                String key = (String) button.getTag();
-                Operation operation = Operation.find(key);
-                if (operation != null && operation.arity == 2) {
-                    button.setEnabled(!selecting || key.equals("+") || key.equals("×"));
-                    button.setAlpha(button.isEnabled() ? 1f : .38f);
+        switch (definition) {
+            case FUNCTIONS, COMPLEMENTS -> {
+                boolean complementary = definition == CalculatorKey.COMPLEMENTS;
+                boolean open = expanded && inverse == complementary;
+                description =
+                        getContext()
+                                .getString(
+                                        complementary
+                                                ? open
+                                                        ? R.string.close_complements
+                                                        : R.string.open_complements
+                                                : open
+                                                        ? R.string.close_functions
+                                                        : R.string.open_functions);
+                click = () -> togglePanel(complementary);
+            }
+            case PI -> {
+                description =
+                        getContext()
+                                .getString(
+                                        tau
+                                                ? R.string.tau_toggle_description
+                                                : R.string.pi_toggle_description);
+                hold =
+                        () -> {
+                            tau = !tau;
+                            bindButtons();
+                            saveTau.accept(tau);
+                            requestLayout();
+                        };
+            }
+            case RECIPROCAL -> {
+                SpannableString fraction = new SpannableString(label);
+                fraction.setSpan(new ReciprocalSpan(), 0, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                label = fraction;
+            }
+            case CLEAR -> {
+                label = selecting ? "" : editing ? "CE" : getContext().getString(R.string.clear);
+                icon = selecting ? R.drawable.ic_select_all : 0;
+                description =
+                        getContext()
+                                .getString(
+                                        selecting
+                                                ? R.string.select_all_description
+                                                : editing
+                                                        ? R.string.clear_entry
+                                                        : R.string.clear_stack);
+                click = () -> command.accept(Command.key(editing ? "CE" : "CLEAR"));
+            }
+            case BACK -> {
+                label = editing ? "⌫" : "";
+                icon = editing ? 0 : R.drawable.ic_delete;
+                description =
+                        getContext()
+                                .getString(
+                                        selecting
+                                                ? R.string.drop_selected
+                                                : editing
+                                                        ? R.string.backspace
+                                                        : R.string.drop_roll_description);
+                click = () -> command.accept(Command.key(editing ? "BACK" : "DROP"));
+                if (!selecting)
+                    hold = () -> command.accept(Command.key(editing ? "BACK" : "ROLL_DOWN"));
+            }
+            case SWAP -> {
+                label = "⇅";
+                enabled = !selecting;
+                if (!selecting) hold = () -> command.accept(Command.key("ROLL_UP"));
+            }
+            case ADD, MULTIPLY -> {
+                enabled = true;
+                if (selecting) {
+                    label = definition == CalculatorKey.ADD ? "Σ" : "Π";
+                    description =
+                            getContext()
+                                    .getString(
+                                            definition == CalculatorKey.ADD
+                                                    ? R.string.sum_selected
+                                                    : R.string.product_selected);
                 }
             }
+            case ENTER -> {
+                label = getContext().getString(selecting ? R.string.pick : R.string.enter);
+                description =
+                        getContext()
+                                .getString(
+                                        selecting
+                                                ? R.string.pick_selected
+                                                : R.string.enter_description);
+                if (!selecting) hold = () -> command.accept(Command.key(Command.PASTE));
+            }
+            case UNDO -> {
+                label =
+                        calculating
+                                ? getContext().getString(R.string.cancel)
+                                : selecting ? "" : getContext().getString(R.string.undo);
+                icon = selecting && !calculating ? R.drawable.ic_select_none : 0;
+                description =
+                        getContext()
+                                .getString(
+                                        calculating
+                                                ? R.string.cancel_calculation
+                                                : selecting
+                                                        ? R.string.select_none_description
+                                                        : R.string.undo_description);
+                click =
+                        () ->
+                                command.accept(
+                                        Command.key(calculating ? Command.CANCEL : Command.UNDO));
+                if (calculating || !selecting)
+                    hold =
+                            () ->
+                                    command.accept(
+                                            Command.key(
+                                                    calculating ? Command.CANCEL : Command.REDO));
+            }
+            default -> {}
+        }
+        button.setText(label);
+        setButtonIcon(button, icon);
+        button.setContentDescription(description);
+        button.setEnabled(enabled);
+        button.setAlpha(enabled ? 1f : .38f);
+        Runnable action = click, heldAction = hold;
+        button.setOnClickListener(v -> action.run());
+        button.setOnLongClickListener(
+                heldAction == null
+                        ? null
+                        : v -> {
+                            heldAction.run();
+                            return true;
+                        });
+        button.setLongClickable(heldAction != null);
     }
 
     private void setButtonIcon(Button button, int resource) {
@@ -317,24 +362,7 @@ public final class CalculatorKeypad extends ViewGroup {
     public void setCalculating(boolean active) {
         if (calculating == active) return;
         calculating = active;
-        updateUndoButton();
-    }
-
-    private void updateUndoButton() {
-        undoButton.setText(
-                calculating
-                        ? getContext().getString(R.string.cancel)
-                        : selecting ? "" : getContext().getString(R.string.undo));
-        setButtonIcon(undoButton, selecting && !calculating ? R.drawable.ic_select_none : 0);
-        undoButton.setContentDescription(
-                getContext()
-                        .getString(
-                                calculating
-                                        ? R.string.cancel_calculation
-                                        : selecting
-                                                ? R.string.select_none_description
-                                                : R.string.undo_description));
-        undoButton.setLongClickable(!selecting || calculating);
+        bindButton(CalculatorKey.UNDO, buttons.get(CalculatorKey.UNDO));
     }
 
     private int dp(int n) {
@@ -346,46 +374,11 @@ public final class CalculatorKeypad extends ViewGroup {
         Button button = new Button(getContext());
         button.setAllCaps(false);
         button.setTag(key);
-        registerButton(key, button);
-        labelButton(key, button);
+        buttons.put(definition, button);
         styleKey(key, button);
-        button.setContentDescription(keyDescription(key));
-        button.setOnClickListener(
-                v -> command.accept(key.equals("CLEAR") ? "SMART_CLEAR" : effectiveKey(key)));
-        boolean longPressKey =
-                EntryEditor.isEntryKey(key)
-                        || switch (key) {
-                            case "π", Command.UNDO, "BACK", "SWAP", Command.ENTER -> true;
-                            default -> false;
-                        };
-        if (longPressKey) button.setOnLongClickListener(v -> longPress(key));
+        if (EntryEditor.isEntryKey(key)) button.setFontFeatureSettings("tnum");
+        bindButton(definition, button);
         return button;
-    }
-
-    private void registerButton(String key, Button b) {
-        if (key.equals("CLEAR")) clearButton = b;
-        if (key.equals("SWAP")) swapButton = b;
-        if (key.equals("+")) sumButton = b;
-        if (key.equals("×")) productButton = b;
-        if (key.equals(Command.UNDO)) undoButton = b;
-        if (key.equals(Command.ENTER)) enterButton = b;
-        if (key.equals("π")) piButton = b;
-        CalculatorKey definition = CalculatorKey.find(key);
-        if (definition.inverse() != null) inverseButtons.put(key, b);
-    }
-
-    private void labelButton(String key, Button button) {
-        CharSequence label = functionLabel(key);
-        if (key.equals(CalculatorKey.RECIPROCAL.wire)) {
-            SpannableString fraction = new SpannableString(label);
-            fraction.setSpan(new ReciprocalSpan(), 0, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            button.setText(fraction);
-        } else
-            button.setText(EntryEditor.isEntryKey(key) ? numbers.entry(label.toString()) : label);
-        if (EntryEditor.isEntryKey(key)) {
-            button.setFontFeatureSettings("tnum");
-            numberButtons.put(key, button);
-        }
     }
 
     private void styleKey(String key, Button b) {
@@ -419,35 +412,6 @@ public final class CalculatorKeypad extends ViewGroup {
         return translated.isEmpty() ? wire : translated;
     }
 
-    private boolean longPress(String key) {
-        switch (key) {
-            case "π":
-                tau = !tau;
-                updateConstant();
-                saveTau.accept(tau);
-                break;
-            case ".":
-                command.accept("HOLD_DECIMAL");
-                break;
-            case Command.UNDO:
-                if (calculating || !selecting)
-                    command.accept(calculating ? Command.CANCEL : Command.REDO);
-                break;
-            case "BACK":
-                if (!selecting) command.accept("HOLD_DROP");
-                break;
-            case "SWAP":
-                if (!selecting) command.accept("ROLL_UP");
-                break;
-            case Command.ENTER:
-                command.accept(Command.PASTE);
-                break;
-            default:
-                command.accept("HOLD_DIGIT:" + key);
-        }
-        return true;
-    }
-
     private void addRows(CalculatorKey[][] keys, List<LinearLayout> rows) {
         for (CalculatorKey[] entries : keys) {
             LinearLayout row = new LinearLayout(getContext());
@@ -455,7 +419,6 @@ public final class CalculatorKeypad extends ViewGroup {
                 String key = definition.wire;
                 FrameLayout cell = new FrameLayout(getContext());
                 Button b = button(definition);
-                if (key.equals("BACK")) deleteButton = b;
                 cell.addView(b, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
                 row.addView(cell, new LinearLayout.LayoutParams(0, -1, 1));
             }
@@ -488,18 +451,6 @@ public final class CalculatorKeypad extends ViewGroup {
         complements.setActivated(expanded && inverse);
         functions.setTextColor(expanded && !inverse ? colors.accent : colors.text);
         complements.setTextColor(expanded && inverse ? colors.accent : colors.text);
-        functions.setContentDescription(
-                getContext()
-                        .getString(
-                                expanded && !inverse
-                                        ? R.string.close_functions
-                                        : R.string.open_functions));
-        complements.setContentDescription(
-                getContext()
-                        .getString(
-                                expanded && inverse
-                                        ? R.string.close_complements
-                                        : R.string.open_complements));
         if (Build.VERSION.SDK_INT >= 30) {
             functions.setStateDescription(
                     getContext()

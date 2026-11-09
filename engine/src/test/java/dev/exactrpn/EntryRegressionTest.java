@@ -350,7 +350,10 @@ final class EntryRegressionTest extends RegressionSupport {
         } catch (IllegalArgumentException expected) {
             assertEquals("8", pasted.entry(), "invalid paste preserves state");
         }
-        keys(pasted, "PASTE_RAW:0.1", "ENTER", "PASTE_RAW:0.2", "+");
+        pasted.pasteText("0.1", NumberText.COMPUTER);
+        pasted.key("ENTER");
+        pasted.pasteText("0.2", NumberText.COMPUTER);
+        pasted.key("+");
         assertTrue(
                 top(pasted).definitelyEquals(RpnCalculator.parse("0.3")),
                 "pasted arithmetic remains exact");

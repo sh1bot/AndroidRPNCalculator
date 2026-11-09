@@ -29,12 +29,17 @@ import java.util.concurrent.atomic.AtomicReference;
 public final class FunctionsTest {
     private CalculationRequest request(String key, byte[] input, FractionMode fractionMode)
             throws java.io.IOException {
+        return request(Command.key(key), input, fractionMode);
+    }
+
+    private CalculationRequest request(Command key, byte[] input, FractionMode fractionMode)
+            throws java.io.IOException {
         CalculationRequest request = new CalculationRequest(key);
         request.input = input;
         if (input != null
-                && !key.equals("RESTORE")
-                && !key.startsWith("COPY_ROWS")
-                && !Command.parse(key).isDisplayOnly())
+                && !key.is("RESTORE")
+                && key.kind != Command.Kind.COPY_ROWS
+                && !key.isDisplayOnly())
             request.entryDraft =
                     RpnCalculator.load(input).detachEntryEditor().entryForCommit().save();
         request.angle = RpnCalculator.AngleUnit.RAD;
@@ -148,7 +153,7 @@ public final class FunctionsTest {
                                     () ->
                                             remote.evaluate(
                                                     request(
-                                                            "COPY_ROWS:0",
+                                                            Command.rows(Command.Kind.COPY_ROWS, 0),
                                                             mixed.state,
                                                             FractionMode.MIXED)))
                             .get(15, TimeUnit.SECONDS);
@@ -236,7 +241,7 @@ public final class FunctionsTest {
     @Test
     public void inverseButtonsSendTheDisplayedFunction() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        AtomicReference<String> command = new AtomicReference<>();
+        AtomicReference<Command> command = new AtomicReference<>();
         InstrumentationRegistry.getInstrumentation()
                 .runOnMainSync(
                         () -> {
@@ -259,26 +264,26 @@ public final class FunctionsTest {
                                 Button button = find(keypad, example[0]);
                                 assertNotNull(example[0], button);
                                 button.performClick();
-                                assertEquals(example[1], command.get());
+                                assertEquals(example[1], command.get().wire);
                             }
                             Button drop = ((Button) keypad.findViewWithTag("BACK"));
                             drop.performLongClick();
-                            assertEquals("HOLD_DROP", command.get());
+                            assertEquals("ROLL_DOWN", command.get().wire);
                             drop.performClick();
-                            assertEquals("BACK", command.get());
+                            assertEquals("DROP", command.get().wire);
                             Button swap = ((Button) keypad.findViewWithTag("SWAP"));
                             swap.performLongClick();
-                            assertEquals("ROLL_UP", command.get());
+                            assertEquals("ROLL_UP", command.get().wire);
                             swap.performClick();
-                            assertEquals("SWAP", command.get());
+                            assertEquals("SWAP", command.get().wire);
                             Button decimal = (Button) keypad.findViewWithTag(".");
                             assertTrue(!decimal.isLongClickable());
-                            keypad.setMode(true, false);
+                            keypad.setMode(InteractionMode.ENTRY);
                             assertTrue(decimal.isLongClickable());
                             decimal.performLongClick();
-                            assertEquals("HOLD_DECIMAL", command.get());
+                            assertEquals("HOLD_DECIMAL", command.get().wire);
                             find(keypad, "⌫").performLongClick();
-                            assertEquals("HOLD_DROP", command.get());
+                            assertEquals("BACK", command.get().wire);
                             keypad.setInverse(false);
                             Button log = find(keypad, "log10");
                             assertNotNull(log);
@@ -298,7 +303,7 @@ public final class FunctionsTest {
                             Button sine = find(keypad, "sin");
                             assertNotNull(sine);
                             sine.performClick();
-                            assertEquals("sin", command.get());
+                            assertEquals("sin", command.get().wire);
                         });
     }
 

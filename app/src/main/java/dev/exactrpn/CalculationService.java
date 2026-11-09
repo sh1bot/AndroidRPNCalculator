@@ -81,7 +81,7 @@ public class CalculationService extends Service {
         try {
             checkAccess();
             CalculationRequest request = CalculationRequest.decode(encoded);
-            Command command = request.command();
+            Command command = request.command;
             readOnly = false;
             loadCheckpoint(request, response);
             readOnly = command.kind == Command.Kind.COPY_ROWS;
@@ -129,6 +129,10 @@ public class CalculationService extends Service {
         byte[] state = evaluation.candidate.save();
         DisplayResult display = evaluation.presentation();
         String id = UUID.randomUUID().toString();
+        display.editorDisposition =
+                evaluation.keepEditor(entry)
+                        ? DisplayResult.EditorDisposition.KEEP
+                        : DisplayResult.EditorDisposition.RESTORE;
         display.checkpoint = id;
         display.state = state;
         byte[] encoded = DisplayResult.encode(display, entry);
@@ -182,13 +186,17 @@ public class CalculationService extends Service {
     private final class Evaluation {
         final RpnCalculator candidate;
         final String stackId;
+        final Command command;
+        final EntryEditor.State beforeEntry;
+        final boolean sameStack;
         ValueFormatter.Notation notation;
         NumberMode numberMode;
         FractionMode fractionMode;
         String operationError = "";
 
         Evaluation(CalculationRequest request) {
-            Command key = request.command();
+            Command key = request.command;
+            command = key;
             List<UnifiedReal> before = cached.values();
             candidate = cached;
             byte[] draft = request.entryDraft;
@@ -200,6 +208,7 @@ public class CalculationService extends Service {
                     throw new IllegalArgumentException("Invalid entry draft", ex);
                 }
             }
+            beforeEntry = candidate.entryState();
             Locale locale = Locale.forLanguageTag(request.locale);
             numberMode = request.numberMode;
             fractionMode = request.fractionMode;
@@ -223,7 +232,17 @@ public class CalculationService extends Service {
                     operationError = ErrorMessages.describe(CalculationService.this, ex);
                 }
             }
-            stackId = candidate.sameStack(before) ? cachedStackId : UUID.randomUUID().toString();
+            sameStack = candidate.sameStack(before);
+            stackId = sameStack ? cachedStackId : UUID.randomUUID().toString();
+        }
+
+        boolean keepEditor(EntryEditor returned) {
+            if (command.isDisplayOnly()) return true;
+            return !command.is(Command.RESTORE)
+                    && !command.is(Command.UNDO)
+                    && !command.is(Command.REDO)
+                    && sameStack
+                    && beforeEntry.same(returned);
         }
 
         DisplayResult presentation() {

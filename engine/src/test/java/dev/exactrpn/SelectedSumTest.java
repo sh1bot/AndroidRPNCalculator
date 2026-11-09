@@ -17,7 +17,7 @@ final class SelectedSumTest {
         }
         CalculatorTestSupport.paste(c, "45");
         c.select(1, 1);
-        Command command = Command.parse("SUM_ROWS:2,0,2");
+        Command command = Command.rows(Command.Kind.SUM_ROWS, 2, 0, 2);
         assertTrue(command.preservesSelection());
         assertArrayEquals(new int[] {2, 0, 2}, command.rows());
         int history = c.undoCount();
