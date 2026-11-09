@@ -73,19 +73,11 @@ public enum CalculatorKey {
     private final String inverseName, unicode;
     private final int ctrl;
     private final int[] codes;
+    private static final CalculatorKey[] KEYS = values();
     private static final Map<String, CalculatorKey> WIRES = new HashMap<>();
-    private static final Map<Integer, CalculatorKey> CODES = new HashMap<>(),
-            UNICODE = new HashMap<>(),
-            CONTROL = new HashMap<>();
 
     static {
-        for (CalculatorKey key : values()) {
-            WIRES.put(key.wire, key);
-            for (int code : key.codes) CODES.put(code, key);
-            for (int i = 0; i < key.unicode.length(); i++)
-                UNICODE.put((int) key.unicode.charAt(i), key);
-            if (key.ctrl != 0) CONTROL.put(key.ctrl, key);
-        }
+        for (CalculatorKey key : KEYS) WIRES.put(key.wire, key);
     }
 
     CalculatorKey() {
@@ -187,11 +179,17 @@ public enum CalculatorKey {
     }
 
     public static String keyboard(int code, int unicode, boolean ctrl) {
-        CalculatorKey key = (ctrl ? CONTROL : CODES).get(code);
-        if (key == null && !ctrl) {
-            int digit = Character.digit(unicode, 10);
-            key = digit >= 0 ? WIRES.get(Integer.toString(digit)) : UNICODE.get(unicode);
+        for (CalculatorKey key : KEYS) {
+            if (ctrl) {
+                if (key.ctrl != 0 && key.ctrl == code) return key.wire;
+            } else {
+                for (int binding : key.codes) if (binding == code) return key.wire;
+            }
         }
-        return key == null ? null : key.wire;
+        if (ctrl) return null;
+        int digit = Character.digit(unicode, 10);
+        if (digit >= 0) return Integer.toString(digit);
+        for (CalculatorKey key : KEYS) if (key.unicode.indexOf(unicode) >= 0) return key.wire;
+        return null;
     }
 }

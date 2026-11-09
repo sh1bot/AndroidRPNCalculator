@@ -78,7 +78,7 @@ final class RemoteCalculator {
         this.temporary = temporary;
     }
 
-    Bundle evaluate(CalculationRequest request) {
+    DisplayResult evaluate(CalculationRequest request) {
         if (!temporary) DeviceAccess.requireUnlocked(context);
         CompletableFuture<Bundle> future = new CompletableFuture<>();
         String inputId = request.inputId;
@@ -125,7 +125,7 @@ final class RemoteCalculator {
         }
     }
 
-    private Bundle readResponse(Bundle response, int epoch) throws IOException {
+    private DisplayResult readResponse(Bundle response, int epoch) throws IOException {
         if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
         if (response.getBoolean("invalidCheckpoint"))
             throw new InvalidCheckpoint(response.getString("error"));
@@ -138,10 +138,10 @@ final class RemoteCalculator {
                             CalculationError.Code.valueOf(response.getString("errorCode")),
                             response.getInt("errorArgument")));
         if (response.containsKey("error")) throw new UserFailure(response.getString("error"));
-        Bundle result = DisplayResult.decode(response.getByteArray("payload"));
+        DisplayResult result = DisplayResult.decode(response.getByteArray("payload"));
         synchronized (this) {
             if (closed || epoch != generation) throw new com.hp.creals.CR.AbortedException();
-            if (result.containsKey("state")) remoteSnapshotId = result.getString("checkpoint");
+            if (result.state != null) remoteSnapshotId = result.checkpoint;
         }
         return result;
     }

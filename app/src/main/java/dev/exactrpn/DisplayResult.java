@@ -1,73 +1,74 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-import static dev.exactrpn.Transfer.readText;
-import static dev.exactrpn.Transfer.writeText;
+import static dev.exactrpn.Transfer.*;
 
-import android.os.Bundle;
-
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.*;
 import java.util.ArrayList;
 
-/** Explicit, transient display protocol; contains no Parcelable or Java object serialization. */
+/** Typed arithmetic reply. Only the outer Messenger envelope uses an Android Bundle. */
 final class DisplayResult {
-    private static final String[] TEXT = {
-        "stackId", "angle", "notation", "checkpoint", "operationError", "compactTop"
-    };
-    private static final String[] INTS = {"numberMode", "fractionMode"};
+    String stackId, checkpoint, copyText;
+    String operationError = "", compactTop = "";
+    byte[] state, entryState;
+    ArrayList<String> rows = new ArrayList<>();
+    RpnCalculator.AngleUnit angle = RpnCalculator.AngleUnit.RAD;
+    ValueFormatter.Notation notation = ValueFormatter.Notation.SCIENTIFIC;
+    NumberMode numberMode = NumberMode.LOCALE;
+    FractionMode fractionMode = FractionMode.DECIMAL;
 
-    static byte[] encode(Bundle result, EntryEditor editor) throws IOException {
+    static byte[] encode(DisplayResult result, EntryEditor editor) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
-            out.writeInt(0x44525036);
-            boolean copy = result.containsKey("copyText");
+            out.writeInt(0x44525037);
+            boolean copy = result.copyText != null;
             out.writeBoolean(copy);
             if (copy) {
-                writeText(out, result.getString("copyText"));
-                return Transfer.require(bytes.toByteArray());
+                writeText(out, result.copyText);
+            } else {
+                writeBytes(out, result.state);
+                writeText(out, result.stackId);
+                writeText(out, result.checkpoint);
+                writeText(out, result.operationError);
+                writeText(out, result.compactTop);
+                out.writeByte(result.angle.ordinal());
+                out.writeByte(result.notation.ordinal());
+                out.writeByte(result.numberMode.ordinal());
+                out.writeByte(result.fractionMode.ordinal());
+                out.writeInt(result.rows.size());
+                for (String value : result.rows) writeText(out, value);
+                writeBytes(out, editor.save(CalculationLimits.TRANSFER_BYTES - bytes.size() - 4));
             }
-            byte[] state = result.getByteArray("state");
-            out.writeInt(state.length);
-            out.write(state);
-            for (String key : TEXT) writeText(out, result.getString(key));
-            ArrayList<String> list = result.getStringArrayList("rows");
-            out.writeInt(list.size());
-            for (String value : list) writeText(out, value);
-            for (String key : INTS) out.writeInt(result.getInt(key));
-            Transfer.writeBytes(
-                    out, editor.save(CalculationLimits.TRANSFER_BYTES - bytes.size() - 4));
         }
-        return Transfer.require(bytes.toByteArray());
+        return require(bytes.toByteArray());
     }
 
-    static Bundle decode(byte[] bytes) throws IOException {
-        try (DataInputStream in =
-                new DataInputStream(new ByteArrayInputStream(Transfer.require(bytes)))) {
-            if (in.readInt() != 0x44525036) throw new IOException("Unknown display protocol");
-            Bundle result = new Bundle();
+    static DisplayResult decode(byte[] bytes) throws IOException {
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(require(bytes)))) {
+            if (in.readInt() != 0x44525037) throw new IOException("Unknown display protocol");
+            DisplayResult result = new DisplayResult();
             if (in.readBoolean()) {
-                result.putString("copyText", readText(in));
-                if (in.read() != -1) throw new IOException("Trailing copy data");
-                return result;
+                result.copyText = readText(in);
+                if (result.copyText == null) throw new IOException("Missing clipboard text");
+            } else {
+                result.state = readBytes(in);
+                result.stackId = readText(in);
+                result.checkpoint = readText(in);
+                result.operationError = readText(in);
+                result.compactTop = readText(in);
+                result.angle = readEnum(in, RpnCalculator.AngleUnit.values());
+                result.notation = readEnum(in, ValueFormatter.Notation.values());
+                result.numberMode = readEnum(in, NumberMode.values());
+                result.fractionMode = readEnum(in, FractionMode.values());
+                int count = in.readInt();
+                if (count < 0 || count > in.available() / 4)
+                    throw new IOException("Invalid display row count");
+                result.rows.ensureCapacity(count);
+                for (int i = 0; i < count; i++) result.rows.add(readText(in));
+                result.entryState = readBytes(in);
+                if (result.state == null || result.entryState == null)
+                    throw new IOException("Missing calculation state");
             }
-            int size = in.readInt();
-            if (size < 0 || size > in.available()) throw new IOException("Invalid snapshot length");
-            byte[] state = new byte[size];
-            in.readFully(state);
-            result.putByteArray("state", state);
-            for (String key : TEXT) result.putString(key, readText(in));
-            int count = in.readInt();
-            if (count < 0 || count > in.available() / 4)
-                throw new IOException("Invalid display row count");
-            ArrayList<String> list = new ArrayList<>(count);
-            for (int i = 0; i < count; i++) list.add(readText(in));
-            result.putStringArrayList("rows", list);
-            for (String key : INTS) result.putInt(key, in.readInt());
-            result.putByteArray("entryState", Transfer.readBytes(in));
             if (in.read() != -1) throw new IOException("Trailing display data");
             return result;
         }

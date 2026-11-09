@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-import android.os.Bundle;
-
 import java.util.AbstractList;
 import java.util.Collections;
 import java.util.List;
@@ -33,9 +31,9 @@ final class Display {
         start = end = 0;
     }
 
-    Display(Bundle result, EntryEditor editor) {
-        fullRows = Collections.unmodifiableList(result.getStringArrayList("rows"));
-        String top = result.getString("compactTop");
+    Display(DisplayResult result, EntryEditor editor) {
+        fullRows = Collections.unmodifiableList(result.rows);
+        String top = result.compactTop;
         compactRows =
                 new AbstractList<String>() {
                     public int size() {
@@ -47,13 +45,13 @@ final class Display {
                         return index == size() - 1 ? top : value;
                     }
                 };
-        stackId = result.getString("stackId");
+        stackId = result.stackId;
         entry = editor.entry();
         problem = editor.entryProblem();
-        notation = ValueFormatter.Notation.valueOf(result.getString("notation"));
-        angleUnit = RpnCalculator.AngleUnit.valueOf(result.getString("angle"));
-        numberMode = NumberMode.values()[result.getInt("numberMode")];
-        fractionMode = FractionMode.values()[result.getInt("fractionMode")];
+        notation = result.notation;
+        angleUnit = result.angle;
+        numberMode = result.numberMode;
+        fractionMode = result.fractionMode;
         editing = editor.isEditing();
         rows = editing ? compactRows : fullRows;
         raw = editor.rawEntry();

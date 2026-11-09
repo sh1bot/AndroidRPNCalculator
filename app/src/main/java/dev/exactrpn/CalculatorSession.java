@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -273,15 +272,14 @@ final class CalculatorSession {
                 return;
             }
             if (onMain(() -> editLocally(key, generation))) return;
-            Bundle result = remote.evaluate(request(key));
+            DisplayResult result = remote.evaluate(request(key));
             if (key.kind == Command.Kind.COPY_ROWS) {
-                if (input.copy != null)
-                    handler.post(() -> input.copy.accept(result.getString("copyText")));
+                if (input.copy != null) handler.post(() -> input.copy.accept(result.copyText));
                 return;
             }
             EntryEditor incoming;
             try {
-                incoming = EntryEditor.load(result.getByteArray("entryState"));
+                incoming = EntryEditor.load(result.entryState);
             } catch (java.io.IOException ex) {
                 throw new IllegalStateException("Invalid entry response", ex);
             }
@@ -383,7 +381,7 @@ final class CalculatorSession {
     }
 
     private void publishResult(
-            Bundle result,
+            DisplayResult result,
             Display nextDisplay,
             EntryEditor incoming,
             Command key,
@@ -402,10 +400,7 @@ final class CalculatorSession {
                             selectedRows.clear();
                             selectedRows.addAll(remaining);
                         }
-                        checkpoint =
-                                new CalculationSnapshot(
-                                        result.getString("checkpoint"),
-                                        result.getByteArray("state"));
+                        checkpoint = new CalculationSnapshot(result.checkpoint, result.state);
                         notation = nextDisplay.notation;
                         numberMode = nextDisplay.numberMode;
                         fractionMode = nextDisplay.fractionMode;
@@ -428,7 +423,7 @@ final class CalculatorSession {
                         }
                         arithmeticDisplay = nextDisplay;
                         display = new Display(nextDisplay, editor);
-                        String operationError = result.getString("operationError", "");
+                        String operationError = result.operationError;
                         setError(
                                 generation,
                                 operationError.isEmpty()

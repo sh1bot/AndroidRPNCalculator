@@ -8,7 +8,6 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import android.content.Context;
-import android.os.Bundle;
 import android.os.SystemClock;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -45,11 +44,11 @@ public final class CancellationTest {
             for (int i = 0; i < 4; i++) {
                 RemoteCalculator remote = new RemoteCalculator(context);
                 try {
-                    Bundle result =
+                    DisplayResult result =
                             worker.submit(() -> remote.evaluate(request("RESTORE", null)))
                                     .get(20, TimeUnit.SECONDS);
-                    assertTrue(result.getStringArrayList("rows").isEmpty());
-                    assertTrue(result.getByteArray("state").length > 0);
+                    assertTrue(result.rows.isEmpty());
+                    assertTrue(result.state.length > 0);
                 } finally {
                     remote.close();
                 }
@@ -76,18 +75,19 @@ public final class CancellationTest {
             store.save(Files.readAllBytes(seed.toPath()));
             // Cold process startup/restoration is separate from the strict cancellation budget.
             long restoring = SystemClock.elapsedRealtime();
-            Bundle initial =
+            DisplayResult initial =
                     worker.submit(() -> remote.evaluate(request("RESTORE", store.load())))
                             .get(30, TimeUnit.SECONDS);
             System.out.println(
                     "Initial checkpoint restore took "
                             + (SystemClock.elapsedRealtime() - restoring)
                             + " ms");
-            byte[] accepted = initial.getByteArray("state");
+            byte[] accepted = initial.state;
             store.save(accepted);
             byte[] committed =
                     Files.readAllBytes(new File(StoreTestSupport.checkpoint(store)).toPath());
-            Future<Bundle> stuck = worker.submit(() -> remote.evaluate(request("1/x", accepted)));
+            Future<DisplayResult> stuck =
+                    worker.submit(() -> remote.evaluate(request("1/x", accepted)));
             SystemClock.sleep(300);
             assertFalse("Reciprocal of unknown zero should still be calculating", stuck.isDone());
             long started = SystemClock.elapsedRealtime();
@@ -104,22 +104,14 @@ public final class CancellationTest {
                     "Cancelled work cannot replace committed storage",
                     committed,
                     Files.readAllBytes(new File(StoreTestSupport.checkpoint(store)).toPath()));
-            Bundle cleared =
+            DisplayResult cleared =
                     worker.submit(() -> remote.evaluate(request("CLEAR", accepted)))
                             .get(15, TimeUnit.SECONDS);
-            assertTrue(
-                    "A fresh worker must accept new operations",
-                    cleared.getStringArrayList("rows").isEmpty());
-            Bundle undone =
-                    worker.submit(
-                                    () ->
-                                            remote.evaluate(
-                                                    request("UNDO", cleared.getByteArray("state"))))
+            assertTrue("A fresh worker must accept new operations", cleared.rows.isEmpty());
+            DisplayResult undone =
+                    worker.submit(() -> remote.evaluate(request("UNDO", cleared.state)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals(
-                    "Cancellation preserves the old stack and undo",
-                    1,
-                    undone.getStringArrayList("rows").size());
+            assertEquals("Cancellation preserves the old stack and undo", 1, undone.rows.size());
         } finally {
             remote.close();
             worker.shutdownNow();
