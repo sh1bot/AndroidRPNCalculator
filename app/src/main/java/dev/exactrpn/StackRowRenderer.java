@@ -116,9 +116,10 @@ final class StackRowRenderer {
                     previousSize[1] = height;
                     android.text.TextPaint measure = new android.text.TextPaint(value.getPaint());
                     boolean singleLine =
-                            display.fractionMode == FractionMode.DECIMAL
-                                    && fullNumber.contains(".")
-                                    && !fullNumber.startsWith("≈");
+                            !fullNumber.contains("/")
+                                    && (fullNumber.startsWith("≈")
+                                            || fullNumber.contains(".")
+                                            || fullNumber.contains("e"));
                     int fullSize = singleLine ? fittedSize(full, measure, width) : 32;
                     measure.setTextSize(sp(fullSize));
                     android.text.StaticLayout layout =
@@ -156,17 +157,24 @@ final class StackRowRenderer {
                                     (fits ? fullNumber : compactNumber).startsWith("≈ "),
                                     chosen));
                 };
-        // Updating text inside onLayout can leave the row at its previous measured height.
-        View.OnLayoutChangeListener resized = (v, l, t, r, b, ol, ot, or, ob) -> value.post(fit);
-        value.addOnLayoutChangeListener(resized);
+        // Fit before drawing, and let a requested relayout finish before showing the row.
+        // This avoids painting either the unbounded value or a stale font size for a frame.
+        android.view.ViewTreeObserver.OnPreDrawListener fitted =
+                () -> {
+                    fit.run();
+                    return !value.isLayoutRequested();
+                };
         value.addOnAttachStateChangeListener(
                 new View.OnAttachStateChangeListener() {
+                    private android.view.ViewTreeObserver observer;
+
                     public void onViewAttachedToWindow(View v) {
-                        viewport.addOnLayoutChangeListener(resized);
+                        observer = value.getViewTreeObserver();
+                        observer.addOnPreDrawListener(fitted);
                     }
 
                     public void onViewDetachedFromWindow(View v) {
-                        viewport.removeOnLayoutChangeListener(resized);
+                        if (observer.isAlive()) observer.removeOnPreDrawListener(fitted);
                     }
                 });
     }
@@ -234,7 +242,12 @@ final class StackRowRenderer {
             TextView value = text(result ? 32 : 22);
             digits(value);
             value.setGravity(Gravity.END);
-            value.setText(numbers.stack(withoutApproximation(display.rows.get(i)), colors.muted));
+            // Fit from a bounded first layout. A huge exact fraction must never briefly
+            // expand the stack before the viewport-aware fitter chooses its fallback.
+            String initial = result ? display.compactRows.get(i) : display.rows.get(i);
+            value.setText(numbers.stack(withoutApproximation(initial), colors.muted));
+            value.setMaxLines(1);
+            value.setEllipsize(android.text.TextUtils.TruncateAt.END);
             if (!result) {
                 value.setPadding(dp(4), dp(5), dp(4), dp(5));
                 value.setSingleLine(true);

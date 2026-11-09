@@ -139,6 +139,108 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void copyingAndCyclingHugeFractionModesKeepsOneStableLine() throws Exception {
+        MainActivity activity = open();
+        CalculatorSession state = session(activity);
+        java.util.concurrent.atomic.AtomicInteger wrappedFrames =
+                new java.util.concurrent.atomic.AtomicInteger();
+        View root = activity.getWindow().getDecorView();
+        android.view.ViewTreeObserver.OnGlobalLayoutListener watch =
+                () -> {
+                    android.widget.TextView value =
+                            (android.widget.TextView) tagged(activity, "stack-value:0");
+                    if (!state.display.editing
+                            && value != null
+                            && value.getLayout() != null
+                            && value.getLayout().getLineCount() > 1)
+                        wrappedFrames.incrementAndGet();
+                };
+        try {
+            for (Command command :
+                    new Command[] {
+                        Command.paste("1e999"),
+                        Command.key("ENTER"),
+                        Command.paste("7"),
+                        Command.key("÷")
+                    }) {
+                instrumentation.runOnMainSync(() -> state.enqueue(command));
+                await(() -> !state.busy);
+            }
+            while (state.display.fractionMode != FractionMode.DECIMAL) {
+                instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
+                await(() -> !state.busy);
+            }
+            await(() -> tagged(activity, "stack-value:0") != null);
+            instrumentation.runOnMainSync(
+                    () -> root.getViewTreeObserver().addOnGlobalLayoutListener(watch));
+            java.util.concurrent.atomic.AtomicReference<String> firstText =
+                    new java.util.concurrent.atomic.AtomicReference<>();
+            float[] firstSize = {0};
+            int[] firstHeight = {0};
+            ClipboardManager clipboard =
+                    (ClipboardManager)
+                            instrumentation
+                                    .getTargetContext()
+                                    .getSystemService(Context.CLIPBOARD_SERVICE);
+            for (int mode = 0; mode < 7; mode++) {
+                String expectedMode = new String[] {"DEC", "FRAC", "IMPR"}[mode % 3];
+                await(
+                        () -> {
+                            android.widget.TextView modeButton =
+                                    (android.widget.TextView)
+                                            ((android.view.ViewGroup) tagged(activity, "mode-row"))
+                                                    .getChildAt(3);
+                            android.widget.TextView value =
+                                    (android.widget.TextView) tagged(activity, "stack-value:0");
+                            return expectedMode.contentEquals(modeButton.getText())
+                                    && value != null
+                                    && value.getText().length() < 100
+                                    && value.getLayout() != null
+                                    && value.getLayout().getLineCount() == 1
+                                    && value.getLayout().getEllipsisCount(0) == 0;
+                        });
+                instrumentation.waitForIdleSync();
+                int pass = mode;
+                instrumentation.runOnMainSync(
+                        () -> {
+                            android.widget.TextView value =
+                                    (android.widget.TextView) tagged(activity, "stack-value:0");
+                            if (pass == 0) {
+                                firstText.set(value.getText().toString());
+                                firstSize[0] = value.getTextSize();
+                                firstHeight[0] = value.getHeight();
+                            } else {
+                                assertEquals(firstText.get(), value.getText().toString());
+                                assertEquals(firstSize[0], value.getTextSize(), .01f);
+                                assertEquals(firstHeight[0], value.getHeight());
+                            }
+                            clipboard.setPrimaryClip(
+                                    android.content.ClipData.newPlainText("test", "pending"));
+                            value.performLongClick();
+                        });
+                await(
+                        () ->
+                                !state.busy
+                                        && clipboard.hasPrimaryClip()
+                                        && !"pending"
+                                                .contentEquals(
+                                                        clipboard
+                                                                .getPrimaryClip()
+                                                                .getItemAt(0)
+                                                                .getText()));
+                instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
+                await(() -> !state.busy);
+            }
+            assertEquals(
+                    "No intermediate layout may wrap the approximation", 0, wrappedFrames.get());
+        } finally {
+            instrumentation.runOnMainSync(
+                    () -> root.getViewTreeObserver().removeOnGlobalLayoutListener(watch));
+            finish(activity);
+        }
+    }
+
+    @Test
     public void bottomIntegerFitsTheStackViewportBeforeAndAfterExpandingFunctions()
             throws Exception {
         MainActivity a = open();
