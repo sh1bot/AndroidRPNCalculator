@@ -42,6 +42,31 @@ public final class CalculatorKeypad extends ViewGroup {
     private boolean functionsBeside;
     private int primaryWidth;
     private final Consumer<Command> command;
+    private Runnable beforeInput = () -> {};
+
+    void setBeforeInput(Runnable refresh) {
+        beforeInput = refresh;
+    }
+
+    private final class KeyButton extends Button {
+        Runnable click, hold;
+
+        KeyButton() {
+            super(CalculatorKeypad.this.getContext());
+            setOnClickListener(
+                    v -> {
+                        beforeInput.run();
+                        if (isEnabled() && click != null) click.run();
+                    });
+            setOnLongClickListener(
+                    v -> {
+                        beforeInput.run();
+                        if (!isEnabled() || hold == null) return false;
+                        hold.run();
+                        return true;
+                    });
+        }
+    }
 
     public CalculatorKeypad(
             Context context,
@@ -339,16 +364,10 @@ public final class CalculatorKeypad extends ViewGroup {
         button.setContentDescription(description);
         button.setEnabled(enabled);
         button.setAlpha(enabled ? 1f : .38f);
-        Runnable action = click, heldAction = hold;
-        button.setOnClickListener(v -> action.run());
-        button.setOnLongClickListener(
-                heldAction == null
-                        ? null
-                        : v -> {
-                            heldAction.run();
-                            return true;
-                        });
-        button.setLongClickable(heldAction != null);
+        KeyButton bound = (KeyButton) button;
+        bound.click = click;
+        bound.hold = hold;
+        button.setLongClickable(hold != null);
     }
 
     private void setButtonIcon(Button button, int resource) {
@@ -371,7 +390,7 @@ public final class CalculatorKeypad extends ViewGroup {
 
     private Button button(CalculatorKey definition) {
         String key = definition.wire;
-        Button button = new Button(getContext());
+        Button button = new KeyButton();
         button.setAllCaps(false);
         button.setTag(key);
         buttons.put(definition, button);
