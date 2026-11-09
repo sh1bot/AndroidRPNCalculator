@@ -6,7 +6,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
-import android.os.Bundle;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -123,7 +122,7 @@ public final class FunctionsTest {
             TestCalculator calculator = new TestCalculator();
             for (String key : new String[] {"7", "ENTER", "3", "÷"}) calculator.key(key);
             Files.write(seed.toPath(), calculator.save());
-            Bundle improper =
+            DisplayResult improper =
                     worker.submit(
                                     () ->
                                             remote.evaluate(
@@ -132,28 +131,28 @@ public final class FunctionsTest {
                                                             Files.readAllBytes(seed.toPath()),
                                                             FractionMode.IMPROPER)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("7/3", improper.getStringArrayList("rows").get(0));
-            Bundle mixed =
+            assertEquals("7/3", improper.rows.get(0));
+            DisplayResult mixed =
                     worker.submit(
                                     () ->
                                             remote.evaluate(
                                                     request(
                                                             "FRACTION",
-                                                            improper.getByteArray("state"),
+                                                            improper.state,
                                                             FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals(FractionMode.MIXED.ordinal(), mixed.getInt("fractionMode"));
-            assertEquals("2 1/3", mixed.getStringArrayList("rows").get(0));
-            Bundle copied =
+            assertEquals(FractionMode.MIXED.ordinal(), mixed.fractionMode.ordinal());
+            assertEquals("2 1/3", mixed.rows.get(0));
+            DisplayResult copied =
                     worker.submit(
                                     () ->
                                             remote.evaluate(
                                                     request(
                                                             "COPY_ROWS:0",
-                                                            mixed.getByteArray("state"),
+                                                            mixed.state,
                                                             FractionMode.MIXED)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("2 1/3", copied.getString("copyText"));
+            assertEquals("2 1/3", copied.copyText);
             android.text.Spanned styled =
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.DOT).stack("2 1/3", 0);
@@ -198,7 +197,7 @@ public final class FunctionsTest {
                                     longFraction.getSpanEnd(fullDenominator[0]))
                             .toString());
             assertTrue(
-                    TestCalculator.load(mixed.getByteArray("state"))
+                    TestCalculator.load(mixed.state)
                             .values()
                             .get(0)
                             .multiply(new com.android.calculator2.UnifiedReal(3))
@@ -206,7 +205,7 @@ public final class FunctionsTest {
             calculator = new TestCalculator();
             CalculatorTestSupport.paste(calculator, "84");
             Files.write(seed.toPath(), calculator.save());
-            Bundle factored =
+            DisplayResult factored =
                     worker.submit(
                                     () ->
                                             remote.evaluate(
@@ -215,18 +214,18 @@ public final class FunctionsTest {
                                                             Files.readAllBytes(seed.toPath()),
                                                             FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals(Arrays.asList("2", "2", "3", "7"), factored.getStringArrayList("rows"));
-            Bundle undone =
+            assertEquals(Arrays.asList("2", "2", "3", "7"), factored.rows);
+            DisplayResult undone =
                     worker.submit(
                                     () ->
                                             remote.evaluate(
                                                     request(
                                                             "UNDO",
-                                                            factored.getByteArray("state"),
+                                                            factored.state,
                                                             FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("84", EntryEditor.load(undone.getByteArray("entryState")).entry());
-            assertTrue(undone.getStringArrayList("rows").isEmpty());
+            assertEquals("84", EntryEditor.load(undone.entryState).entry());
+            assertTrue(undone.rows.isEmpty());
         } finally {
             remote.close();
             worker.shutdownNow();
@@ -309,14 +308,12 @@ public final class FunctionsTest {
         RemoteCalculator remote = new RemoteCalculator(context);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
-            Bundle result =
+            DisplayResult result =
                     worker.submit(() -> remote.evaluate(request("+", null, FractionMode.DECIMAL)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals(
-                    context.getString(R.string.error_need_values, 2),
-                    result.getString("operationError"));
-            assertTrue(result.getStringArrayList("rows").isEmpty());
-            assertTrue(result.getByteArray("state").length > 0);
+            assertEquals(context.getString(R.string.error_need_values, 2), result.operationError);
+            assertTrue(result.rows.isEmpty());
+            assertTrue(result.state.length > 0);
         } finally {
             remote.close();
             worker.shutdownNow();

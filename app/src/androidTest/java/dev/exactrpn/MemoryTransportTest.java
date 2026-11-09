@@ -4,7 +4,6 @@ package dev.exactrpn;
 import static org.junit.Assert.*;
 
 import android.content.Context;
-import android.os.Bundle;
 import android.os.FileObserver;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -37,14 +36,14 @@ public final class MemoryTransportTest {
         return observer;
     }
 
-    private CalculationRequest request(String key, Bundle accepted) {
+    private CalculationRequest request(String key, DisplayResult accepted) {
         CalculationRequest request = new CalculationRequest(key);
         request.angle = RpnCalculator.AngleUnit.RAD;
         request.notation = ValueFormatter.Notation.SCIENTIFIC;
         request.locale = "en-US";
         if (accepted != null) {
-            request.input = accepted.getByteArray("state");
-            request.inputId = accepted.getString("checkpoint");
+            request.input = accepted.state;
+            request.inputId = accepted.checkpoint;
         }
         return request;
     }
@@ -52,26 +51,28 @@ public final class MemoryTransportTest {
     @Test
     public void displayPacketSharesRowsAndBudgetsEntryHistoryWithoutTruncatingValues()
             throws Exception {
-        Bundle result = new Bundle();
+        DisplayResult result = new DisplayResult();
         String row = String.join("", java.util.Collections.nCopies(9, "1234567890")) + "/7";
-        result.putStringArrayList(
-                "rows", new java.util.ArrayList<>(java.util.Collections.nCopies(2000, row)));
-        result.putString("compactTop", "1.76e+88");
-        result.putString("stackId", "stack");
-        result.putString("checkpoint", "checkpoint");
-        result.putString("angle", "RAD");
-        result.putString("notation", "SCIENTIFIC");
-        result.putString("entry", "");
-        result.putString("problem", "");
-        result.putByteArray("state", new TestCalculator().save());
+        result.rows = new java.util.ArrayList<>(java.util.Collections.nCopies(2000, row));
+        result.compactTop = "1.76e+88";
+        result.stackId = "stack";
+        result.checkpoint = "checkpoint";
+        result.angle = RpnCalculator.AngleUnit.GRAD;
+        result.notation = ValueFormatter.Notation.ENGINEERING;
+        result.numberMode = NumberMode.UNGROUPED;
+        result.fractionMode = FractionMode.IMPROPER;
+        result.state = new TestCalculator().save();
         EntryEditor editor = new EntryEditor();
         for (int i = 0; i < 1000; i++) editor.key("9");
         byte[] packet = DisplayResult.encode(result, editor);
         assertTrue(packet.length <= CalculationLimits.TRANSFER_BYTES);
-        Bundle decoded = DisplayResult.decode(packet);
-        assertFalse(decoded.containsKey("compactRows"));
-        assertEquals(result.getStringArrayList("rows"), decoded.getStringArrayList("rows"));
-        EntryEditor restored = EntryEditor.load(decoded.getByteArray("entryState"));
+        DisplayResult decoded = DisplayResult.decode(packet);
+        assertEquals(result.rows, decoded.rows);
+        assertEquals(result.angle, decoded.angle);
+        assertEquals(result.notation, decoded.notation);
+        assertEquals(result.numberMode, decoded.numberMode);
+        assertEquals(result.fractionMode, decoded.fractionMode);
+        EntryEditor restored = EntryEditor.load(decoded.entryState);
         assertEquals(String.join("", java.util.Collections.nCopies(1000, "9")), restored.entry());
         assertTrue(restored.undoCount() > 0 && restored.undoCount() < 100);
         Display full = new Display(decoded, new EntryEditor());
@@ -83,11 +84,9 @@ public final class MemoryTransportTest {
         assertThrows(
                 java.io.IOException.class,
                 () -> DisplayResult.decode(java.util.Arrays.copyOf(packet, packet.length - 1)));
-        Bundle copy = new Bundle();
-        copy.putString("copyText", "7/3");
-        assertEquals(
-                "7/3",
-                DisplayResult.decode(DisplayResult.encode(copy, null)).getString("copyText"));
+        DisplayResult copy = new DisplayResult();
+        copy.copyText = "7/3";
+        assertEquals("7/3", DisplayResult.decode(DisplayResult.encode(copy, null)).copyText);
     }
 
     @Test
@@ -96,7 +95,7 @@ public final class MemoryTransportTest {
         RemoteCalculator remote = new RemoteCalculator(context, true);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
-            Bundle accepted = null;
+            DisplayResult accepted = null;
             for (String key : new String[] {"RESTORE", "10ˣ", "ENTER", "ENTER", "ENTER"}) {
                 CalculationRequest next = request(key, accepted);
                 if (key.equals("10ˣ")) {
@@ -113,14 +112,15 @@ public final class MemoryTransportTest {
             expectTooLarge(worker, remote, oversized);
             CalculationRequest single = request("COPY_ROWS:0", accepted);
             single.input = null;
-            Bundle copied = worker.submit(() -> remote.evaluate(single)).get(30, TimeUnit.SECONDS);
-            assertEquals(65537, copied.getString("copyText").length());
-            assertTrue(copied.getString("copyText").startsWith("1"));
+            DisplayResult copied =
+                    worker.submit(() -> remote.evaluate(single)).get(30, TimeUnit.SECONDS);
+            assertEquals(65537, copied.copyText.length());
+            assertTrue(copied.copyText.startsWith("1"));
             remote.cancel();
             CalculationRequest restore = request("RESTORE", accepted);
-            Bundle restored =
+            DisplayResult restored =
                     worker.submit(() -> remote.evaluate(restore)).get(30, TimeUnit.SECONDS);
-            assertEquals(accepted.getStringArrayList("rows"), restored.getStringArrayList("rows"));
+            assertEquals(accepted.rows, restored.rows);
         } finally {
             remote.close();
             worker.shutdownNow();
@@ -150,9 +150,9 @@ public final class MemoryTransportTest {
             TestCalculator calculator = new TestCalculator();
             CalculatorTestSupport.paste(calculator, "42");
             calculator.key("ENTER");
-            Bundle seed = new Bundle();
-            seed.putByteArray("state", calculator.save());
-            Bundle accepted =
+            DisplayResult seed = new DisplayResult();
+            seed.state = calculator.save();
+            DisplayResult accepted =
                     worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
                             .get(20, TimeUnit.SECONDS);
             CalculationRequest invalid = request("RESTORE", accepted);
@@ -163,10 +163,10 @@ public final class MemoryTransportTest {
             } catch (java.util.concurrent.ExecutionException expected) {
                 assertTrue(expected.getCause() instanceof RemoteCalculator.UserFailure);
             }
-            Bundle copied =
+            DisplayResult copied =
                     worker.submit(() -> remote.evaluate(request("COPY_ROWS:0", accepted)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("42", copied.getString("copyText"));
+            assertEquals("42", copied.copyText);
         } finally {
             remote.close();
             worker.shutdownNow();
@@ -182,9 +182,9 @@ public final class MemoryTransportTest {
             TestCalculator calculator = new TestCalculator();
             CalculatorTestSupport.paste(calculator, "45");
             calculator.key("ENTER");
-            Bundle seed = new Bundle();
-            seed.putByteArray("state", calculator.save());
-            Bundle accepted =
+            DisplayResult seed = new DisplayResult();
+            seed.state = calculator.save();
+            DisplayResult accepted =
                     worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
                             .get(20, TimeUnit.SECONDS);
             for (String badCopy : new String[] {"COPY_ROWS:999", "COPY_ROWS:bad"}) {
@@ -197,12 +197,12 @@ public final class MemoryTransportTest {
                 }
                 var field = RemoteCalculator.class.getDeclaredField("remoteSnapshotId");
                 field.setAccessible(true);
-                assertEquals(accepted.getString("checkpoint"), field.get(remote));
+                assertEquals(accepted.checkpoint, field.get(remote));
                 CalculationRequest next = request("COPY_ROWS:0", accepted);
                 next.input = null;
-                Bundle copied =
+                DisplayResult copied =
                         worker.submit(() -> remote.evaluate(next)).get(15, TimeUnit.SECONDS);
-                assertEquals("45", copied.getString("copyText"));
+                assertEquals("45", copied.copyText);
             }
         } finally {
             remote.close();

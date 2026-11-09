@@ -87,8 +87,8 @@ public class CalculationService extends Service {
             readOnly = command.kind == Command.Kind.COPY_ROWS;
             byte[] display;
             if (readOnly) {
-                Bundle copy = new Bundle();
-                copy.putString("copyText", copyRows(request, command));
+                DisplayResult copy = new DisplayResult();
+                copy.copyText = copyRows(request, command);
                 display = DisplayResult.encode(copy, null);
             } else {
                 display = arithmeticResult(request);
@@ -127,10 +127,10 @@ public class CalculationService extends Service {
         Evaluation evaluation = new Evaluation(request);
         EntryEditor entry = evaluation.candidate.detachEntryEditor();
         byte[] state = evaluation.candidate.save();
-        Bundle display = evaluation.presentation();
+        DisplayResult display = evaluation.presentation();
         String id = UUID.randomUUID().toString();
-        display.putString("checkpoint", id);
-        display.putByteArray("state", state);
+        display.checkpoint = id;
+        display.state = state;
         byte[] encoded = DisplayResult.encode(display, entry);
         cachedId = id;
         cachedStackId = evaluation.stackId;
@@ -226,7 +226,7 @@ public class CalculationService extends Service {
             stackId = candidate.sameStack(before) ? cachedStackId : UUID.randomUUID().toString();
         }
 
-        Bundle presentation() {
+        DisplayResult presentation() {
             List<UnifiedReal> values = candidate.values();
             texts.setMode(notation, fractionMode);
             texts.retain(values);
@@ -238,15 +238,15 @@ public class CalculationService extends Service {
                 rows.add(texts.row(value, newest));
                 if (newest) compactTop = texts.compactTop(value);
             }
-            Bundle display = new Bundle();
-            display.putString("operationError", operationError);
-            display.putString("stackId", stackId);
-            display.putStringArrayList("rows", rows);
-            display.putString("compactTop", compactTop);
-            display.putString("angle", candidate.angleUnit().name());
-            display.putString("notation", notation.name());
-            display.putInt("numberMode", numberMode.ordinal());
-            display.putInt("fractionMode", fractionMode.ordinal());
+            DisplayResult display = new DisplayResult();
+            display.operationError = operationError;
+            display.stackId = stackId;
+            display.rows = rows;
+            display.compactTop = compactTop;
+            display.angle = candidate.angleUnit();
+            display.notation = notation;
+            display.numberMode = numberMode;
+            display.fractionMode = fractionMode;
             return display;
         }
     }
