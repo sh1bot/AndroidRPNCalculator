@@ -154,6 +154,10 @@ public final class RpnCalculator {
         discardPendingValues();
     }
 
+    EntryEditor.State entryState() {
+        return new EntryEditor.State(editor);
+    }
+
     public EntryEditor detachEntryEditor() {
         EntryEditor result = editor;
         editor = editor.copy();

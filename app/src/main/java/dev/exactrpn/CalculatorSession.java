@@ -58,9 +58,6 @@ final class CalculatorSession {
     boolean scientificExpanded, inverse;
     volatile long busySince;
     private volatile Thread calculatingThread;
-    private ValueFormatter.Notation notation;
-    private NumberMode numberMode;
-    private FractionMode fractionMode;
 
     CalculatorSession(
             ValueFormatter.Notation n,
@@ -77,9 +74,6 @@ final class CalculatorSession {
             FractionMode fractionMode,
             boolean temporary) {
         this.temporary = temporary;
-        notation = n;
-        this.numberMode = numberMode;
-        this.fractionMode = fractionMode;
         display = new Display(n, angle, numberMode, fractionMode);
     }
 
@@ -106,8 +100,14 @@ final class CalculatorSession {
     void onForeground() {
         if (restorePending && !busy && canUseSavedState()) {
             restorePending = false;
-            enqueue(Command.parse(Command.RESTORE));
+            enqueue(Command.key(Command.RESTORE));
         }
+    }
+
+    InteractionMode mode(Display snapshot) {
+        return snapshot.editing
+                ? InteractionMode.ENTRY
+                : selectedRows.isEmpty() ? InteractionMode.STACK : InteractionMode.SELECT;
     }
 
     void enqueue(Command command) {
@@ -115,11 +115,7 @@ final class CalculatorSession {
     }
 
     void copyRows(int[] rows, java.util.function.Consumer<String> copy) {
-        String indices =
-                java.util.Arrays.stream(rows)
-                        .mapToObj(Integer::toString)
-                        .collect(java.util.stream.Collectors.joining(","));
-        enqueue(Command.parse("COPY_ROWS:" + indices), copy);
+        enqueue(Command.rows(Command.Kind.COPY_ROWS, rows), copy);
     }
 
     private void enqueue(Command command, java.util.function.Consumer<String> copy) {
@@ -189,8 +185,8 @@ final class CalculatorSession {
             String before = editor.entry();
             boolean wasEditing = editor.isEditing(), wasRaw = editor.rawEntry();
             int undos = editor.undoCount(), redos = editor.redoCount();
-            editor.setInputProfile(inputProfile(numberMode));
-            key.apply(editor, inputProfile(NumberMode.LOCALE), inputProfile(numberMode));
+            editor.setInputProfile(inputProfile(display.numberMode));
+            key.apply(editor, inputProfile(NumberMode.LOCALE), inputProfile(display.numberMode));
             if (checkpoint == null) {
                 try {
                     checkpoint =
@@ -296,8 +292,7 @@ final class CalculatorSession {
 
     private CalculationRequest request(Command key) {
         CalculationRequest request =
-                new CalculationRequest(
-                        Command.entryKey(key.wire, editor != null && editor.isEditing()));
+                new CalculationRequest(key.forEntry(editor != null && editor.isEditing()));
         if (!key.is(Command.RESTORE)
                 && !key.isDisplayOnly()
                 && key.kind != Command.Kind.COPY_ROWS) {
@@ -318,10 +313,11 @@ final class CalculatorSession {
         }
         if (input != null) input.input(request);
         request.locale = localeTag;
-        request.angle = display.angleUnit;
-        request.notation = notation;
-        request.numberMode = numberMode;
-        request.fractionMode = fractionMode;
+        Display settings = display;
+        request.angle = settings.angleUnit;
+        request.notation = settings.notation;
+        request.numberMode = settings.numberMode;
+        request.fractionMode = settings.fractionMode;
         return request;
     }
 
@@ -402,25 +398,9 @@ final class CalculatorSession {
                             selectedRows.addAll(remaining);
                         }
                         checkpoint = new CalculationSnapshot(result.checkpoint, result.state);
-                        notation = nextDisplay.notation;
-                        numberMode = nextDisplay.numberMode;
-                        fractionMode = nextDisplay.fractionMode;
-                        boolean keepEdits =
-                                editor != null
-                                        && (key.isDisplayOnly()
-                                                || !key.is(Command.UNDO)
-                                                        && !key.is(Command.REDO)
-                                                        && java.util.Objects.equals(
-                                                                nextDisplay.stackId,
-                                                                display.stackId)
-                                                        && nextDisplay.editing == editor.isEditing()
-                                                        && nextDisplay.entry.equals(editor.entry())
-                                                        && nextDisplay.raw == editor.rawEntry()
-                                                        && nextDisplay.start
-                                                                == editor.selectionStart()
-                                                        && nextDisplay.end
-                                                                == editor.selectionEnd());
-                        if (!keepEdits) {
+                        if (editor == null
+                                || result.editorDisposition
+                                        == DisplayResult.EditorDisposition.RESTORE) {
                             editor = incoming;
                             editorDirty = editor.undoCount() > 0 || editor.redoCount() > 0;
                             localBranch = false;

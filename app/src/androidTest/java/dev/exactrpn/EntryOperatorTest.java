@@ -30,7 +30,11 @@ public final class EntryOperatorTest {
     private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
 
     private void key(CalculatorSession session, String key) {
-        instrumentation.runOnMainSync(() -> session.enqueue(Command.parse(key)));
+        key(session, Command.key(key));
+    }
+
+    private void key(CalculatorSession session, Command key) {
+        instrumentation.runOnMainSync(() -> session.enqueue(key));
         long until = SystemClock.elapsedRealtime() + 15000;
         while (session.busy && SystemClock.elapsedRealtime() < until) SystemClock.sleep(25);
         assertFalse("Calculation timed out", session.busy);
@@ -95,7 +99,7 @@ public final class EntryOperatorTest {
         try {
             key(session, "RESTORE");
             String value = String.join("", java.util.Collections.nCopies(101, "7"));
-            key(session, "PASTE_RAW:" + value);
+            key(session, Command.paste(value));
             key(session, "ENTER");
             for (int i = 0; i < 101; i++) key(session, "7");
             key(session, "ENTER");
@@ -173,7 +177,7 @@ public final class EntryOperatorTest {
                                     "1", "2", ".", "3", "LEFT", "RIGHT", "BACK", "UNDO", "REDO",
                                     "UNDO"
                                 }) {
-                            session.enqueue(Command.parse(input));
+                            session.enqueue(Command.key(input));
                             assertFalse("Typing must not start worker activity", session.busy);
                             assertSame(
                                     "Typing must not serialize a new stack snapshot",
@@ -229,11 +233,11 @@ public final class EntryOperatorTest {
         session.attach(context);
         try {
             key(session, "RESTORE");
-            key(session, "PASTE_RAW:1\n2.5\n3");
+            key(session, Command.paste("1\n2.5\n3"));
             assertEquals(Arrays.asList("1", "2.5", "3"), session.display.rows);
             assertFalse(session.display.editing);
             byte[] before = session.checkpoint.bytes;
-            key(session, "PASTE_RAW:4\nbad\n6");
+            key(session, Command.paste("4\nbad\n6"));
             assertTrue(session.error.contains("line 2"));
             assertArrayEquals(before, session.checkpoint.bytes);
             key(session, "UNDO");
@@ -339,7 +343,7 @@ public final class EntryOperatorTest {
             key(session, "RESTORE");
             for (String key : new String[] {"π", "e", "+", "e", "π", "+", "−"}) key(session, key);
             CalculationSnapshot accepted = session.checkpoint;
-            instrumentation.runOnMainSync(() -> session.enqueue(Command.parse("1/x")));
+            instrumentation.runOnMainSync(() -> session.enqueue(Command.key("1/x")));
             SystemClock.sleep(300);
             assertTrue("Reciprocal of unknown zero should still be calculating", session.busy);
             long started = SystemClock.elapsedRealtime();
@@ -404,10 +408,10 @@ public final class EntryOperatorTest {
             assertTrue(entered.await(5, TimeUnit.SECONDS));
             instrumentation.runOnMainSync(
                     () -> {
-                        session.enqueue(Command.parse("+"));
+                        session.enqueue(Command.key("+"));
                         // An intermediate empty result must retain history for queued Undo.
-                        session.enqueue(Command.parse("CLEAR"));
-                        session.enqueue(Command.parse("UNDO"));
+                        session.enqueue(Command.key("CLEAR"));
+                        session.enqueue(Command.key("UNDO"));
                         session.background = true;
                         session.saveForLifecycle();
                     });
@@ -443,7 +447,7 @@ public final class EntryOperatorTest {
         View root = activity.getWindow().getDecorView();
         android.widget.EditText entry = root.findViewWithTag("number-entry");
         try {
-            key(session, "PASTE_RAW:1.23");
+            key(session, Command.paste("1.23"));
             awaitUi(() -> entry.getText().toString().equals("1.23"));
             instrumentation.runOnMainSync(() -> root.findViewWithTag(".").performLongClick());
             awaitUi(() -> !session.busy && entry.getText().toString().equals("1.23e"));
@@ -681,7 +685,7 @@ public final class EntryOperatorTest {
             assertEquals("0", session.display.entry);
             assertEquals(Arrays.asList("1"), session.display.rows);
             key(session, "CE");
-            key(session, "PASTE_RAW:1,234");
+            key(session, Command.paste("1,234"));
             key(session, "+");
             assertTrue(session.display.editing);
             assertEquals("1,234", session.display.entry);

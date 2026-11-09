@@ -28,7 +28,7 @@ import java.util.concurrent.TimeUnit;
 @RunWith(AndroidJUnit4.class)
 public final class CancellationTest {
     private CalculationRequest request(String key, byte[] input) {
-        CalculationRequest request = new CalculationRequest(key);
+        CalculationRequest request = new CalculationRequest(Command.key(key));
         request.input = input;
         request.angle = RpnCalculator.AngleUnit.RAD;
         request.notation = ValueFormatter.Notation.SCIENTIFIC;

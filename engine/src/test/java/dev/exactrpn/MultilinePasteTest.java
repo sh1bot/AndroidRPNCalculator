@@ -18,7 +18,7 @@ final class MultilinePasteTest {
     void batchIsAtomicOrderedUndoableAndRestorable() throws Exception {
         TestCalculator c = new TestCalculator();
         CalculatorTestSupport.paste(c, "7");
-        c.apply(Command.parse("PASTE_RAW:1\r\n\n2.5\n3"), NumberText.COMPUTER, NumberText.COMPUTER);
+        c.apply(Command.paste("1\r\n\n2.5\n3"), NumberText.COMPUTER, NumberText.COMPUTER);
         assertFalse(c.isEditing());
         assertEquals(4, c.values().size());
         assertEquals("3", c.values().get(3).bigIntegerValue().toString());

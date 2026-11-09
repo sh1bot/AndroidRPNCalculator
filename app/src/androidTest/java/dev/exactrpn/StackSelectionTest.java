@@ -99,14 +99,20 @@ public final class StackSelectionTest {
         MainActivity a = open();
         CalculatorSession state = session(a);
         try {
-            for (String command :
-                    new String[] {"PASTE_RAW:1e999", "ENTER", "PASTE_RAW:7", "÷", "ENTER"}) {
-                instrumentation.runOnMainSync(() -> state.enqueue(Command.parse(command)));
+            for (Command command :
+                    new Command[] {
+                        Command.paste("1e999"),
+                        Command.key("ENTER"),
+                        Command.paste("7"),
+                        Command.key("÷"),
+                        Command.key("ENTER")
+                    }) {
+                instrumentation.runOnMainSync(() -> state.enqueue(command));
                 await(() -> !state.busy);
             }
             for (int mode = 0; mode < 2; mode++) {
                 String expectedMode = mode == 0 ? "FRAC" : "IMPR";
-                instrumentation.runOnMainSync(() -> state.enqueue(Command.parse("FRACTION")));
+                instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
                 await(() -> !state.busy);
                 await(
                         () -> {
@@ -140,8 +146,7 @@ public final class StackSelectionTest {
         try {
             char[] digits = new char[600];
             java.util.Arrays.fill(digits, '7');
-            instrumentation.runOnMainSync(
-                    () -> state.enqueue(Command.parse("PASTE_RAW:" + new String(digits))));
+            instrumentation.runOnMainSync(() -> state.enqueue(Command.paste(new String(digits))));
             await(() -> !state.busy && state.display.editing);
             key(a, "ENTER");
             try {
@@ -230,7 +235,7 @@ public final class StackSelectionTest {
         CalculatorSession state = session(a);
         try {
             for (String key : new String[] {"6", "5", "5", "3", "6"}) key(a, key);
-            instrumentation.runOnMainSync(() -> state.enqueue(Command.parse("10ˣ")));
+            instrumentation.runOnMainSync(() -> state.enqueue(Command.key("10ˣ")));
             await(() -> !state.busy && !state.display.editing);
             assertEquals(java.util.Arrays.asList("1e+65536"), state.display.rows);
             assertTrue(state.error.isEmpty());

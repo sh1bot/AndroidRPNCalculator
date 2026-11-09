@@ -5,7 +5,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
-/** Parsed at the application boundary; punctuation inside entry text remains literal. */
+/** Typed actions shared by the editor, keypad and arithmetic process. */
 public final class Command {
     public enum Kind {
         KEY,
@@ -30,12 +30,6 @@ public final class Command {
         }
     }
 
-    private static final java.util.Map<String, Kind> KINDS = new java.util.HashMap<>();
-
-    static {
-        for (Kind kind : Kind.values()) KINDS.put(kind.name(), kind);
-    }
-
     public static final String ENTER = "ENTER",
             UNDO = "UNDO",
             REDO = "REDO",
@@ -45,7 +39,9 @@ public final class Command {
     private static final Set<String> PRESENTATION =
             new HashSet<>(Arrays.asList("FORMAT", "NUMBER_FORMAT", "FRACTION", "ANGLE"));
     public final Kind kind;
+    // Only KEY actions have a key identifier; entry text is never interpreted as a command.
     public final String wire;
+    public final Operation operation;
     public final String text;
     public final int start, end;
     public final boolean raw, explicitDecimal;
@@ -59,7 +55,8 @@ public final class Command {
             int end,
             boolean raw,
             boolean explicitDecimal,
-            int[] rows) {
+            int[] rows,
+            Operation operation) {
         this.kind = kind;
         this.wire = wire;
         this.text = text;
@@ -67,54 +64,75 @@ public final class Command {
         this.end = end;
         this.raw = raw;
         this.explicitDecimal = explicitDecimal;
-        this.rows = rows;
+        this.rows = rows.clone();
+        this.operation = operation;
     }
 
-    public static Command parse(String wire) {
-        int colon = wire.indexOf(':');
-        String prefix = colon < 0 ? wire : wire.substring(0, colon);
-        String payload = colon < 0 ? "" : wire.substring(colon + 1);
-        Kind kind = KINDS.getOrDefault(prefix, Kind.KEY);
-        if (kind == Kind.EDIT) {
-            String[] fields = payload.split(":", 5);
-            if (fields.length != 5) throw new IllegalArgumentException("Invalid edit command");
-            return new Command(
-                    kind,
-                    wire,
-                    fields[4],
-                    Integer.parseInt(fields[0]),
-                    Integer.parseInt(fields[1]),
-                    Boolean.parseBoolean(fields[2]),
-                    Boolean.parseBoolean(fields[3]),
-                    new int[0]);
-        }
-        if (kind == Kind.SELECT) {
-            String[] fields = payload.split(":", -1);
-            if (fields.length != 2) throw new IllegalArgumentException("Invalid selection command");
-            return new Command(
-                    kind,
-                    wire,
-                    "",
-                    Integer.parseInt(fields[0]),
-                    Integer.parseInt(fields[1]),
-                    false,
-                    false,
-                    new int[0]);
-        }
-        if (kind == Kind.HOLD_DIGIT && !payload.matches("[0-9]"))
+    public static Command key(String key) {
+        return new Command(
+                Kind.KEY,
+                java.util.Objects.requireNonNull(key),
+                "",
+                0,
+                0,
+                false,
+                false,
+                new int[0],
+                null);
+    }
+
+    public static Command edit(String text, int start, int end, boolean raw, boolean decimal) {
+        return new Command(
+                Kind.EDIT,
+                "",
+                java.util.Objects.requireNonNull(text),
+                start,
+                end,
+                raw,
+                decimal,
+                new int[0],
+                null);
+    }
+
+    public static Command select(int start, int end) {
+        return new Command(Kind.SELECT, "", "", start, end, false, false, new int[0], null);
+    }
+
+    public static Command paste(String text) {
+        return new Command(
+                Kind.PASTE_RAW,
+                "",
+                java.util.Objects.requireNonNull(text),
+                0,
+                0,
+                false,
+                false,
+                new int[0],
+                null);
+    }
+
+    public static Command holdDigit(String digit) {
+        if (digit.length() != 1 || digit.charAt(0) < '0' || digit.charAt(0) > '9')
             throw new IllegalArgumentException("Invalid digit shortcut");
-        int[] rows =
-                kind.takesRows
-                        ? Arrays.stream(
-                                        (kind == Kind.UNARY_ROWS
-                                                        ? payload.substring(
-                                                                payload.indexOf(':') + 1)
-                                                        : payload)
-                                                .split(","))
-                                .mapToInt(Integer::parseInt)
-                                .toArray()
-                        : new int[0];
-        return new Command(kind, wire, payload, 0, 0, false, false, rows);
+        return new Command(Kind.HOLD_DIGIT, "", digit, 0, 0, false, false, new int[0], null);
+    }
+
+    public static Command rows(Kind kind, int... rows) {
+        if (!kind.takesRows || kind == Kind.UNARY_ROWS)
+            throw new IllegalArgumentException("Not a row action");
+        return new Command(kind, "", "", 0, 0, false, false, rows, null);
+    }
+
+    public static Command unaryRows(Operation operation, int... rows) {
+        if (operation == null || operation.arity != 1)
+            throw new IllegalArgumentException("Not a unary operation");
+        return new Command(Kind.UNARY_ROWS, "", "", 0, 0, false, false, rows, operation);
+    }
+
+    public Command forEntry(boolean editing) {
+        if (kind != Kind.KEY) return this;
+        String key = entryKey(wire, editing);
+        return key == null ? null : key.equals(wire) ? this : key(key);
     }
 
     public int[] rows() {
@@ -173,8 +191,7 @@ public final class Command {
     public void apply(RpnCalculator calculator, NumberText.Profile locale) {
         switch (kind) {
             case UNARY_ROWS:
-                calculator.transformRows(
-                        Operation.find(text.substring(0, text.indexOf(':'))), rows);
+                calculator.transformRows(operation, rows);
                 break;
             case DROP_ROWS:
                 calculator.dropRows(rows);

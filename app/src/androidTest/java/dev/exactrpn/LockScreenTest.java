@@ -186,7 +186,7 @@ public final class LockScreenTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         RemoteCalculator remote = new RemoteCalculator(context, true);
         try {
-            CalculationRequest request = new CalculationRequest("RESTORE");
+            CalculationRequest request = new CalculationRequest(Command.key("RESTORE"));
             request.input = saved.getBytes(java.nio.charset.StandardCharsets.UTF_8);
             try {
                 worker.submit(() -> remote.evaluate(request)).get(15, TimeUnit.SECONDS);
@@ -253,7 +253,7 @@ public final class LockScreenTest {
             RemoteCalculator normalWorker = new RemoteCalculator(context);
             ExecutorService blockedWorker = Executors.newSingleThreadExecutor();
             try {
-                CalculationRequest blocked = new CalculationRequest("RESTORE");
+                CalculationRequest blocked = new CalculationRequest(Command.key("RESTORE"));
                 blocked.input =
                         saved.getAbsolutePath().getBytes(java.nio.charset.StandardCharsets.UTF_8);
                 try {

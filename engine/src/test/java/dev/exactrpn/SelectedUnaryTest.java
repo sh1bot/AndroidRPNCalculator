@@ -12,7 +12,10 @@ final class SelectedUnaryTest {
             CalculatorTestSupport.paste(c, n);
             c.key("ENTER");
         }
-        c.apply(Command.parse("UNARY_ROWS:√:0,2"), NumberText.COMPUTER, NumberText.COMPUTER);
+        c.apply(
+                Command.unaryRows(Operation.find("√"), 0, 2),
+                NumberText.COMPUTER,
+                NumberText.COMPUTER);
         assertEquals("2", c.values().get(0).bigIntegerValue().toString());
         assertEquals("9", c.values().get(1).bigIntegerValue().toString());
         c = TestCalculator.load(c.save());

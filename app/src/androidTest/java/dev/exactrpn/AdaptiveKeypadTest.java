@@ -107,7 +107,7 @@ public final class AdaptiveKeypadTest {
         InstrumentationRegistry.getInstrumentation()
                 .runOnMainSync(
                         () -> {
-                            AtomicReference<String> command = new AtomicReference<>();
+                            AtomicReference<Command> command = new AtomicReference<>();
                             AtomicReference<Boolean> preference = new AtomicReference<>(false);
                             CalculatorKeypad keypad =
                                     new CalculatorKeypad(
@@ -117,7 +117,7 @@ public final class AdaptiveKeypadTest {
                             assertTrue(preference.get());
                             assertNull(command.get());
                             find(keypad, "τ").performClick();
-                            assertEquals("τ", command.get());
+                            assertEquals("τ", command.get().wire);
                             command.set(null);
                             keypad.setInverse(true);
                             assertNotNull(find(keypad, "τ"));
@@ -125,7 +125,7 @@ public final class AdaptiveKeypadTest {
                             assertFalse(preference.get());
                             assertNull(command.get());
                             find(keypad, "π").performClick();
-                            assertEquals("π", command.get());
+                            assertEquals("π", command.get().wire);
                         });
     }
 
@@ -135,8 +135,8 @@ public final class AdaptiveKeypadTest {
         InstrumentationRegistry.getInstrumentation()
                 .runOnMainSync(
                         () -> {
-                            AtomicReference<String> command = new AtomicReference<>(),
-                                    state = new AtomicReference<>();
+                            AtomicReference<Command> command = new AtomicReference<>();
+                            AtomicReference<String> state = new AtomicReference<>();
                             CalculatorKeypad keypad =
                                     new CalculatorKeypad(
                                             context,
@@ -150,16 +150,16 @@ public final class AdaptiveKeypadTest {
                             assertEquals("true:false", state.get());
                             assertNull(command.get());
                             find(keypad, "rem").performClick();
-                            assertEquals("rem", command.get());
+                            assertEquals("rem", command.get().wire);
                             command.set(null);
                             find(keypad, "f⁻¹()").performClick();
                             assertTrue(keypad.isExpanded());
                             assertEquals("true:true", state.get());
                             assertNull(command.get());
                             find(keypad, "mod").performClick();
-                            assertEquals("mod", command.get());
+                            assertEquals("mod", command.get().wire);
                             find(keypad, "⌈x⌉").performClick();
-                            assertEquals("ceil", command.get());
+                            assertEquals("ceil", command.get().wire);
                             command.set(null);
                             find(keypad, "f⁻¹()").performClick();
                             assertFalse(keypad.isExpanded());
@@ -179,7 +179,7 @@ public final class AdaptiveKeypadTest {
         InstrumentationRegistry.getInstrumentation()
                 .runOnMainSync(
                         () -> {
-                            AtomicReference<String> command = new AtomicReference<>();
+                            AtomicReference<Command> command = new AtomicReference<>();
                             CalculatorKeypad keypad =
                                     new CalculatorKeypad(
                                             context, command::set, false, (open, inverse) -> {});
@@ -221,11 +221,10 @@ public final class AdaptiveKeypadTest {
                             for (String key : new String[] {"1", "ENTER", "2", "ENTER"})
                                 calculator.key(key);
                             find(keypad, "2").performLongClick();
-                            assertEquals("HOLD_DIGIT:2", command.get());
+                            assertEquals(Command.Kind.HOLD_DIGIT, command.get().kind);
+                            assertEquals("2", command.get().text);
                             calculator.apply(
-                                    Command.parse(command.get()),
-                                    NumberText.COMPUTER,
-                                    NumberText.COMPUTER);
+                                    command.get(), NumberText.COMPUTER, NumberText.COMPUTER);
                             assertEquals(
                                     java.util.Arrays.asList("1", "2", "1"),
                                     CalculatorTestSupport.formattedValues(
@@ -233,21 +232,20 @@ public final class AdaptiveKeypadTest {
                                             ValueFormatter.Notation.SCIENTIFIC,
                                             FractionMode.DECIMAL));
                             find(keypad, "0").performLongClick();
-                            assertEquals("HOLD_DIGIT:0", command.get());
+                            assertEquals(Command.Kind.HOLD_DIGIT, command.get().kind);
+                            assertEquals("0", command.get().text);
                             CalculatorTestSupport.paste(calculator, "4");
-                            keypad.setMode(true, false);
+                            keypad.setMode(InteractionMode.ENTRY);
                             find(keypad, "1").performLongClick();
                             calculator.apply(
-                                    Command.parse(command.get()),
-                                    NumberText.COMPUTER,
-                                    NumberText.COMPUTER);
+                                    command.get(), NumberText.COMPUTER, NumberText.COMPUTER);
                             assertEquals("41", calculator.entry());
                             assertEquals(3, calculator.values().size());
                             assertNotNull(find(keypad, "CE"));
                             assertNotNull(find(keypad, "⌫"));
                             keypad.setCalculating(true);
                             find(keypad, "Cancel").performLongClick();
-                            assertEquals("CANCEL", command.get());
+                            assertEquals("CANCEL", command.get().wire);
                         });
     }
 

@@ -37,6 +37,10 @@ public final class MemoryTransportTest {
     }
 
     private CalculationRequest request(String key, DisplayResult accepted) {
+        return request(Command.key(key), accepted);
+    }
+
+    private CalculationRequest request(Command key, DisplayResult accepted) {
         CalculationRequest request = new CalculationRequest(key);
         request.angle = RpnCalculator.AngleUnit.RAD;
         request.notation = ValueFormatter.Notation.SCIENTIFIC;
@@ -105,12 +109,13 @@ public final class MemoryTransportTest {
                 }
                 accepted = worker.submit(() -> remote.evaluate(next)).get(30, TimeUnit.SECONDS);
             }
-            CalculationRequest copy = request("COPY_ROWS:0,1,2,3", accepted);
+            CalculationRequest copy =
+                    request(Command.rows(Command.Kind.COPY_ROWS, 0, 1, 2, 3), accepted);
             expectTooLarge(worker, remote, copy);
             CalculationRequest oversized = request("RESTORE", accepted);
             oversized.entryDraft = new byte[CalculationLimits.TRANSFER_BYTES];
             expectTooLarge(worker, remote, oversized);
-            CalculationRequest single = request("COPY_ROWS:0", accepted);
+            CalculationRequest single = request(Command.rows(Command.Kind.COPY_ROWS, 0), accepted);
             single.input = null;
             DisplayResult copied =
                     worker.submit(() -> remote.evaluate(single)).get(30, TimeUnit.SECONDS);
@@ -164,7 +169,12 @@ public final class MemoryTransportTest {
                 assertTrue(expected.getCause() instanceof RemoteCalculator.UserFailure);
             }
             DisplayResult copied =
-                    worker.submit(() -> remote.evaluate(request("COPY_ROWS:0", accepted)))
+                    worker.submit(
+                                    () ->
+                                            remote.evaluate(
+                                                    request(
+                                                            Command.rows(Command.Kind.COPY_ROWS, 0),
+                                                            accepted)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("42", copied.copyText);
         } finally {
@@ -187,7 +197,11 @@ public final class MemoryTransportTest {
             DisplayResult accepted =
                     worker.submit(() -> remote.evaluate(request("RESTORE", seed)))
                             .get(20, TimeUnit.SECONDS);
-            for (String badCopy : new String[] {"COPY_ROWS:999", "COPY_ROWS:bad"}) {
+            for (Command badCopy :
+                    new Command[] {
+                        Command.rows(Command.Kind.COPY_ROWS, 999),
+                        Command.rows(Command.Kind.COPY_ROWS, -1)
+                    }) {
                 try {
                     worker.submit(() -> remote.evaluate(request(badCopy, accepted)))
                             .get(15, TimeUnit.SECONDS);
@@ -198,7 +212,8 @@ public final class MemoryTransportTest {
                 var field = RemoteCalculator.class.getDeclaredField("remoteSnapshotId");
                 field.setAccessible(true);
                 assertEquals(accepted.checkpoint, field.get(remote));
-                CalculationRequest next = request("COPY_ROWS:0", accepted);
+                CalculationRequest next =
+                        request(Command.rows(Command.Kind.COPY_ROWS, 0), accepted);
                 next.input = null;
                 DisplayResult copied =
                         worker.submit(() -> remote.evaluate(next)).get(15, TimeUnit.SECONDS);
@@ -211,8 +226,87 @@ public final class MemoryTransportTest {
     }
 
     @Test
+    public void workerExplicitlyPreservesNoOpDraftsAndRestoresHistoryReplies() throws Exception {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        RemoteCalculator remote = new RemoteCalculator(context, true);
+        ExecutorService worker = Executors.newSingleThreadExecutor();
+        try {
+            DisplayResult accepted =
+                    worker.submit(() -> remote.evaluate(request("RESTORE", null)))
+                            .get(15, TimeUnit.SECONDS);
+            assertEquals(DisplayResult.EditorDisposition.RESTORE, accepted.editorDisposition);
+            remote.cancel(); // A fresh worker must recognize a no-op without relying on stack IDs.
+            CalculationRequest noop = request("DROP", accepted);
+            EntryEditor local = new EntryEditor();
+            local.key("1");
+            local.key("UNDO");
+            noop.entryDraft = local.entryForCommit().save();
+            accepted = worker.submit(() -> remote.evaluate(noop)).get(15, TimeUnit.SECONDS);
+            assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
+            CalculationRequest mode = request("FRACTION", accepted);
+            accepted = worker.submit(() -> remote.evaluate(mode)).get(15, TimeUnit.SECONDS);
+            assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
+            CalculationRequest invalid = request("+", accepted);
+            local.pasteClipboard("1,234", NumberText.COMPUTER);
+            invalid.entryDraft = local.entryForCommit().save();
+            accepted = worker.submit(() -> remote.evaluate(invalid)).get(15, TimeUnit.SECONDS);
+            assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
+            assertFalse(accepted.operationError.isEmpty());
+            CalculationRequest commit = request("+", accepted);
+            local.pasteText("7", NumberText.COMPUTER);
+            commit.entryDraft = local.entryForCommit().save();
+            accepted = worker.submit(() -> remote.evaluate(commit)).get(15, TimeUnit.SECONDS);
+            assertEquals(DisplayResult.EditorDisposition.RESTORE, accepted.editorDisposition);
+            assertEquals(java.util.Arrays.asList("7"), accepted.rows);
+            assertFalse(accepted.operationError.isEmpty());
+            CalculationRequest undo = request("UNDO", accepted);
+            accepted = worker.submit(() -> remote.evaluate(undo)).get(15, TimeUnit.SECONDS);
+            assertEquals(DisplayResult.EditorDisposition.RESTORE, accepted.editorDisposition);
+            assertEquals("7", EntryEditor.load(accepted.entryState).entry());
+        } finally {
+            remote.close();
+            worker.shutdownNow();
+        }
+    }
+
+    @Test
+    public void everyCommandPayloadRoundTripsWithoutParsingText() throws Exception {
+        for (Command command :
+                new Command[] {
+                    Command.key("SELECT_HOME"),
+                    Command.edit("1:234,5\nEDIT:false", 2, 7, true, false),
+                    Command.select(1, 3),
+                    Command.paste("1,234\n5.6"),
+                    Command.holdDigit("0"),
+                    Command.rows(Command.Kind.DROP_ROWS, 3, 1, 3),
+                    Command.rows(Command.Kind.PICK_ROWS, 0),
+                    Command.rows(Command.Kind.SUM_ROWS, 0, 2),
+                    Command.rows(Command.Kind.PRODUCT_ROWS, 0, 2),
+                    Command.rows(Command.Kind.COPY_ROWS, 1),
+                    Command.unaryRows(Operation.SQRT, 0, 2)
+                }) {
+            CalculationRequest request = new CalculationRequest(command);
+            Command decoded =
+                    CalculationRequest.decode(request.encode("session", null, false)).command;
+            assertEquals(command.kind, decoded.kind);
+            assertEquals(command.wire, decoded.wire);
+            assertEquals(command.text, decoded.text);
+            assertEquals(command.start, decoded.start);
+            assertEquals(command.end, decoded.end);
+            assertEquals(command.raw, decoded.raw);
+            assertEquals(command.explicitDecimal, decoded.explicitDecimal);
+            assertEquals(command.operation, decoded.operation);
+            assertArrayEquals(command.rows(), decoded.rows());
+        }
+        byte[] encoded =
+                new CalculationRequest(Command.key("ENTER")).encode("session", null, false);
+        encoded[4] = (byte) 255;
+        assertThrows(java.io.IOException.class, () -> CalculationRequest.decode(encoded));
+    }
+
+    @Test
     public void requestCodecRoundTripsModesAndRejectsMalformedData() throws Exception {
-        CalculationRequest request = new CalculationRequest("PASTE_RAW:1,234\n5.6");
+        CalculationRequest request = new CalculationRequest(Command.paste("1,234\n5.6"));
         request.locale = "de-DE";
         request.angle = RpnCalculator.AngleUnit.GRAD;
         request.notation = ValueFormatter.Notation.ENGINEERING;
@@ -222,7 +316,8 @@ public final class MemoryTransportTest {
         request.entryDraft = new byte[] {1, 2, 3};
         byte[] encoded = request.encode("session", "checkpoint", true);
         CalculationRequest decoded = CalculationRequest.decode(encoded);
-        assertEquals(request.key, decoded.key);
+        assertEquals(request.command.kind, decoded.command.kind);
+        assertEquals(request.command.text, decoded.command.text);
         assertEquals(request.locale, decoded.locale);
         assertEquals(request.angle, decoded.angle);
         assertEquals(request.notation, decoded.notation);

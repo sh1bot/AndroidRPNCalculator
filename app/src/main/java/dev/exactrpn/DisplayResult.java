@@ -8,6 +8,12 @@ import java.util.ArrayList;
 
 /** Typed arithmetic reply. Only the outer Messenger envelope uses an Android Bundle. */
 final class DisplayResult {
+    enum EditorDisposition {
+        KEEP,
+        RESTORE
+    }
+
+    EditorDisposition editorDisposition = EditorDisposition.RESTORE;
     String stackId, checkpoint, copyText;
     String operationError = "", compactTop = "";
     byte[] state, entryState;
@@ -20,12 +26,13 @@ final class DisplayResult {
     static byte[] encode(DisplayResult result, EntryEditor editor) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
-            out.writeInt(0x44525037);
+            out.writeInt(0x44525038);
             boolean copy = result.copyText != null;
             out.writeBoolean(copy);
             if (copy) {
                 writeText(out, result.copyText);
             } else {
+                out.writeByte(result.editorDisposition.ordinal());
                 writeBytes(out, result.state);
                 writeText(out, result.stackId);
                 writeText(out, result.checkpoint);
@@ -45,12 +52,13 @@ final class DisplayResult {
 
     static DisplayResult decode(byte[] bytes) throws IOException {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(require(bytes)))) {
-            if (in.readInt() != 0x44525037) throw new IOException("Unknown display protocol");
+            if (in.readInt() != 0x44525038) throw new IOException("Unknown display protocol");
             DisplayResult result = new DisplayResult();
             if (in.readBoolean()) {
                 result.copyText = readText(in);
                 if (result.copyText == null) throw new IOException("Missing clipboard text");
             } else {
+                result.editorDisposition = readEnum(in, EditorDisposition.values());
                 result.state = readBytes(in);
                 result.stackId = readText(in);
                 result.checkpoint = readText(in);

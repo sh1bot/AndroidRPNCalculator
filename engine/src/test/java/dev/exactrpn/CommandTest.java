@@ -14,10 +14,10 @@ final class CommandTest {
     @Test
     void entryUpdatesStayLocalRatherThanBecomingArithmeticCommands() {
         EntryEditor editor = new EntryEditor();
-        Command edit = Command.parse("EDIT:1:1:false:false:123");
+        Command edit = Command.edit("123", 1, 1, false, false);
         edit.apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
-        Command.parse("SELECT:2:2").apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
-        Command.parse("BACK").apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
+        Command.select(2, 2).apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
+        Command.key("BACK").apply(editor, NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals("13", editor.entry());
         TestCalculator calculator = new TestCalculator();
         calculator.key("π");
@@ -30,7 +30,7 @@ final class CommandTest {
 
     @Test
     void editRetainsEmbeddedPunctuation() {
-        Command command = Command.parse("EDIT:1:2:true:false:1:234,5");
+        Command command = Command.edit("1:234,5", 1, 2, true, false);
         assertEquals(Command.Kind.EDIT, command.kind);
         assertEquals("1:234,5", command.text);
         assertEquals(1, command.start);
@@ -40,23 +40,27 @@ final class CommandTest {
     }
 
     @Test
-    void rowCommandsShareValidatedParsing() {
-        assertArrayEquals(new int[] {3, 1, 3}, Command.parse("PICK_ROWS:3,1,3").rows());
-        assertArrayEquals(new int[] {0, 2}, Command.parse("DROP_ROWS:0,2").rows());
-        assertThrows(IllegalArgumentException.class, () -> Command.parse("DROP_ROWS:hello"));
-        assertThrows(IllegalArgumentException.class, () -> Command.parse("EDIT:1:2"));
-        int[] copy = Command.parse("PICK_ROWS:1").rows();
+    void rowCommandsOwnTheirIndicesAndRequireTheRightKind() {
+        assertArrayEquals(
+                new int[] {3, 1, 3}, Command.rows(Command.Kind.PICK_ROWS, 3, 1, 3).rows());
+        assertArrayEquals(new int[] {0, 2}, Command.rows(Command.Kind.DROP_ROWS, 0, 2).rows());
+        assertThrows(IllegalArgumentException.class, () -> Command.rows(Command.Kind.KEY, 0));
+        assertThrows(IllegalArgumentException.class, () -> Command.unaryRows(Operation.ADD, 0));
+        int[] source = {1};
+        Command pick = Command.rows(Command.Kind.PICK_ROWS, source);
+        source[0] = 7;
+        int[] copy = pick.rows();
         copy[0] = 9;
-        assertEquals(1, Command.parse("PICK_ROWS:1").rows()[0]);
+        assertEquals(1, pick.rows()[0]);
     }
 
     @Test
     void onlyPresentationAndRowActionsPreserveSelection() {
-        assertTrue(Command.parse("FRACTION").preservesSelection());
-        assertTrue(Command.parse("SELECT:1:1").preservesSelection());
-        assertTrue(Command.parse("DROP_ROWS:0").preservesSelection());
-        assertFalse(Command.parse("ENTER").preservesSelection());
-        assertFalse(Command.parse("EDIT:0:0:false:false:12").preservesSelection());
+        assertTrue(Command.key("FRACTION").preservesSelection());
+        assertTrue(Command.select(1, 1).preservesSelection());
+        assertTrue(Command.rows(Command.Kind.DROP_ROWS, 0).preservesSelection());
+        assertFalse(Command.key("ENTER").preservesSelection());
+        assertFalse(Command.edit("12", 0, 0, false, false).preservesSelection());
     }
 
     @Test
@@ -99,7 +103,7 @@ final class CommandTest {
             com.android.calculator2.UnifiedReal original = calculator.values().get(10 - depth);
             int history = calculator.undoCount();
             String digit = depth == 10 ? "0" : Integer.toString(depth);
-            Command hold = Command.parse("HOLD_DIGIT:" + digit);
+            Command hold = Command.holdDigit(digit);
             assertTrue(hold.preservesSelection());
             calculator.apply(hold, NumberText.COMPUTER, NumberText.COMPUTER);
             assertEquals(11, calculator.values().size());
@@ -120,7 +124,7 @@ final class CommandTest {
         calculator.key("π");
         CalculatorTestSupport.paste(calculator, "45");
         calculator.select(1, 1);
-        calculator.apply(Command.parse("HOLD_DIGIT:7"), NumberText.COMPUTER, NumberText.COMPUTER);
+        calculator.apply(Command.holdDigit("7"), NumberText.COMPUTER, NumberText.COMPUTER);
         assertEquals("475", calculator.entry());
         assertEquals(1, calculator.values().size());
         assertTrue(calculator.isEditing());
@@ -141,7 +145,7 @@ final class CommandTest {
         assertTrue(calculator.entry().isEmpty());
         assertFalse(calculator.isEditing());
         for (String bad : new String[] {"", "10", "-1", "."})
-            assertThrows(IllegalArgumentException.class, () -> Command.parse("HOLD_DIGIT:" + bad));
+            assertThrows(IllegalArgumentException.class, () -> Command.holdDigit(bad));
     }
 
     @Test

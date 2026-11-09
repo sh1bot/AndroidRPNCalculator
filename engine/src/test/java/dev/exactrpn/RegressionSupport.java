@@ -20,7 +20,7 @@ abstract class RegressionSupport {
     }
 
     static void keys(TestCalculator c, String... keys) {
-        for (String k : keys) c.apply(Command.parse(k), NumberText.COMPUTER, NumberText.COMPUTER);
+        for (String k : keys) c.key(k);
     }
 
     static UnifiedReal top(TestCalculator c) {
