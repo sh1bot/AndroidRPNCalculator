@@ -48,6 +48,40 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void undoAndRedoCrossEntryBoundariesWithoutSkippingTheRestoredDraft() throws Exception {
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL,
+                        true);
+        session.attach(instrumentation.getTargetContext());
+        try {
+            for (String command :
+                    new String[] {
+                        "RESTORE", "1", "2", "ENTER", "3", "4", "5", "+", "UNDO", "UNDO", "UNDO"
+                    }) key(session, command);
+            assertEquals("12", session.display.entry);
+            key(session, "REDO");
+            assertFalse(session.display.editing);
+            assertEquals(Arrays.asList("12"), session.display.rows);
+            key(session, "FORMAT");
+            key(session, "NUMBER_FORMAT");
+            key(session, "FRACTION");
+            key(session, "REDO");
+            assertTrue(session.display.editing);
+            assertEquals("345", session.display.entry);
+            key(session, "REDO");
+            assertFalse(session.display.editing);
+            assertEquals(Arrays.asList("357"), session.display.rows);
+        } finally {
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     public void digitsAndCursorEditsStayLocalUntilCommit() throws Exception {
         CalculatorSession session =
                 new CalculatorSession(

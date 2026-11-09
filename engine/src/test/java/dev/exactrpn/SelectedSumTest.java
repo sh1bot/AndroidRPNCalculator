@@ -30,10 +30,10 @@ final class SelectedSumTest {
         assertEquals(1, c.selectionStart());
         assertEquals(history + 1, c.undoCount());
         c = TestCalculator.load(c.save());
-        c.key("UNDO");
+        c.arithmeticKey("UNDO");
         assertEquals(3, c.values().size());
         assertEquals("45", c.entry());
-        c.key("REDO");
+        c.arithmeticKey("REDO");
         assertTrue(c.values().get(3).definitelyEquals(RpnCalculator.parse("0.3")));
     }
 

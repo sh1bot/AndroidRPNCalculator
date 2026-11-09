@@ -124,22 +124,21 @@ public final class RpnCalculator {
 
     private static final class State {
         final List<UnifiedReal> stack;
-        final EntryEditor.State entry;
+        final EntryEditor entry;
 
-        State(List<UnifiedReal> stack, EntryEditor.State entry) {
+        State(List<UnifiedReal> stack, EntryEditor entry) {
             this.stack = stack;
             this.entry = entry;
         }
 
         State(RpnCalculator c) {
-            this(new ArrayList<>(c.stack), new EntryEditor.State(c.editor));
+            this(new ArrayList<>(c.stack), c.editor.copy());
         }
     }
 
     private void restore(State state) {
         stack = new ArrayList<>(state.stack);
-        editor = new EntryEditor();
-        editor.restore(state.entry);
+        editor = state.entry.copy();
         syncCurrentValues();
     }
 
@@ -157,41 +156,13 @@ public final class RpnCalculator {
 
     public EntryEditor detachEntryEditor() {
         EntryEditor result = editor;
-        editor = new EntryEditor();
-        editor.setInputProfile(result.inputProfile);
-        editor.restore(new EntryEditor.State(result));
-        if (result.isEditing()
-                && result.undoCount() == 0
-                && !undo.isEmpty()
-                && !undo.peek().entry.editing
-                && sameStack(undo.peek().stack, stack)) {
-            result.undo.push(undo.pop().entry);
-        }
+        editor = editor.copy();
+        editor.clearUndo();
         return result;
     }
 
-    private static State entryState(EntryEditor.State entry, List<UnifiedReal> stack) {
-        return new State(new ArrayList<>(stack), entry);
-    }
-
     public void useEntryEditor(EntryEditor draft) {
-        if (draft.editing) {
-            for (EntryEditor.State state : draft.undo)
-                if (!state.editing) {
-                    if (undo.isEmpty()
-                            || undo.peek().entry.editing
-                            || !sameStack(undo.peek().stack, stack))
-                        undo.push(entryState(state, stack));
-                    break;
-                }
-            if (undo.size() + redo.size() > 100) {
-                if (undo.size() > 1) undo.removeLast();
-                else redo.removeLast();
-            }
-        }
-        editor = new EntryEditor();
-        editor.inputProfile = draft.inputProfile;
-        editor.restore(new EntryEditor.State(draft));
+        editor = draft.copy();
     }
 
     /** Replace the entry section without decoding the arithmetic graph or nesting snapshots. */
@@ -202,7 +173,7 @@ public final class RpnCalculator {
     public static byte[] saveWithEntry(byte[] calculation, EntryEditor draft, boolean newBranch)
             throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(calculation));
-        if (in.readInt() != 0x52504e35)
+        if (in.readInt() != 0x52504e36)
             throw new IOException("Unsupported snapshot for entry replacement");
         int length = in.readInt();
         if (length < 0 || length > calculation.length - 13)
@@ -539,7 +510,7 @@ public final class RpnCalculator {
                 body.length + currentEntry.length + 13, CalculationLimits.ARITHMETIC_BYTES);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e35);
+        out.writeInt(0x52504e36);
         out.writeInt(body.length);
         out.write(body);
         out.writeInt(currentEntry.length);
@@ -598,7 +569,9 @@ public final class RpnCalculator {
             out.writeInt(state.stack.size());
             for (UnifiedReal value : state.stack) out.writeInt(ids.get(savedValues.get(value)));
             if (index == 0) continue;
-            EntryEditor.writeState(out, state.entry);
+            byte[] entry = state.entry.encode();
+            out.writeInt(entry.length);
+            out.write(entry);
         }
         out.flush();
         return bytes.toByteArray();
@@ -607,7 +580,7 @@ public final class RpnCalculator {
     public static RpnCalculator load(byte[] bytes) throws IOException {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            if (in.readInt() != 0x52504e35) throw new IOException("Unknown saved state version");
+            if (in.readInt() != 0x52504e36) throw new IOException("Unknown saved state version");
             byte[] body = readSection(in), entry = readSection(in);
             boolean branch = in.readBoolean();
             if (in.available() != 0) throw new IOException("Trailing saved state data");
@@ -661,9 +634,7 @@ public final class RpnCalculator {
                 stack.add(values.get(id));
             }
             State state =
-                    new State(
-                            stack,
-                            i == 0 ? new EntryEditor.State(c.editor) : EntryEditor.readState(in));
+                    new State(stack, i == 0 ? c.editor.copy() : EntryEditor.load(readSection(in)));
             if (i == 0) c.restore(state);
             else if (i <= undos) c.undo.addLast(state);
             else c.redo.addLast(state);

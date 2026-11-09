@@ -27,9 +27,9 @@ final class SelectedProductTest {
         assertEquals("45", c.entry());
         assertEquals(1, c.selectionStart());
         c = TestCalculator.load(c.save());
-        c.key("UNDO");
+        c.arithmeticKey("UNDO");
         assertEquals(3, c.values().size());
-        c.key("REDO");
+        c.arithmeticKey("REDO");
         assertTrue(c.values().get(3).definitelyEquals(RpnCalculator.parse("0.02")));
     }
 

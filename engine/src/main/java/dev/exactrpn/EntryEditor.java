@@ -87,6 +87,19 @@ public final class EntryEditor {
         redo.clear();
     }
 
+    EntryEditor copy() {
+        EntryEditor result = new EntryEditor();
+        result.inputProfile = inputProfile;
+        result.restore(new State(this));
+        result.undo.addAll(undo);
+        result.redo.addAll(redo);
+        return result;
+    }
+
+    boolean same(EntryEditor other) {
+        return new State(this).same(other);
+    }
+
     public EntryEditor entryForCommit() {
         EntryEditor result = new EntryEditor();
         result.inputProfile = inputProfile;
@@ -339,7 +352,7 @@ public final class EntryEditor {
         return bytes;
     }
 
-    private byte[] encode() throws IOException {
+    byte[] encode() throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
         out.writeInt(0x45445431);

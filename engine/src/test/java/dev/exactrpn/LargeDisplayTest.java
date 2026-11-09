@@ -7,6 +7,23 @@ import org.junit.jupiter.api.Test;
 
 final class LargeDisplayTest {
     @Test
+    void largeFractionsUseCompactOlderRowsButCopyExactly() {
+        var value = RpnCalculator.parse("1e999").divide(new com.android.calculator2.UnifiedReal(7));
+        for (FractionMode mode : new FractionMode[] {FractionMode.MIXED, FractionMode.IMPROPER}) {
+            String display =
+                    ValueFormatter.format(value, false, ValueFormatter.Notation.SCIENTIFIC, mode);
+            assertTrue(
+                    display.length() < 100,
+                    "Older fractions must not be clipped to a prefix: " + mode);
+            assertTrue(display.startsWith("≈ "));
+            String copied =
+                    ValueFormatter.clipboard(value, ValueFormatter.Notation.SCIENTIFIC, mode);
+            assertTrue(copied.length() >= 1000);
+            assertTrue(copied.endsWith("/7"));
+        }
+    }
+
+    @Test
     void displayLimitsDoNotTruncateExactDecimalCopies() {
         java.math.BigInteger numerator =
                 java.math.BigInteger.TEN
