@@ -86,11 +86,11 @@ final class MoreFunctionsTest {
         UnifiedReal phi = calculator.values().get(0);
         assertEquals(
                 "1.61803398874989484820458683436563811772",
-                ValueFormatter.clipboard(phi, ValueFormatter.Notation.SCIENTIFIC));
+                TestValueFormatter.clipboard(phi, ValueFormatter.Notation.SCIENTIFIC));
         UnifiedReal restored = TestCalculator.load(calculator.save()).values().get(0);
         assertEquals(
-                ValueFormatter.clipboard(phi, ValueFormatter.Notation.SCIENTIFIC),
-                ValueFormatter.clipboard(restored, ValueFormatter.Notation.SCIENTIFIC));
+                TestValueFormatter.clipboard(phi, ValueFormatter.Notation.SCIENTIFIC),
+                TestValueFormatter.clipboard(restored, ValueFormatter.Notation.SCIENTIFIC));
         calculator.key("UNDO");
         assertTrue(calculator.values().isEmpty());
         calculator.key("REDO");

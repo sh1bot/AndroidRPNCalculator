@@ -43,8 +43,7 @@ public final class MemoryTransportTest {
     private CalculationRequest request(Command key, DisplayResult accepted) {
         CalculationRequest request = new CalculationRequest(key);
         request.angle = RpnCalculator.AngleUnit.RAD;
-        request.notation = ValueFormatter.Notation.SCIENTIFIC;
-        request.locale = "en-US";
+        if (key.kind == Command.Kind.READ_VALUES) request.numbers = NumericRequest.PRECISE;
         if (accepted != null) {
             request.input = accepted.state;
             request.inputId = accepted.checkpoint;
@@ -56,41 +55,55 @@ public final class MemoryTransportTest {
     public void displayPacketSharesRowsAndBudgetsEntryHistoryWithoutTruncatingValues()
             throws Exception {
         DisplayResult result = new DisplayResult();
-        String row = String.join("", java.util.Collections.nCopies(9, "1234567890")) + "/7";
-        result.rows = new java.util.ArrayList<>(java.util.Collections.nCopies(2000, row));
-        result.compactTop = "1.76e+88";
+        NumericValue number =
+                NumericEvaluator.read(
+                        RpnCalculator.parse("123456789012345678901234567890"),
+                        NumericRequest.DEFAULT);
+        result.values = new java.util.ArrayList<>(java.util.Collections.nCopies(3800, number));
         result.stackId = "stack";
         result.checkpoint = "checkpoint";
         result.angle = RpnCalculator.AngleUnit.GRAD;
-        result.notation = ValueFormatter.Notation.ENGINEERING;
-        result.numberMode = NumberMode.UNGROUPED;
-        result.fractionMode = FractionMode.IMPROPER;
         result.state = new TestCalculator().save();
         EntryEditor editor = new EntryEditor();
         for (int i = 0; i < 1000; i++) editor.key("9");
         byte[] packet = DisplayResult.encode(result, editor);
         assertTrue(packet.length <= CalculationLimits.TRANSFER_BYTES);
         DisplayResult decoded = DisplayResult.decode(packet);
-        assertEquals(result.rows, decoded.rows);
+        assertEquals(result.values.size(), decoded.values.size());
+        assertEquals(number.rational.numerator, decoded.values.get(3799).rational.numerator);
         assertEquals(result.angle, decoded.angle);
-        assertEquals(result.notation, decoded.notation);
-        assertEquals(result.numberMode, decoded.numberMode);
-        assertEquals(result.fractionMode, decoded.fractionMode);
         EntryEditor restored = EntryEditor.load(decoded.entryState);
         assertEquals(String.join("", java.util.Collections.nCopies(1000, "9")), restored.entry());
         assertTrue(restored.undoCount() > 0 && restored.undoCount() < 100);
-        Display full = new Display(decoded, new EntryEditor());
+        Display full =
+                new Display(
+                        decoded,
+                        new EntryEditor(),
+                        new Display(
+                                ValueFormatter.Notation.ENGINEERING,
+                                RpnCalculator.AngleUnit.RAD,
+                                NumberMode.UNGROUPED,
+                                FractionMode.IMPROPER));
         Display editing = new Display(full, restored);
-        assertEquals(row, full.rows.get(1999));
-        assertEquals(row, editing.rows.get(1998));
-        assertEquals("1.76e+88", editing.rows.get(1999));
+        assertEquals("123456789012345678901234567890", full.rows.get(3799));
+        assertEquals("≈ 123.456789012e+27", editing.rows.get(3798));
+        assertEquals("≈ 123.456789012e+27", editing.rows.get(3799));
         assertThrows(UnsupportedOperationException.class, () -> editing.rows.set(0, "changed"));
         assertThrows(
                 java.io.IOException.class,
                 () -> DisplayResult.decode(java.util.Arrays.copyOf(packet, packet.length - 1)));
         DisplayResult copy = new DisplayResult();
-        copy.copyText = "7/3";
-        assertEquals("7/3", DisplayResult.decode(DisplayResult.encode(copy, null)).copyText);
+        copy.readOnly = true;
+        copy.values.add(
+                NumericEvaluator.read(
+                        RpnCalculator.parse("7").divide(RpnCalculator.parse("3")),
+                        NumericRequest.PRECISE));
+        assertEquals(
+                "7/3",
+                ValueFormatter.clipboard(
+                        DisplayResult.decode(DisplayResult.encode(copy, null)).values.get(0),
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        FractionMode.IMPROPER));
     }
 
     @Test
@@ -109,23 +122,33 @@ public final class MemoryTransportTest {
                 }
                 accepted = worker.submit(() -> remote.evaluate(next)).get(30, TimeUnit.SECONDS);
             }
+            for (int i = 0; i < 12; i++) {
+                CalculationRequest duplicate = request("ENTER", accepted);
+                accepted =
+                        worker.submit(() -> remote.evaluate(duplicate)).get(15, TimeUnit.SECONDS);
+            }
             CalculationRequest copy =
-                    request(Command.rows(Command.Kind.COPY_ROWS, 0, 1, 2, 3), accepted);
+                    request(
+                            Command.rows(
+                                    Command.Kind.READ_VALUES,
+                                    java.util.stream.IntStream.range(0, 16).toArray()),
+                            accepted);
             expectTooLarge(worker, remote, copy);
             CalculationRequest oversized = request("RESTORE", accepted);
             oversized.entryDraft = new byte[CalculationLimits.TRANSFER_BYTES];
             expectTooLarge(worker, remote, oversized);
-            CalculationRequest single = request(Command.rows(Command.Kind.COPY_ROWS, 0), accepted);
+            CalculationRequest single =
+                    request(Command.rows(Command.Kind.READ_VALUES, 0), accepted);
             single.input = null;
             DisplayResult copied =
                     worker.submit(() -> remote.evaluate(single)).get(30, TimeUnit.SECONDS);
-            assertEquals(65537, copied.copyText.length());
-            assertTrue(copied.copyText.startsWith("1"));
+            assertEquals(65537, ResultTestSupport.copy(copied).length());
+            assertTrue(ResultTestSupport.copy(copied).startsWith("1"));
             remote.cancel();
             CalculationRequest restore = request("RESTORE", accepted);
             DisplayResult restored =
                     worker.submit(() -> remote.evaluate(restore)).get(30, TimeUnit.SECONDS);
-            assertEquals(accepted.rows, restored.rows);
+            assertEquals(ResultTestSupport.rows(accepted), ResultTestSupport.rows(restored));
         } finally {
             remote.close();
             worker.shutdownNow();
@@ -173,10 +196,11 @@ public final class MemoryTransportTest {
                                     () ->
                                             remote.evaluate(
                                                     request(
-                                                            Command.rows(Command.Kind.COPY_ROWS, 0),
+                                                            Command.rows(
+                                                                    Command.Kind.READ_VALUES, 0),
                                                             accepted)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("42", copied.copyText);
+            assertEquals("42", ResultTestSupport.copy(copied));
         } finally {
             remote.close();
             worker.shutdownNow();
@@ -199,8 +223,8 @@ public final class MemoryTransportTest {
                             .get(20, TimeUnit.SECONDS);
             for (Command badCopy :
                     new Command[] {
-                        Command.rows(Command.Kind.COPY_ROWS, 999),
-                        Command.rows(Command.Kind.COPY_ROWS, -1)
+                        Command.rows(Command.Kind.READ_VALUES, 999),
+                        Command.rows(Command.Kind.READ_VALUES, -1)
                     }) {
                 try {
                     worker.submit(() -> remote.evaluate(request(badCopy, accepted)))
@@ -213,11 +237,11 @@ public final class MemoryTransportTest {
                 field.setAccessible(true);
                 assertEquals(accepted.checkpoint, field.get(remote));
                 CalculationRequest next =
-                        request(Command.rows(Command.Kind.COPY_ROWS, 0), accepted);
+                        request(Command.rows(Command.Kind.READ_VALUES, 0), accepted);
                 next.input = null;
                 DisplayResult copied =
                         worker.submit(() -> remote.evaluate(next)).get(15, TimeUnit.SECONDS);
-                assertEquals("45", copied.copyText);
+                assertEquals("45", ResultTestSupport.copy(copied));
             }
         } finally {
             remote.close();
@@ -243,22 +267,18 @@ public final class MemoryTransportTest {
             noop.entryDraft = local.entryForCommit().save();
             accepted = worker.submit(() -> remote.evaluate(noop)).get(15, TimeUnit.SECONDS);
             assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
-            CalculationRequest mode = request("FRACTION", accepted);
+            CalculationRequest mode = request("ANGLE", accepted);
             accepted = worker.submit(() -> remote.evaluate(mode)).get(15, TimeUnit.SECONDS);
             assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
-            CalculationRequest invalid = request("+", accepted);
             local.pasteClipboard("1,234", NumberText.COMPUTER);
-            invalid.entryDraft = local.entryForCommit().save();
-            accepted = worker.submit(() -> remote.evaluate(invalid)).get(15, TimeUnit.SECONDS);
-            assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
-            assertFalse(accepted.operationError.isEmpty());
+            assertThrows(IllegalArgumentException.class, local::prepared);
             CalculationRequest commit = request("+", accepted);
             local.pasteText("7", NumberText.COMPUTER);
             commit.entryDraft = local.entryForCommit().save();
             accepted = worker.submit(() -> remote.evaluate(commit)).get(15, TimeUnit.SECONDS);
             assertEquals(DisplayResult.EditorDisposition.RESTORE, accepted.editorDisposition);
-            assertEquals(java.util.Arrays.asList("7"), accepted.rows);
-            assertFalse(accepted.operationError.isEmpty());
+            assertEquals(java.util.Arrays.asList("7"), ResultTestSupport.rows(accepted));
+            assertNotNull(accepted.operationError);
             CalculationRequest undo = request("UNDO", accepted);
             accepted = worker.submit(() -> remote.evaluate(undo)).get(15, TimeUnit.SECONDS);
             assertEquals(DisplayResult.EditorDisposition.RESTORE, accepted.editorDisposition);
@@ -274,15 +294,18 @@ public final class MemoryTransportTest {
         for (Command command :
                 new Command[] {
                     Command.key("SELECT_HOME"),
-                    Command.edit("1:234,5\nEDIT:false", 2, 7, true, false),
-                    Command.select(1, 3),
-                    Command.paste("1,234\n5.6"),
+                    Command.pushValues(
+                            new RationalValue[] {
+                                new RationalValue(
+                                        java.math.BigInteger.valueOf(1234),
+                                        java.math.BigInteger.ONE)
+                            }),
                     Command.holdDigit("0"),
                     Command.rows(Command.Kind.DROP_ROWS, 3, 1, 3),
                     Command.rows(Command.Kind.PICK_ROWS, 0),
                     Command.rows(Command.Kind.SUM_ROWS, 0, 2),
                     Command.rows(Command.Kind.PRODUCT_ROWS, 0, 2),
-                    Command.rows(Command.Kind.COPY_ROWS, 1),
+                    Command.rows(Command.Kind.READ_VALUES, 1),
                     Command.unaryRows(Operation.SQRT, 0, 2)
                 }) {
             CalculationRequest request = new CalculationRequest(command);
@@ -305,24 +328,23 @@ public final class MemoryTransportTest {
     }
 
     @Test
-    public void requestCodecRoundTripsModesAndRejectsMalformedData() throws Exception {
-        CalculationRequest request = new CalculationRequest(Command.paste("1,234\n5.6"));
-        request.locale = "de-DE";
+    public void requestCodecRoundTripsNumericalBoundsAndRejectsMalformedData() throws Exception {
+        CalculationRequest request =
+                new CalculationRequest(Command.rows(Command.Kind.READ_VALUES, 0));
+
         request.angle = RpnCalculator.AngleUnit.GRAD;
-        request.notation = ValueFormatter.Notation.ENGINEERING;
-        request.numberMode = NumberMode.UNGROUPED;
-        request.fractionMode = FractionMode.IMPROPER;
+
+        request.numbers = new NumericRequest(java.math.BigInteger.valueOf(2000), 12, 8192, true);
         request.entryBranch = true;
         request.entryDraft = new byte[] {1, 2, 3};
         byte[] encoded = request.encode("session", "checkpoint", true);
         CalculationRequest decoded = CalculationRequest.decode(encoded);
         assertEquals(request.command.kind, decoded.command.kind);
         assertEquals(request.command.text, decoded.command.text);
-        assertEquals(request.locale, decoded.locale);
         assertEquals(request.angle, decoded.angle);
-        assertEquals(request.notation, decoded.notation);
-        assertEquals(request.numberMode, decoded.numberMode);
-        assertEquals(request.fractionMode, decoded.fractionMode);
+        assertEquals(request.numbers.limit, decoded.numbers.limit);
+        assertEquals(request.numbers.base, decoded.numbers.base);
+        assertEquals(request.numbers.exactBytes, decoded.numbers.exactBytes);
         assertArrayEquals(request.entryDraft, decoded.entryDraft);
         assertTrue(decoded.entryBranch);
         assertEquals("session", decoded.sessionId);
@@ -338,7 +360,7 @@ public final class MemoryTransportTest {
             } catch (java.io.IOException expected) {
             }
         }
-        encoded[encoded.length - 1] = (byte) 255;
+        java.nio.ByteBuffer.wrap(encoded).putInt(encoded.length - 9, 1);
         try {
             CalculationRequest.decode(encoded);
             fail("Invalid mode accepted");

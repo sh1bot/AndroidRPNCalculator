@@ -72,8 +72,8 @@ final class HistoryRegressionTest extends RegressionSupport {
         angleSaved.setAngleUnit(RpnCalculator.AngleUnit.RAD);
         TestCalculator angleRestored = TestCalculator.load(angleSaved.save());
         assertEquals(
-                ValueFormatter.format(top(angleSaved), true, sci),
-                ValueFormatter.format(top(angleRestored), true, sci),
+                TestValueFormatter.format(top(angleSaved), true, sci),
+                TestValueFormatter.format(top(angleRestored), true, sci),
                 "restore trig expression with original angle unit");
         TestCalculator bounded = new TestCalculator();
         for (int i = 0; i < 150; i++) CalculatorTestSupport.paste(bounded, Integer.toString(i));

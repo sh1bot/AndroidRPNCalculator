@@ -52,6 +52,45 @@ public final class EntryOperatorTest {
     }
 
     @Test
+    public void presentationModesReformatLocallyWithoutChangingWorkerCheckpoint() throws Exception {
+        CalculatorSession session =
+                new CalculatorSession(
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        RpnCalculator.AngleUnit.RAD,
+                        NumberMode.DOT,
+                        FractionMode.DECIMAL,
+                        true);
+        session.attach(instrumentation.getTargetContext());
+        try {
+            key(session, "RESTORE");
+            key(session, Command.paste("7"));
+            key(session, "ENTER");
+            key(session, Command.paste("3"));
+            key(session, "÷");
+            CalculationSnapshot checkpoint = session.checkpoint;
+            java.util.List<NumericValue> values = session.display.values;
+            key(session, "FRACTION");
+            assertEquals("2 1/3", session.display.rows.get(0));
+            key(session, "FRACTION");
+            assertEquals("7/3", session.display.rows.get(0));
+            key(session, "FORMAT");
+            key(session, "NUMBER_FORMAT");
+            key(session, "FRACTION");
+            assertSame(
+                    "Formatting must not produce a new arithmetic checkpoint",
+                    checkpoint,
+                    session.checkpoint);
+            assertSame("Modes must reuse numerical data", values, session.display.values);
+            key(session, "UNDO");
+            assertEquals("3", session.display.entry);
+            assertEquals(java.util.Arrays.asList("7"), session.display.rows);
+        } finally {
+            session.close();
+            assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     public void emptyStackNoOpsPreserveAnEntryRedo() throws Exception {
         CalculatorSession session =
                 new CalculatorSession(

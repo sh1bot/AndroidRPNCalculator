@@ -2,11 +2,13 @@
 package dev.exactrpn;
 
 import java.util.AbstractList;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 final class Display {
     final List<String> rows, fullRows, compactRows;
+    final List<NumericValue> values;
     final String entry, problem, stackId;
     final ValueFormatter.Notation notation;
     final boolean editing, raw;
@@ -20,20 +22,62 @@ final class Display {
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
             FractionMode fractionMode) {
-        rows = fullRows = compactRows = Collections.emptyList();
-        entry = problem = "";
-        stackId = "initial";
-        this.notation = notation;
-        angleUnit = angle;
-        this.numberMode = numberMode;
-        this.fractionMode = fractionMode;
-        editing = raw = false;
-        start = end = 0;
+        this(
+                Collections.emptyList(),
+                "initial",
+                angle,
+                notation,
+                numberMode,
+                fractionMode,
+                new EntryEditor());
     }
 
-    Display(DisplayResult result, EntryEditor editor) {
-        fullRows = Collections.unmodifiableList(result.rows);
-        String top = result.compactTop;
+    Display(DisplayResult result, EntryEditor editor, Display settings) {
+        this(
+                Collections.unmodifiableList(result.values),
+                result.stackId,
+                result.angle,
+                settings.notation,
+                settings.numberMode,
+                settings.fractionMode,
+                editor);
+    }
+
+    Display(
+            Display stack,
+            ValueFormatter.Notation notation,
+            NumberMode numberMode,
+            FractionMode fractionMode,
+            EntryEditor editor) {
+        this(
+                stack.values,
+                stack.stackId,
+                stack.angleUnit,
+                notation,
+                numberMode,
+                fractionMode,
+                editor);
+    }
+
+    private Display(
+            List<NumericValue> values,
+            String stackId,
+            RpnCalculator.AngleUnit angle,
+            ValueFormatter.Notation notation,
+            NumberMode numberMode,
+            FractionMode fractionMode,
+            EntryEditor editor) {
+        this.values = values;
+        ArrayList<String> full = new ArrayList<>(values.size());
+        for (int i = 0; i < values.size(); i++)
+            full.add(
+                    ValueFormatter.format(
+                            values.get(i), i == values.size() - 1, notation, fractionMode));
+        fullRows = Collections.unmodifiableList(full);
+        String top =
+                values.isEmpty()
+                        ? ""
+                        : ValueFormatter.format(values.get(values.size() - 1), false, notation);
         compactRows =
                 new AbstractList<String>() {
                     public int size() {
@@ -41,25 +85,25 @@ final class Display {
                     }
 
                     public String get(int index) {
-                        String value = fullRows.get(index);
-                        return index == size() - 1 ? top : value;
+                        return index == size() - 1 ? top : fullRows.get(index);
                     }
                 };
-        stackId = result.stackId;
+        this.stackId = stackId;
+        this.notation = notation;
+        angleUnit = angle;
+        this.numberMode = numberMode;
+        this.fractionMode = fractionMode;
         entry = editor.entry();
         problem = editor.entryProblem();
-        notation = result.notation;
-        angleUnit = result.angle;
-        numberMode = result.numberMode;
-        fractionMode = result.fractionMode;
         editing = editor.isEditing();
-        rows = editing ? compactRows : fullRows;
         raw = editor.rawEntry();
         start = editor.selectionStart();
         end = editor.selectionEnd();
+        rows = editing ? compactRows : fullRows;
     }
 
     Display(Display stack, EntryEditor editor) {
+        values = stack.values;
         fullRows = stack.fullRows;
         compactRows = stack.compactRows;
         stackId = stack.stackId;
