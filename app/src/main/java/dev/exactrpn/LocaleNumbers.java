@@ -12,7 +12,6 @@ import android.text.style.RelativeSizeSpan;
 import android.text.style.SubscriptSpan;
 import android.text.style.SuperscriptSpan;
 
-import java.math.BigInteger;
 import java.util.Locale;
 
 /** Use Android's own ICU formatter so grouping widths and suppression rules follow the OS. */
@@ -20,17 +19,21 @@ public final class LocaleNumbers {
     private final NumberFormat integers;
     private final DecimalFormatSymbols symbols;
     private final int primary, secondary;
-    private final boolean computer;
+    private final RadixMode radixMode;
     private final NumberText.Profile inputProfile;
 
     public LocaleNumbers(Locale locale) {
-        this(locale, NumberMode.LOCALE);
+        this(locale, NumberMode.LOCALE, RadixMode.DECIMAL);
     }
 
     public LocaleNumbers(Locale locale, NumberMode mode) {
+        this(locale, mode, RadixMode.DECIMAL);
+    }
+
+    public LocaleNumbers(Locale locale, NumberMode mode, RadixMode radixMode) {
         boolean computer = mode == NumberMode.DOT;
         boolean grouping = mode != NumberMode.UNGROUPED;
-        this.computer = computer;
+        this.radixMode = radixMode;
         integers = NumberFormat.getIntegerInstance(computer ? Locale.US : locale);
         integers.setMaximumIntegerDigits(Integer.MAX_VALUE);
         DecimalFormat format = (DecimalFormat) integers;
@@ -40,11 +43,25 @@ public final class LocaleNumbers {
             format.setDecimalFormatSymbols(symbols);
         }
         format.setGroupingUsed(grouping && format.isGroupingUsed());
-        primary = format.isGroupingUsed() ? format.getGroupingSize() : 0;
-        secondary = format.getSecondaryGroupingSize();
+        primary =
+                format.isGroupingUsed()
+                        ? radixMode == RadixMode.DECIMAL
+                                ? format.getGroupingSize()
+                                : radixMode.grouping
+                        : 0;
+        secondary =
+                primary == 0
+                        ? 0
+                        : radixMode == RadixMode.DECIMAL
+                                ? format.getSecondaryGroupingSize()
+                                : radixMode.grouping;
         inputProfile =
                 new NumberText.Profile(
-                        decimalSeparator(), symbols.getGroupingSeparator(), primary, secondary);
+                        decimalSeparator(),
+                        symbols.getGroupingSeparator(),
+                        primary,
+                        secondary,
+                        radixMode.radix);
     }
 
     public char decimalSeparator() {
@@ -53,6 +70,7 @@ public final class LocaleNumbers {
 
     /** Entry localizes digits and decimal separator, but never inserts grouping. */
     public String entry(String canonical) {
+        canonical = radixMode.digits(canonical);
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < canonical.length(); i++) {
             char c = canonical.charAt(i);
@@ -73,9 +91,10 @@ public final class LocaleNumbers {
         }
         // The near-zero bound is an annotation, but its power of ten uses the same styling.
         String bound = "0 (|x| < 1";
-        if (number.startsWith(bound + "e") && number.endsWith(")")) {
+        int boundMarker = exponent(number, bound.length());
+        if (number.startsWith(bound) && boundMarker == bound.length() && number.endsWith(")")) {
             text.append(entry(bound));
-            appendExponent(text, number.substring(bound.length() + 1, number.length() - 1));
+            appendExponent(text, number.substring(boundMarker + 1, number.length() - 1));
             return text.append(")");
         }
         if (number.contains("(")) return text.append(entry(number));
@@ -121,8 +140,7 @@ public final class LocaleNumbers {
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE | (1 << Spanned.SPAN_PRIORITY_SHIFT));
             return text;
         }
-        int e = number.indexOf('e');
-        if (e < 0) e = number.indexOf('E');
+        int e = exponent(number, 0);
         String mantissa = e < 0 ? number : number.substring(0, e);
         int dot = mantissa.indexOf('.');
         String whole = dot < 0 ? mantissa : mantissa.substring(0, dot);
@@ -167,7 +185,7 @@ public final class LocaleNumbers {
 
     private static final class EntryIndexRaise extends SuperscriptSpan {}
 
-    /** Style entry in place: e/E stays one editable character, so offsets and copy stay literal. */
+    /** The exponent marker stays one editable character, so offsets and copy stay literal. */
     public void styleEntry(Spannable text) {
         styleDecimal(text);
         for (Object span : text.getSpans(0, text.length(), Object.class))
@@ -176,7 +194,7 @@ public final class LocaleNumbers {
                     || span instanceof EntryIndexRaise) text.removeSpan(span);
         int marker = -1;
         for (int i = 0; i < text.length(); i++)
-            if (text.charAt(i) == 'e' || text.charAt(i) == 'E') {
+            if (isExponent(text.charAt(i))) {
                 marker = i;
                 break;
             }
@@ -186,7 +204,7 @@ public final class LocaleNumbers {
         for (int i = marker + 1; i < text.length(); i++) {
             char c = text.charAt(i);
             if (i == marker + 1 && (c == '+' || c == '-' || c == '−')) continue;
-            if (Character.digit(c, 10) < 0) return;
+            if (Character.digit(c, radixMode.radix) < 0) return;
         }
         text.setSpan(
                 new ExponentMarkerSpan(entry("10")),
@@ -213,7 +231,7 @@ public final class LocaleNumbers {
                 text.getSpans(0, text.length(), DecimalSeparatorSpan.class)) text.removeSpan(span);
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
-            if (c == 'e' || c == 'E') break;
+            if (isExponent(c)) break;
             if (c == decimalSeparator())
                 text.setSpan(
                         new DecimalSeparatorSpan(symbols.getZeroDigit()),
@@ -224,12 +242,22 @@ public final class LocaleNumbers {
     }
 
     private void appendInteger(SpannableStringBuilder text, String whole, int groupingColor) {
-        BigInteger integer = new BigInteger(whole);
-        String localized = integers.format(integer);
-        if (whole.startsWith("-") && integer.signum() == 0)
-            localized =
-                    ((DecimalFormat) integers).getNegativePrefix()
-                            + localized; // No double conversion or digit loss.
+        boolean negative = whole.startsWith("-");
+        if (negative || whole.startsWith("+")) whole = whole.substring(1);
+        StringBuilder grouped = new StringBuilder();
+        int first = whole.length(), width = primary;
+        while (width > 0 && first > width) {
+            int next = first - width;
+            grouped.insert(0, symbols.getGroupingSeparator() + whole.substring(next, first));
+            first = next;
+            width = secondary > 0 ? secondary : primary;
+        }
+        grouped.insert(0, whole.substring(0, first));
+        String localized = entry(grouped.toString());
+        if (negative) {
+            DecimalFormat format = (DecimalFormat) integers;
+            localized = format.getNegativePrefix() + localized + format.getNegativeSuffix();
+        }
         int start = text.length();
         text.append(localized);
         for (int i = 0; i < localized.length(); i++) {
@@ -247,19 +275,36 @@ public final class LocaleNumbers {
     }
 
     public String copy(String canonical) {
-        return computer ? canonical : entry(canonical);
+        return entry(canonical);
     }
 
     public String canonicalEntry(String visible) {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < visible.length(); i++) {
             char c = visible.charAt(i);
-            int digit = Character.digit(c, 10);
+            int digit = Character.digit(c, radixMode.radix);
             text.append(
                     digit >= 0
-                            ? (char) ('0' + digit)
-                            : c == decimalSeparator() ? '.' : c == '−' ? '-' : c);
+                            ? Character.toUpperCase(Character.forDigit(digit, radixMode.radix))
+                            : c == '\u218a'
+                                    ? 'A'
+                                    : c == '\u218b'
+                                            ? 'B'
+                                            : c == decimalSeparator() ? '.' : c == '−' ? '-' : c);
         }
         return text.toString();
+    }
+
+    public RadixMode radixMode() {
+        return radixMode;
+    }
+
+    private boolean isExponent(char c) {
+        return c == 'p' || c == 'P' || radixMode == RadixMode.DECIMAL && (c == 'e' || c == 'E');
+    }
+
+    private int exponent(String text, int from) {
+        for (int i = from; i < text.length(); i++) if (isExponent(text.charAt(i))) return i;
+        return -1;
     }
 }

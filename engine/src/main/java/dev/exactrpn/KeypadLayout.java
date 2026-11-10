@@ -32,18 +32,42 @@ public final class KeypadLayout {
             int controlHeight,
             int stackMinimum,
             int stackHeightMinimum) {
+        return choose(
+                width,
+                height,
+                expanded,
+                gap,
+                keyMinimum,
+                controlHeight,
+                stackMinimum,
+                stackHeightMinimum,
+                4,
+                5);
+    }
+
+    public static KeypadLayout choose(
+            int width,
+            int height,
+            boolean expanded,
+            int gap,
+            int keyMinimum,
+            int controlHeight,
+            int stackMinimum,
+            int stackHeightMinimum,
+            int columns,
+            int primaryRows) {
         width = Math.max(1, width);
         height = Math.max(1, height);
-        int digitsMinimum = 4 * keyMinimum;
+        int digitsMinimum = columns * keyMinimum;
         // Move beside the stack only when the vertical arrangement cannot keep useful key heights.
         boolean beside =
                 width >= stackMinimum + gap + digitsMinimum
                         && height
                                 < stackHeightMinimum
                                         + controlHeight
-                                        + (expanded ? 8 : 5) * keyMinimum;
+                                        + (primaryRows + (expanded ? 3 : 0)) * keyMinimum;
         if (!beside) {
-            int naturalHeight = controlHeight + 5 * (width / 4);
+            int naturalHeight = controlHeight + primaryRows * (width / columns);
             int keypadHeight =
                     Math.min(
                             naturalHeight,
@@ -58,7 +82,11 @@ public final class KeypadLayout {
                     width);
         }
         int primary =
-                Math.max(digitsMinimum, Math.min(6 * keyMinimum, (height - controlHeight) * 4 / 5));
+                Math.max(
+                        digitsMinimum,
+                        Math.min(
+                                (columns + 2) * keyMinimum,
+                                (height - controlHeight) * columns / primaryRows));
         primary = Math.min(primary, width - stackMinimum - gap);
         int functionWidth = 5 * keyMinimum;
         boolean functionsBeside =

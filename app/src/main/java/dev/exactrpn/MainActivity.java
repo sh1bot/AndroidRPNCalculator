@@ -31,7 +31,7 @@ public class MainActivity extends Activity {
     private ThemeColors colors;
     private EntryField entryView;
     private TextView status, noticeView;
-    private Button notationButton, angleButton, numberFormatButton, fractionButton;
+    private Button notationButton, angleButton, radixButton, numberFormatButton, fractionButton;
     private CalculatorKeypad keys;
     private LocaleNumbers numbers, localNumbers, computerNumbers, ungroupedNumbers;
     private boolean changingEntry, entryShowsRaw;
@@ -73,7 +73,13 @@ public class MainActivity extends Activity {
         }
     }
 
-    private LocaleNumbers numberFormat(NumberMode mode) {
+    private LocaleNumbers numberFormat(NumberMode mode, RadixMode radix) {
+        if (localNumbers == null || localNumbers.radixMode() != radix) {
+            Locale locale = getResources().getConfiguration().getLocales().get(0);
+            localNumbers = new LocaleNumbers(locale, NumberMode.LOCALE, radix);
+            computerNumbers = new LocaleNumbers(locale, NumberMode.DOT, radix);
+            ungroupedNumbers = new LocaleNumbers(locale, NumberMode.UNGROUPED, radix);
+        }
         return mode == NumberMode.DOT
                 ? computerNumbers
                 : mode == NumberMode.UNGROUPED ? ungroupedNumbers : localNumbers;
@@ -255,12 +261,14 @@ public class MainActivity extends Activity {
         execute(Command.paste(text.toString()));
     }
 
-    private void copyValue(String text, NumberMode mode) {
+    private void copyValue(String text, NumberMode mode, RadixMode radix) {
         android.content.ClipboardManager clipboard =
                 (android.content.ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        Locale locale = getResources().getConfiguration().getLocales().get(0);
+        LocaleNumbers copyFormat = new LocaleNumbers(locale, mode, radix);
         clipboard.setPrimaryClip(
                 android.content.ClipData.newPlainText(
-                        getString(R.string.clipboard_label), numberFormat(mode).copy(text)));
+                        getString(R.string.clipboard_label), copyFormat.copy(text)));
         if (Build.VERSION.SDK_INT <= 32) showNotice(getString(R.string.copied), false);
     }
 
@@ -329,7 +337,9 @@ public class MainActivity extends Activity {
 
     private void stackRowTapped(int index, Display snapshot) {
         if (!stackActionAllowed(snapshot)) return;
-        session.copyRows(new int[] {index}, text -> copyValue(text, snapshot.numberMode));
+        session.copyRows(
+                new int[] {index},
+                text -> copyValue(text, snapshot.numberMode, snapshot.radixMode));
     }
 
     private boolean executeSelectionAction(String key) {
@@ -409,6 +419,10 @@ public class MainActivity extends Activity {
             editor.putInt("numberMode", display.numberMode.ordinal());
             changed = true;
         }
+        if (preferences.getInt("radixMode", -1) != display.radixMode.ordinal()) {
+            editor.putInt("radixMode", display.radixMode.ordinal());
+            changed = true;
+        }
         if (changed) editor.apply();
     }
 
@@ -416,13 +430,14 @@ public class MainActivity extends Activity {
         Display display = session.display;
         if (display.editing) clearStackSelection(false);
         if (rendered != display || selectionDirty) {
-            numbers = numberFormat(display.numberMode);
+            numbers = numberFormat(display.numberMode, display.radixMode);
             keys.setNumberFormat(numbers);
             boolean stackChanged =
                     selectionDirty
                             || rendered == null
                             || !Objects.equals(rendered.stackId, display.stackId)
                             || rendered.numberMode != display.numberMode
+                            || rendered.radixMode != display.radixMode
                             || rendered.editing != display.editing
                             || !rendered.rows.equals(display.rows);
             selectionDirty = false;
@@ -450,13 +465,36 @@ public class MainActivity extends Activity {
         int keyCode = event.getKeyCode();
         int unicode = event.getUnicodeChar();
         if (unicode == numbers.decimalSeparator()) unicode = '.';
-        String key =
-                KeyboardInput.command(
-                        keyCode,
-                        unicode,
-                        event.isCtrlPressed(),
-                        event.isAltPressed(),
-                        event.isMetaPressed());
+        String key = null;
+        if (session.display.editing
+                && !event.isCtrlPressed()
+                && !event.isAltPressed()
+                && !event.isMetaPressed()) {
+            int digit =
+                    unicode == '\u218a'
+                            ? 10
+                            : unicode == '\u218b'
+                                    ? 11
+                                    : Character.digit(unicode, session.display.radixMode.radix);
+            if (digit >= 0 && digit < session.display.radixMode.radix)
+                key =
+                        Character.toString(
+                                Character.toUpperCase(
+                                        Character.forDigit(
+                                                digit, session.display.radixMode.radix)));
+            else if (unicode == 'p'
+                    || unicode == 'P'
+                    || session.display.radixMode != RadixMode.HEX
+                            && (unicode == 'e' || unicode == 'E')) key = "HOLD_DECIMAL";
+        }
+        if (key == null)
+            key =
+                    KeyboardInput.command(
+                            keyCode,
+                            unicode,
+                            event.isCtrlPressed(),
+                            event.isAltPressed(),
+                            event.isMetaPressed());
         if (key == null) return super.dispatchKeyEvent(event);
         boolean navigation =
                 key.equals("LEFT")
@@ -554,10 +592,6 @@ public class MainActivity extends Activity {
     }
 
     private boolean restoreSession() {
-        Locale locale = getResources().getConfiguration().getLocales().get(0);
-        localNumbers = new LocaleNumbers(locale);
-        computerNumbers = new LocaleNumbers(locale, NumberMode.DOT);
-        ungroupedNumbers = new LocaleNumbers(locale, NumberMode.UNGROUPED);
         session = (CalculatorSession) getLastNonConfigurationInstance();
         boolean restoreSession = session == null;
         if (session == null) {
@@ -568,6 +602,7 @@ public class MainActivity extends Activity {
                                 RpnCalculator.AngleUnit.RAD,
                                 NumberMode.LOCALE,
                                 FractionMode.DECIMAL,
+                                RadixMode.DECIMAL,
                                 true);
             else {
                 session =
@@ -578,13 +613,22 @@ public class MainActivity extends Activity {
                                 RpnCalculator.AngleUnit.valueOf(
                                         getPreferences(0).getString("angleUnit", "RAD")),
                                 NumberMode.values()[getPreferences(0).getInt("numberMode", 0)],
-                                FractionMode.values()[getPreferences(0).getInt("fractionMode", 0)]);
+                                FractionMode.values()[getPreferences(0).getInt("fractionMode", 0)],
+                                savedRadix(),
+                                false);
                 session.tauConstant = getPreferences(0).getBoolean("tauConstant", false);
             }
         }
         session.attach(this);
-        numbers = numberFormat(session.display.numberMode);
+        numbers = numberFormat(session.display.numberMode, session.display.radixMode);
         return restoreSession;
+    }
+
+    private RadixMode savedRadix() {
+        int ordinal = getPreferences(0).getInt("radixMode", 0);
+        return ordinal >= 0 && ordinal < RadixMode.values().length
+                ? RadixMode.values()[ordinal]
+                : RadixMode.DECIMAL;
     }
 
     private LinearLayout createRoot() {
@@ -633,7 +677,7 @@ public class MainActivity extends Activity {
                     protected void onMeasure(int widthSpec, int heightSpec) {
                         int width = View.MeasureSpec.getSize(widthSpec);
                         int menuWidth = Math.min(dp(48), width / 6);
-                        int buttonWidth = Math.min(dp(54), (width - menuWidth) / 5);
+                        int buttonWidth = Math.min(dp(54), (width - menuWidth) / 6);
                         for (int i = 0; i < getChildCount(); i++)
                             if (getChildAt(i) instanceof Button)
                                 getChildAt(i).getLayoutParams().width =
@@ -660,6 +704,7 @@ public class MainActivity extends Activity {
         header.setGravity(Gravity.CENTER_VERTICAL);
         angleButton = modeButton(header, "ANGLE");
         notationButton = modeButton(header, "FORMAT");
+        radixButton = modeButton(header, "RADIX");
         numberFormatButton = modeButton(header, "NUMBER_FORMAT");
         fractionButton = modeButton(header, "FRACTION");
         status = text(12);
@@ -851,6 +896,9 @@ public class MainActivity extends Activity {
                                 display.notation == ValueFormatter.Notation.ENGINEERING
                                         ? R.string.engineering
                                         : R.string.scientific)));
+        radixButton.setText(new String[] {"DEC", "HEX", "DOZ"}[display.radixMode.ordinal()]);
+        radixButton.setContentDescription(
+                getString(R.string.radix_description, radixButton.getText()));
         fractionButton.setText(
                 new String[] {"DEC", "FRAC", "IMPR"}[display.fractionMode.ordinal()]);
         fractionButton.setContentDescription(

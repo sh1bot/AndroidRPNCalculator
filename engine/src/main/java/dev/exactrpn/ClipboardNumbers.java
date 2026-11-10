@@ -10,7 +10,7 @@ public final class ClipboardNumbers {
     private ClipboardNumbers() {}
 
     private static final java.util.regex.Pattern FRACTION =
-            java.util.regex.Pattern.compile("([+-]?[0-9]+)(?: ([0-9]+))?/([0-9]+)");
+            java.util.regex.Pattern.compile("(.+?)(?: ([^ ]+))?/([^/ ]+)");
 
     public static RationalValue[] parse(String text, NumberText.Profile locale) {
         if (text.length() > RpnCalculator.MAX_PASTE_LENGTH)
@@ -27,22 +27,21 @@ public final class ClipboardNumbers {
                     BigInteger[] parts =
                             ExactFunctions.parts(
                                     RpnCalculator.parse(
-                                            NumberText.analyze(line, locale).canonical()));
+                                            NumberText.analyze(line, locale).canonical(),
+                                            locale.radix));
                     values.add(new RationalValue(parts[0], parts[1]));
                 } else {
                     var match = FRACTION.matcher(line);
                     if (!match.matches())
                         throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
-                    BigInteger whole = RpnCalculator.parse(match.group(1)).bigIntegerValue(),
-                            denominator = RpnCalculator.parse(match.group(3)).bigIntegerValue();
+                    BigInteger whole = integer(match.group(1), locale),
+                            denominator = integer(match.group(3), locale);
                     BigInteger numerator =
                             match.group(2) == null
                                     ? whole
                                     : whole.abs()
                                             .multiply(denominator)
-                                            .add(
-                                                    RpnCalculator.parse(match.group(2))
-                                                            .bigIntegerValue())
+                                            .add(integer(match.group(2), locale))
                                             .multiply(
                                                     BigInteger.valueOf(
                                                             line.startsWith("-") ? -1 : 1));
@@ -54,5 +53,12 @@ public final class ClipboardNumbers {
         }
         if (values.size() < 2) throw new IllegalArgumentException("Expected multiple values");
         return values.toArray(new RationalValue[0]);
+    }
+
+    private static BigInteger integer(String text, NumberText.Profile profile) {
+        NumberText.Profile plain =
+                new NumberText.Profile(profile.decimal, (char) 0, 0, 0, profile.radix);
+        return RpnCalculator.parse(NumberText.selected(text, plain), profile.radix)
+                .bigIntegerValue();
     }
 }

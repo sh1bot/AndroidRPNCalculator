@@ -60,4 +60,14 @@ final class KeypadLayoutTest {
                     else assertEquals(height, plan.stackHeight + plan.keypadHeight);
                 }
     }
+
+    @Test
+    void fiveColumnRadixKeypadsUseTheirActualRowCount() {
+        KeypadLayout dozenal = KeypadLayout.choose(392, 700, false, 12, 48, 48, 200, 112, 5, 5),
+                hex = KeypadLayout.choose(392, 700, false, 12, 48, 48, 200, 112, 5, 6);
+        assertFalse(dozenal.besideStack);
+        assertFalse(hex.besideStack);
+        assertTrue(hex.keypadHeight > dozenal.keypadHeight);
+        assertTrue(hex.stackHeight < dozenal.stackHeight);
+    }
 }

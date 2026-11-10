@@ -71,7 +71,8 @@ public final class EntryEditor {
         return a.decimal == b.decimal
                 && a.grouping == b.grouping
                 && a.primary == b.primary
-                && a.secondary == b.secondary;
+                && a.secondary == b.secondary
+                && a.radix == b.radix;
     }
 
     public int undoCount() {
@@ -117,7 +118,7 @@ public final class EntryEditor {
         EntryEditor result = entryForCommit();
         result.resolveRaw();
         if (result.raw) NumberText.analyze(result.entry, result.rawProfile).canonical();
-        if (!result.entry.isEmpty()) RpnCalculator.parse(result.entry);
+        if (!result.entry.isEmpty()) RpnCalculator.parse(result.entry, result.inputProfile.radix);
         return result;
     }
 
@@ -181,7 +182,7 @@ public final class EntryEditor {
         if (!editing || entry.isEmpty()) return "";
         if (raw) return NumberText.analyze(entry, rawProfile).ambiguous() ? "Ambiguous" : "Invalid";
         try {
-            RpnCalculator.parse(entry);
+            RpnCalculator.parse(entry, inputProfile.radix);
             return "";
         } catch (IllegalArgumentException ex) {
             return "Invalid";
@@ -281,7 +282,7 @@ public final class EntryEditor {
 
     public static boolean isEntryKey(String key) {
         return key.length() == 1
-                && (key.charAt(0) == '.' || key.charAt(0) >= '0' && key.charAt(0) <= '9');
+                && (key.charAt(0) == '.' || Character.digit(key.charAt(0), 16) >= 0);
     }
 
     boolean applyEntryKey(String key, boolean clearsEntry) {
@@ -293,17 +294,22 @@ public final class EntryEditor {
                     resolveExplicitDecimal();
                 } else {
                     String remaining = entryWithoutSelection();
-                    if (remaining.contains(".")
-                            || remaining.contains("e")
-                            || remaining.contains("E")) return true;
+                    if (remaining.contains(".") || hasExponent(remaining)) return true;
                     replaceSelection(entry.isEmpty() || entry.equals("-") ? "0." : ".");
                 }
-            } else replaceSelection(key);
+            } else {
+                int digit = Character.digit(key.charAt(0), inputProfile.radix);
+                if (digit < 0) return true;
+                replaceSelection(
+                        Character.toString(
+                                Character.toUpperCase(
+                                        Character.forDigit(digit, inputProfile.radix))));
+            }
             resolveRaw();
         } else if (key.equals("HOLD_DECIMAL")) {
             String remaining = entryWithoutSelection();
-            if (remaining.contains("e") || remaining.contains("E")) return true;
-            replaceSelection("e");
+            if (hasExponent(remaining)) return true;
+            replaceSelection(inputProfile.radix == 10 ? "e" : "P");
             resolveRaw();
         } else if (key.equals("BACK") || key.equals("DROP") || key.equals("DELETE")) {
             if (editing) {
@@ -335,15 +341,26 @@ public final class EntryEditor {
         return true;
     }
 
+    private boolean hasExponent(String text) {
+        return text.indexOf('P') >= 0
+                || inputProfile.radix == 10 && (text.indexOf('e') >= 0 || text.indexOf('E') >= 0);
+    }
+
     static void writeProfile(DataOutputStream out, NumberText.Profile p) throws IOException {
         out.writeChar(p.decimal);
         out.writeChar(p.grouping);
         out.writeInt(p.primary);
         out.writeInt(p.secondary);
+        out.writeInt(p.radix);
     }
 
-    static NumberText.Profile readProfile(DataInputStream in) throws IOException {
-        return new NumberText.Profile(in.readChar(), in.readChar(), in.readInt(), in.readInt());
+    static NumberText.Profile readProfile(DataInputStream in, boolean legacy) throws IOException {
+        return new NumberText.Profile(
+                in.readChar(),
+                in.readChar(),
+                in.readInt(),
+                in.readInt(),
+                legacy ? 10 : in.readInt());
     }
 
     public byte[] save() throws IOException {
@@ -364,7 +381,7 @@ public final class EntryEditor {
     byte[] encode() throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x45445431);
+        out.writeInt(0x45445432);
         writeProfile(out, inputProfile);
         writeState(out, new State(this));
         out.writeInt(undo.size());
@@ -376,15 +393,17 @@ public final class EntryEditor {
 
     public static EntryEditor load(byte[] bytes) throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-        if (in.readInt() != 0x45445431) throw new IOException("Unknown entry format");
+        int magic = in.readInt();
+        boolean legacy = magic == 0x45445431;
+        if (!legacy && magic != 0x45445432) throw new IOException("Unknown entry format");
         EntryEditor result = new EntryEditor();
-        result.inputProfile = readProfile(in);
-        result.restore(readState(in));
+        result.inputProfile = readProfile(in, legacy);
+        result.restore(readState(in, legacy));
         int undos = in.readInt(), redos = in.readInt();
         if (undos < 0 || redos < 0 || undos > 100 || redos > 100 || undos + redos > 100)
             throw new IOException("Invalid entry history");
-        for (int i = 0; i < undos; i++) result.undo.addLast(readState(in));
-        for (int i = 0; i < redos; i++) result.redo.addLast(readState(in));
+        for (int i = 0; i < undos; i++) result.undo.addLast(readState(in, legacy));
+        for (int i = 0; i < redos; i++) result.redo.addLast(readState(in, legacy));
         if (in.available() != 0) throw new IOException("Trailing entry data");
         return result;
     }
@@ -398,11 +417,11 @@ public final class EntryEditor {
         writeProfile(out, state.profile);
     }
 
-    static State readState(DataInputStream in) throws IOException {
+    static State readState(DataInputStream in, boolean legacy) throws IOException {
         String text = in.readUTF();
         boolean editing = in.readBoolean(), raw = in.readBoolean();
         int start = in.readInt(), end = in.readInt();
-        NumberText.Profile profile = readProfile(in);
+        NumberText.Profile profile = readProfile(in, legacy);
         if (text.length() > MAX_ENTRY_LENGTH
                 || start < 0
                 || end < 0

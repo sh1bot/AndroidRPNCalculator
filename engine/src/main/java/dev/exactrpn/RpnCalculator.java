@@ -9,7 +9,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -346,8 +345,9 @@ public final class RpnCalculator {
 
     /** Long-press digits pick a one-based stack level; entry mode keeps their digit function. */
     public void holdDigit(String digit) {
-        if (!digit.matches("[0-9]")) throw new IllegalArgumentException("Invalid digit shortcut");
-        int depth = digit.equals("0") ? 10 : Integer.parseInt(digit);
+        int value = digit.length() == 1 ? Character.digit(digit.charAt(0), 16) : -1;
+        if (value < 0) throw new IllegalArgumentException("Invalid digit shortcut");
+        int depth = value == 0 ? 10 : value;
         need(depth);
         pickRows(stack.size() - depth);
     }
@@ -639,7 +639,7 @@ public final class RpnCalculator {
         // Caller validates locale-sensitive entry; history retains its restoration context.
         if (editor.raw) throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
         if (!editor.entry.isEmpty()) {
-            UnifiedReal value = parse(editor.entry);
+            UnifiedReal value = parse(editor.entry, editor.inputProfile.radix);
             stack.add(value);
             saveValue(value, SavedValue.of(value, "r", null, null));
         }
@@ -669,13 +669,65 @@ public final class RpnCalculator {
     }
 
     public static UnifiedReal parse(String text) {
-        BigDecimal d = new BigDecimal(text);
-        if (Math.abs((long) d.scale()) > 1000 || d.precision() > 1000)
+        return parse(text, 10);
+    }
+
+    public static UnifiedReal parse(String text, int radix) {
+        if (radix < 2 || radix > 36 || text == null || text.isEmpty())
+            throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+        String value = text.toUpperCase(java.util.Locale.ROOT);
+        boolean negative = value.startsWith("-");
+        if (negative || value.startsWith("+")) value = value.substring(1);
+        int p = value.indexOf('P'), e = radix == 10 ? value.indexOf('E') : -1;
+        if (p >= 0 && e >= 0) throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+        int marker = Math.max(p, e);
+        char markerCharacter = p >= 0 ? 'P' : 'E';
+        if (marker >= 0 && value.indexOf(markerCharacter, marker + 1) >= 0)
+            throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+        int exponent = 0;
+        if (marker >= 0) {
+            String power = value.substring(marker + 1);
+            value = value.substring(0, marker);
+            boolean powerNegative = power.startsWith("-");
+            if (powerNegative || power.startsWith("+")) power = power.substring(1);
+            if (power.isEmpty() || power.length() > 8)
+                throw CalculationError.invalid(CalculationError.Code.NUMBER_TOO_LARGE);
+            try {
+                exponent = Integer.parseInt(power, radix);
+            } catch (NumberFormatException ex) {
+                throw CalculationError.invalid(CalculationError.Code.NUMBER_TOO_LARGE);
+            }
+            if (powerNegative) exponent = -exponent;
+        }
+        int point = value.indexOf('.');
+        if (point >= 0 && value.indexOf('.', point + 1) >= 0)
+            throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+        int fractional = point < 0 ? 0 : value.length() - point - 1;
+        String digits = point < 0 ? value : value.substring(0, point) + value.substring(point + 1);
+        if (digits.isEmpty()) throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+        int first = 0;
+        while (first < digits.length() && digits.charAt(first) == '0') first++;
+        if (Math.max(1, digits.length() - first) > 1000)
             throw CalculationError.invalid(CalculationError.Code.NUMBER_TOO_LARGE);
-        BigInteger n = d.unscaledValue();
+        BigInteger n;
+        try {
+            n = new BigInteger(digits, radix);
+        } catch (NumberFormatException ex) {
+            throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+        }
+        if (negative) n = n.negate();
+        int scale;
+        try {
+            scale = Math.subtractExact(fractional, exponent);
+        } catch (ArithmeticException ex) {
+            throw CalculationError.invalid(CalculationError.Code.NUMBER_TOO_LARGE);
+        }
+        if (Math.abs((long) scale) > 1000)
+            throw CalculationError.invalid(CalculationError.Code.NUMBER_TOO_LARGE);
+        BigInteger base = BigInteger.valueOf(radix);
         return new UnifiedReal(
-                d.scale() < 0
-                        ? new BoundedRational(n.multiply(BigInteger.TEN.pow(-d.scale())))
-                        : new BoundedRational(n, BigInteger.TEN.pow(d.scale())));
+                scale < 0
+                        ? new BoundedRational(n.multiply(base.pow(-scale)))
+                        : new BoundedRational(n, base.pow(scale)));
     }
 }
