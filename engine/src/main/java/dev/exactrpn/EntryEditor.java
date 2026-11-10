@@ -282,7 +282,9 @@ public final class EntryEditor {
 
     public static boolean isEntryKey(String key) {
         return key.length() == 1
-                && (key.charAt(0) == '.' || Character.digit(key.charAt(0), 16) >= 0);
+                && (key.charAt(0) == '.'
+                        || key.charAt(0) >= '0' && key.charAt(0) <= '9'
+                        || key.charAt(0) >= 'A' && key.charAt(0) <= 'F');
     }
 
     boolean applyEntryKey(String key, boolean clearsEntry) {

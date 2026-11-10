@@ -7,7 +7,6 @@ import android.app.Instrumentation;
 import android.content.Intent;
 import android.os.SystemClock;
 import android.view.View;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -644,12 +643,11 @@ public final class EntryOperatorTest {
             instrumentation.runOnMainSync(
                     () -> {
                         root.findViewWithTag("1").performClick();
-                        LinearLayout modes = root.findViewWithTag("mode-row");
-                        for (int i = 0; i < 4; i++) {
-                            assertTrue(
-                                    "Mode button must stay enabled",
-                                    modes.getChildAt(i).isEnabled());
-                            modes.getChildAt(i).performClick();
+                        for (String mode :
+                                new String[] {"ANGLE", "FORMAT", "NUMBER_FORMAT", "FRACTION"}) {
+                            View button = root.findViewWithTag(mode);
+                            assertTrue("Mode button must stay enabled", button.isEnabled());
+                            button.performClick();
                         }
                     });
             awaitUi(() -> !session.busy);

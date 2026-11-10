@@ -117,9 +117,7 @@ public final class StackSelectionTest {
                 await(
                         () -> {
                             android.widget.TextView modeButton =
-                                    (android.widget.TextView)
-                                            ((android.view.ViewGroup) tagged(a, "mode-row"))
-                                                    .getChildAt(3);
+                                    (android.widget.TextView) tagged(a, "FRACTION");
                             if (!expectedMode.contentEquals(modeButton.getText())) return false;
                             for (int row = 0; row < 2; row++) {
                                 android.widget.TextView value =
@@ -187,9 +185,7 @@ public final class StackSelectionTest {
                 await(
                         () -> {
                             android.widget.TextView modeButton =
-                                    (android.widget.TextView)
-                                            ((android.view.ViewGroup) tagged(activity, "mode-row"))
-                                                    .getChildAt(3);
+                                    (android.widget.TextView) tagged(activity, "FRACTION");
                             android.widget.TextView value =
                                     (android.widget.TextView) tagged(activity, "stack-value:0");
                             android.widget.TextView label =

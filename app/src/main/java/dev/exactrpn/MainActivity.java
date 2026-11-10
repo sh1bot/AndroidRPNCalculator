@@ -692,6 +692,7 @@ public class MainActivity extends Activity {
 
     private Button modeButton(LinearLayout header, String command) {
         Button button = new Button(this);
+        button.setTag(command);
         styleModeButton(button);
         button.setOnClickListener(v -> execute(command));
         header.addView(button, new LinearLayout.LayoutParams(dp(54), dp(48)));

@@ -3,6 +3,7 @@ package dev.exactrpn;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.android.calculator2.UnifiedReal;
 
@@ -34,6 +35,9 @@ final class RadixModeTest {
 
     @Test
     void editorPersistsItsRadixAndRejectsDigitsOutsideIt() throws Exception {
+        assertFalse(EntryEditor.isEntryKey("e"), "Euler's constant remains a command");
+        assertTrue(EntryEditor.isEntryKey("E"), "uppercase E is a hexadecimal digit");
+
         EntryEditor editor = new EntryEditor();
         editor.setInputProfile(new NumberText.Profile('.', '\u2009', 4, 4, 16));
         editor.key("F");

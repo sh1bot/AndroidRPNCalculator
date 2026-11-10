@@ -24,7 +24,8 @@ public enum RadixMode {
     }
 
     public String digits(String canonical) {
-        if (this != DOZENAL) return canonical.toUpperCase(java.util.Locale.ROOT);
+        if (this == DECIMAL) return canonical;
+        if (this == HEX) return canonical.toUpperCase(java.util.Locale.ROOT);
         return canonical
                 .replace('A', '\u218a')
                 .replace('a', '\u218a')
