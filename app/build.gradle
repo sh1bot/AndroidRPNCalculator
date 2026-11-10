@@ -27,7 +27,9 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // This app has no runtime reflection that needs generic, annotation, or
+            // inner-class metadata retained by Android's general-purpose defaults.
+            proguardFiles 'proguard-rules.pro'
         }
         if (signingFile) {
             debug { signingConfig signingConfigs.permanent }
