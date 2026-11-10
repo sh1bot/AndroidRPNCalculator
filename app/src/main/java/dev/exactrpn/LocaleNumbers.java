@@ -95,9 +95,13 @@ public final class LocaleNumbers {
         if (number.startsWith(bound) && boundMarker == bound.length() && number.endsWith(")")) {
             text.append(entry(bound));
             appendExponent(text, number.substring(boundMarker + 1, number.length() - 1));
-            return text.append(")");
+            text.append(")");
+            return styleDozenal(text);
         }
-        if (number.contains("(")) return text.append(entry(number));
+        if (number.contains("(")) {
+            text.append(entry(number));
+            return styleDozenal(text);
+        }
         int slash = number.indexOf('/');
         if (slash >= 0) {
             int whole = number.indexOf(' ');
@@ -138,7 +142,7 @@ public final class LocaleNumbers {
                     fractionStart,
                     text.length(),
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE | (1 << Spanned.SPAN_PRIORITY_SHIFT));
-            return text;
+            return styleDozenal(text);
         }
         int e = exponent(number, 0);
         String mantissa = e < 0 ? number : number.substring(0, e);
@@ -156,7 +160,7 @@ public final class LocaleNumbers {
             text.append(entry(mantissa.substring(dot + 1)));
         }
         if (e >= 0) appendExponent(text, number.substring(e + 1));
-        return text;
+        return styleDozenal(text);
     }
 
     private void appendExponent(SpannableStringBuilder text, String exponent) {
@@ -187,6 +191,7 @@ public final class LocaleNumbers {
 
     /** The exponent marker stays one editable character, so offsets and copy stay literal. */
     public void styleEntry(Spannable text) {
+        styleDozenal(text);
         styleDecimal(text);
         for (Object span : text.getSpans(0, text.length(), Object.class))
             if (span instanceof ExponentMarkerSpan
@@ -223,6 +228,20 @@ public final class LocaleNumbers {
                     text.length(),
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
+    }
+
+    /** Preserve the real dozenal characters for editing and copying, with a drawing fallback. */
+    <T extends Spannable> T styleDozenal(T text) {
+        for (TurnedDigitSpan span : text.getSpans(0, text.length(), TurnedDigitSpan.class))
+            text.removeSpan(span);
+        if (radixMode != RadixMode.DOZENAL) return text;
+        for (int i = 0; i < text.length(); i++) {
+            char digit = text.charAt(i);
+            if (digit == '\u218a' || digit == '\u218b')
+                text.setSpan(
+                        new TurnedDigitSpan(digit), i, i + 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return text;
     }
 
     /** Styling only: preserve characters, caret offsets, locale and validation colors. */

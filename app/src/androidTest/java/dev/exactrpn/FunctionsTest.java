@@ -115,6 +115,21 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void dozenalDigitsKeepTheirCharactersAndInstallFontFallbacks() {
+        LocaleNumbers numbers = new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.DOZENAL);
+        android.text.Spanned stack = (android.text.Spanned) numbers.stack("↊↋", 0);
+        assertEquals("↊↋", stack.toString());
+        assertEquals(2, stack.getSpans(0, stack.length(), TurnedDigitSpan.class).length);
+
+        android.text.SpannableString entry = new android.text.SpannableString(numbers.entry("AB"));
+        numbers.styleEntry(entry);
+        numbers.styleEntry(entry);
+        assertEquals("↊↋", entry.toString());
+        assertEquals(2, entry.getSpans(0, entry.length(), TurnedDigitSpan.class).length);
+        assertEquals("↊↋", numbers.copy("AB"));
+    }
+
+    @Test
     public void mixedDisplayCopyAndFactorisationThroughRemoteProcess() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context);
