@@ -107,6 +107,33 @@ public final class MemoryTransportTest {
     }
 
     @Test
+    public void optionalExactDataCannotCrowdOutCalculationState() throws Exception {
+        DisplayResult result = new DisplayResult();
+        result.state = new byte[230000];
+        java.util.Arrays.fill(result.state, (byte) 7);
+        NumericValue value =
+                NumericEvaluator.read(
+                        RpnCalculator.parse("1e399").divide(RpnCalculator.parse("7")),
+                        NumericRequest.DEFAULT);
+        result.values = new java.util.ArrayList<>(java.util.Collections.nCopies(400, value));
+        byte[] packet = DisplayResult.encode(result, new EntryEditor());
+        assertTrue(packet.length <= CalculationLimits.TRANSFER_BYTES);
+        DisplayResult decoded = DisplayResult.decode(packet);
+        assertArrayEquals(result.state, decoded.state);
+        assertEquals(400, decoded.values.size());
+        assertNull(decoded.values.get(0).rational);
+        assertNotNull(decoded.values.get(399).rational);
+        assertEquals(value.num, decoded.values.get(0).num);
+        assertEquals(value.scale, decoded.values.get(0).scale);
+        result.exactRequired = true;
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> DisplayResult.encode(result, new EntryEditor()));
+        assertNotNull(
+                "Packing must never change cached numerical data", result.values.get(0).rational);
+    }
+
+    @Test
     public void oversizedCopiesAndRequestsPreserveTheAcceptedCalculation() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context, true);

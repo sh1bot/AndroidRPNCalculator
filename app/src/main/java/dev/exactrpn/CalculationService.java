@@ -76,9 +76,14 @@ public class CalculationService extends Service {
             if (readOnly) {
                 DisplayResult result = new DisplayResult();
                 result.readOnly = true;
+                result.exactRequired = request.numbers.requireRational;
                 result.stackId = cachedStackId;
+                java.util.IdentityHashMap<UnifiedReal, NumericValue> evaluated =
+                        new java.util.IdentityHashMap<>();
                 for (UnifiedReal value : cached.selectedValues(command.rows()))
-                    result.values.add(NumericEvaluator.read(value, request.numbers));
+                    result.values.add(
+                            evaluated.computeIfAbsent(
+                                    value, v -> NumericEvaluator.read(v, request.numbers)));
                 display = DisplayResult.encode(result, null);
             } else {
                 display = arithmeticResult(request);
@@ -217,6 +222,7 @@ public class CalculationService extends Service {
             numbers.retain(values);
             DisplayResult display = new DisplayResult();
             for (UnifiedReal value : values) display.values.add(numbers.read(value, precision));
+            display.exactRequired = precision.requireRational;
             display.operationError = operationError;
             display.errorArgument = errorArgument;
             display.stackId = stackId;

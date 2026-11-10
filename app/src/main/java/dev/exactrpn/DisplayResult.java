@@ -18,18 +18,42 @@ final class DisplayResult {
     CalculationError.Code operationError;
     int errorArgument;
     byte[] state, entryState;
-    boolean readOnly;
+    boolean readOnly, exactRequired;
     ArrayList<NumericValue> values = new ArrayList<>();
     RpnCalculator.AngleUnit angle = RpnCalculator.AngleUnit.RAD;
 
     static byte[] encode(DisplayResult result, EntryEditor editor) throws IOException {
+        boolean[] exact = new boolean[result.values.size()];
+        if (result.exactRequired) {
+            java.util.Arrays.fill(exact, true);
+        } else {
+            EntryEditor current = editor == null ? null : editor.copy();
+            if (current != null) current.clearUndo();
+            int remaining =
+                    CalculationLimits.TRANSFER_BYTES - packet(result, current, exact).length;
+            // Keep recent numerical results first when optional exact data competes for space.
+            for (int i = exact.length - 1; i >= 0; i--) {
+                RationalValue rational = result.values.get(i).rational;
+                int extra = rational == null ? 0 : rational.byteSize() + 8;
+                if (extra <= remaining) {
+                    exact[i] = true;
+                    remaining -= extra;
+                }
+            }
+        }
+        return require(packet(result, editor, exact));
+    }
+
+    private static byte[] packet(DisplayResult result, EntryEditor editor, boolean[] exact)
+            throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
             out.writeInt(0x44525039);
             out.writeBoolean(result.readOnly);
             writeText(out, result.stackId);
             out.writeInt(result.values.size());
-            for (NumericValue value : result.values) NumericCodec.writeValue(out, value);
+            for (int i = 0; i < result.values.size(); i++)
+                NumericCodec.writeValue(out, result.values.get(i), exact[i]);
             if (!result.readOnly) {
                 out.writeByte(result.editorDisposition.ordinal());
                 writeBytes(out, result.state);
@@ -40,7 +64,7 @@ final class DisplayResult {
                 writeBytes(out, editor.save(CalculationLimits.TRANSFER_BYTES - bytes.size() - 4));
             }
         }
-        return require(bytes.toByteArray());
+        return bytes.toByteArray();
     }
 
     static DisplayResult decode(byte[] bytes) throws IOException {
