@@ -222,28 +222,15 @@ public final class RpnCalculator {
         return Collections.unmodifiableList(new ArrayList<>(stack));
     }
 
-    /** Clipboard text is retained, including ambiguous or invalid punctuation, for correction. */
-    /** Multiple nonblank lines are validated before any state is changed. */
-    public void pasteClipboard(String text, NumberText.Profile locale) {
-        if (text.length() > MAX_PASTE_LENGTH)
-            throw CalculationError.invalid(CalculationError.Code.ENTRY_TOO_LONG, MAX_PASTE_LENGTH);
-        String[] lines = text.split("\\R", -1);
+    /** Push a previously validated exact batch as one transaction. */
+    public void pushValues(RationalValue[] inputs) {
         List<UnifiedReal> values = new ArrayList<>();
-        int nonblank = 0;
-        for (String line : lines) if (!line.trim().isEmpty()) nonblank++;
-        if (nonblank < 2) throw new IllegalArgumentException("Expected multiple clipboard values");
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].trim();
-            if (line.isEmpty()) continue;
-            try {
-                EntryEditor.checkLength(line);
-                values.add(parseClipboardLine(line, locale));
-            } catch (IllegalArgumentException | ArithmeticException ex) {
-                throw CalculationError.invalid(CalculationError.Code.INVALID_PASTE_LINE, i + 1);
-            }
-        }
+        for (RationalValue input : inputs)
+            values.add(
+                    new UnifiedReal(
+                            new com.android.calculator2.BoundedRational(
+                                    input.numerator, input.denominator)));
         State before = new State(this);
-        // Commit any current entry only after the clipboard has passed validation.
         try {
             commit();
         } catch (RuntimeException ex) {
@@ -255,20 +242,6 @@ public final class RpnCalculator {
             saveValue(value, SavedValue.of(value, "r", null, null));
         }
         remember(before);
-    }
-
-    private static final java.util.regex.Pattern COPIED_FRACTION =
-            java.util.regex.Pattern.compile("([+-]?[0-9]+)(?: ([0-9]+))?/([0-9]+)");
-
-    private static UnifiedReal parseClipboardLine(String text, NumberText.Profile locale) {
-        if (!text.contains("/")) return parse(NumberText.analyze(text, locale).canonical());
-        java.util.regex.Matcher fraction = COPIED_FRACTION.matcher(text);
-        if (!fraction.matches())
-            throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
-        UnifiedReal whole = parse(fraction.group(1)), denominator = parse(fraction.group(3));
-        if (fraction.group(2) == null) return whole.divide(denominator);
-        UnifiedReal part = parse(fraction.group(2)).divide(denominator);
-        return text.startsWith("-") ? whole.negate().add(part).negate() : whole.add(part);
     }
 
     public void key(String key) {
@@ -310,8 +283,7 @@ public final class RpnCalculator {
                 commit();
                 committed = new State(this);
                 applyStackOrOperation(key);
-                if (!stack.isEmpty())
-                    ValueFormatter.format(top(), true, ValueFormatter.Notation.SCIENTIFIC);
+                if (!stack.isEmpty()) NumericEvaluator.read(top(), NumericRequest.DEFAULT);
             }
             remember(before);
         } catch (RuntimeException ex) {
@@ -433,7 +405,7 @@ public final class RpnCalculator {
         for (int row : rows) {
             UnifiedReal original = stack.get(row);
             UnifiedReal result = operation.evaluate(original, null, angleUnit);
-            ValueFormatter.format(result, true, ValueFormatter.Notation.SCIENTIFIC);
+            NumericEvaluator.read(result, NumericRequest.DEFAULT);
             results.add(result);
             expressions.add(
                     SavedValue.of(
@@ -664,10 +636,8 @@ public final class RpnCalculator {
     }
 
     private void commit() {
-        editor.resolveRaw();
-        if (editor.raw)
-            NumberText.analyze(editor.entry, editor.rawProfile)
-                    .canonical(); // Throws instead of guessing.
+        // Caller validates locale-sensitive entry; history retains its restoration context.
+        if (editor.raw) throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
         if (!editor.entry.isEmpty()) {
             UnifiedReal value = parse(editor.entry);
             stack.add(value);

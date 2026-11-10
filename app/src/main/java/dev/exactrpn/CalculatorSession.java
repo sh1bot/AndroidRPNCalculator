@@ -115,7 +115,7 @@ final class CalculatorSession {
     }
 
     void copyRows(int[] rows, java.util.function.Consumer<String> copy) {
-        enqueue(Command.rows(Command.Kind.COPY_ROWS, rows), copy);
+        enqueue(Command.rows(Command.Kind.READ_VALUES, rows), copy);
     }
 
     private void enqueue(Command command, java.util.function.Consumer<String> copy) {
@@ -234,8 +234,7 @@ final class CalculatorSession {
 
     private byte[] completedDraft(Command key) throws java.io.IOException {
         if (editor == null) return null;
-        return (key.is(Command.UNDO) || key.is(Command.REDO) ? editor : editor.entryForCommit())
-                .save();
+        return (key.is(Command.UNDO) || key.is(Command.REDO) ? editor : editor.prepared()).save();
     }
 
     private synchronized PendingKey nextKey() {
@@ -269,9 +268,17 @@ final class CalculatorSession {
                 return;
             }
             if (onMain(() -> editLocally(key, generation))) return;
+            if (changeFormat(key, generation)) return;
+            Display settings = display;
             DisplayResult result = remote.evaluate(request(key));
-            if (key.kind == Command.Kind.COPY_ROWS) {
-                if (input.copy != null) handler.post(() -> input.copy.accept(result.copyText));
+            if (key.kind == Command.Kind.READ_VALUES) {
+                java.util.StringJoiner text = new java.util.StringJoiner("\n");
+                for (NumericValue value : result.values)
+                    text.add(
+                            ValueFormatter.clipboard(
+                                    value, settings.notation, settings.fractionMode));
+                CalculationLimits.require(text.length(), CalculationLimits.TRANSFER_BYTES);
+                if (input.copy != null) handler.post(() -> input.copy.accept(text.toString()));
                 return;
             }
             EntryEditor incoming;
@@ -280,7 +287,8 @@ final class CalculatorSession {
             } catch (java.io.IOException ex) {
                 throw new IllegalStateException("Invalid entry response", ex);
             }
-            publishResult(result, new Display(result, incoming), incoming, key, generation);
+            publishResult(
+                    result, new Display(result, incoming, settings), incoming, key, generation);
             if (key.is(Command.RESTORE) && !temporary) acknowledgeRestore();
             if (background) saveForLifecycle();
         } catch (RuntimeException ex) {
@@ -290,12 +298,44 @@ final class CalculatorSession {
         }
     }
 
+    private boolean changeFormat(Command key, long generation) {
+        if (!key.is("FORMAT") && !key.is("NUMBER_FORMAT") && !key.is("FRACTION")) return false;
+        Display current = display;
+        ValueFormatter.Notation notation =
+                key.is("FORMAT")
+                        ? current.notation == ValueFormatter.Notation.SCIENTIFIC
+                                ? ValueFormatter.Notation.ENGINEERING
+                                : ValueFormatter.Notation.SCIENTIFIC
+                        : current.notation;
+        EntryEditor entry = onMain(() -> editor == null ? new EntryEditor() : editor.copy());
+        Display next =
+                new Display(
+                        current,
+                        notation,
+                        key.is("NUMBER_FORMAT") ? current.numberMode.next() : current.numberMode,
+                        key.is("FRACTION") ? current.fractionMode.next() : current.fractionMode,
+                        entry);
+        onMain(
+                () -> {
+                    arithmeticDisplay = next;
+                    display = new Display(next, editor == null ? entry : editor);
+                    setError(generation, "");
+                    return null;
+                });
+        return true;
+    }
+
     private CalculationRequest request(Command key) {
-        CalculationRequest request =
-                new CalculationRequest(key.forEntry(editor != null && editor.isEditing()));
+        Command action =
+                key.kind == Command.Kind.PASTE_RAW
+                        ? Command.pushValues(
+                                ClipboardNumbers.parse(key.text, inputProfile(NumberMode.LOCALE)))
+                        : key.forEntry(editor != null && editor.isEditing());
+        CalculationRequest request = new CalculationRequest(action);
+        if (key.kind == Command.Kind.READ_VALUES) request.numbers = NumericRequest.PRECISE;
         if (!key.is(Command.RESTORE)
                 && !key.isDisplayOnly()
-                && key.kind != Command.Kind.COPY_ROWS) {
+                && key.kind != Command.Kind.READ_VALUES) {
             request.entryDraft = onMain(() -> completedDraft(key));
             request.entryBranch = localBranch;
         }
@@ -312,12 +352,7 @@ final class CalculatorSession {
             }
         }
         if (input != null) input.input(request);
-        request.locale = localeTag;
-        Display settings = display;
-        request.angle = settings.angleUnit;
-        request.notation = settings.notation;
-        request.numberMode = settings.numberMode;
-        request.fractionMode = settings.fractionMode;
+        request.angle = display.angleUnit;
         return request;
     }
 
@@ -408,7 +443,13 @@ final class CalculatorSession {
                         }
                         arithmeticDisplay = nextDisplay;
                         display = new Display(nextDisplay, editor);
-                        String operationError = result.operationError;
+                        String operationError =
+                                result.operationError == null
+                                        ? ""
+                                        : ErrorMessages.fromCode(
+                                                context,
+                                                result.operationError,
+                                                result.errorArgument);
                         setError(
                                 generation,
                                 operationError.isEmpty()

@@ -359,15 +359,15 @@ final class EntryRegressionTest extends RegressionSupport {
                 "pasted arithmetic remains exact");
         assertEquals(
                 "123456789012345678901234567890",
-                ValueFormatter.clipboard(huge, sci),
+                TestValueFormatter.clipboard(huge, sci),
                 "clipboard retains full exact integer");
         assertEquals(
                 "-0.00000000000000000001",
-                ValueFormatter.clipboard(RpnCalculator.parse("-1e-20"), sci),
+                TestValueFormatter.clipboard(RpnCalculator.parse("-1e-20"), sci),
                 "clipboard preserves tiny exact value with ASCII minus");
         assertEquals(
                 "0.3333333333333333333333333333333333333333",
-                ValueFormatter.clipboard(third, sci),
+                TestValueFormatter.clipboard(third, sci),
                 "clipboard omits approximation annotation");
         assertEquals(
                 "PASTE", KeyboardInput.command(50, 0, true, false, false), "Ctrl V paste shortcut");

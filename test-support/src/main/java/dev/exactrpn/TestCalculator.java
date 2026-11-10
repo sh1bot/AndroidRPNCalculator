@@ -84,11 +84,12 @@ final class TestCalculator {
         boolean oldBranch = branch;
         if (branch) engine.discardRedo();
         engine.useEntryEditor(
-                command.is(Command.UNDO) || command.is(Command.REDO)
-                        ? editor
-                        : editor.entryForCommit());
+                command.is(Command.UNDO) || command.is(Command.REDO) ? editor : editor.prepared());
         try {
-            command.forEntry(editor.isEditing()).apply(engine, locale);
+            (command.kind == Command.Kind.PASTE_RAW
+                            ? Command.pushValues(ClipboardNumbers.parse(command.text, locale))
+                            : command.forEntry(editor.isEditing()))
+                    .apply(engine);
             EntryEditor incoming = engine.detachEntryEditor();
             if (!command.is(Command.UNDO)
                     && !command.is(Command.REDO)

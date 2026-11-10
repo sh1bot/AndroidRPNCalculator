@@ -112,6 +112,15 @@ public final class EntryEditor {
         return result;
     }
 
+    /** Validate and canonicalize on the caller before crossing the arithmetic boundary. */
+    public EntryEditor prepared() {
+        EntryEditor result = entryForCommit();
+        result.resolveRaw();
+        if (result.raw) NumberText.analyze(result.entry, result.rawProfile).canonical();
+        if (!result.entry.isEmpty()) RpnCalculator.parse(result.entry);
+        return result;
+    }
+
     public boolean key(String key) {
         key = Command.entryKey(key, editing);
         if (key == null) return true;

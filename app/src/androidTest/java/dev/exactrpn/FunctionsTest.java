@@ -28,25 +28,22 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class FunctionsTest {
-    private CalculationRequest request(String key, byte[] input, FractionMode fractionMode)
-            throws java.io.IOException {
-        return request(Command.key(key), input, fractionMode);
+    private CalculationRequest request(String key, byte[] input) throws java.io.IOException {
+        return request(Command.key(key), input);
     }
 
-    private CalculationRequest request(Command key, byte[] input, FractionMode fractionMode)
-            throws java.io.IOException {
+    private CalculationRequest request(Command key, byte[] input) throws java.io.IOException {
         CalculationRequest request = new CalculationRequest(key);
         request.input = input;
+        if (key.kind == Command.Kind.READ_VALUES) request.numbers = NumericRequest.PRECISE;
         if (input != null
                 && !key.is("RESTORE")
-                && key.kind != Command.Kind.COPY_ROWS
+                && key.kind != Command.Kind.READ_VALUES
                 && !key.isDisplayOnly())
             request.entryDraft =
                     RpnCalculator.load(input).detachEntryEditor().entryForCommit().save();
         request.angle = RpnCalculator.AngleUnit.RAD;
-        request.notation = ValueFormatter.Notation.SCIENTIFIC;
-        request.locale = "en-US";
-        request.fractionMode = fractionMode;
+
         return request;
     }
 
@@ -134,31 +131,36 @@ public final class FunctionsTest {
                                             remote.evaluate(
                                                     request(
                                                             "RESTORE",
-                                                            Files.readAllBytes(seed.toPath()),
-                                                            FractionMode.IMPROPER)))
+                                                            Files.readAllBytes(seed.toPath()))))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("7/3", improper.rows.get(0));
-            DisplayResult mixed =
-                    worker.submit(
-                                    () ->
-                                            remote.evaluate(
-                                                    request(
-                                                            "FRACTION",
-                                                            improper.state,
-                                                            FractionMode.DECIMAL)))
-                            .get(15, TimeUnit.SECONDS);
-            assertEquals(FractionMode.MIXED.ordinal(), mixed.fractionMode.ordinal());
-            assertEquals("2 1/3", mixed.rows.get(0));
+            NumericValue number = improper.values.get(0);
+            assertEquals(
+                    "7/3",
+                    ValueFormatter.format(
+                            number,
+                            true,
+                            ValueFormatter.Notation.SCIENTIFIC,
+                            FractionMode.IMPROPER));
+            assertEquals(
+                    "2 1/3",
+                    ValueFormatter.format(
+                            number, true, ValueFormatter.Notation.SCIENTIFIC, FractionMode.MIXED));
+            DisplayResult mixed = improper;
             DisplayResult copied =
                     worker.submit(
                                     () ->
                                             remote.evaluate(
                                                     request(
-                                                            Command.rows(Command.Kind.COPY_ROWS, 0),
-                                                            mixed.state,
-                                                            FractionMode.MIXED)))
+                                                            Command.rows(
+                                                                    Command.Kind.READ_VALUES, 0),
+                                                            mixed.state)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("2 1/3", copied.copyText);
+            assertEquals(
+                    "2 1/3",
+                    ValueFormatter.clipboard(
+                            copied.values.get(0),
+                            ValueFormatter.Notation.SCIENTIFIC,
+                            FractionMode.MIXED));
             android.text.Spanned styled =
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.DOT).stack("2 1/3", 0);
@@ -217,21 +219,14 @@ public final class FunctionsTest {
                                             remote.evaluate(
                                                     request(
                                                             "Factor",
-                                                            Files.readAllBytes(seed.toPath()),
-                                                            FractionMode.DECIMAL)))
+                                                            Files.readAllBytes(seed.toPath()))))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals(Arrays.asList("2", "2", "3", "7"), factored.rows);
+            assertEquals(Arrays.asList("2", "2", "3", "7"), ResultTestSupport.rows(factored));
             DisplayResult undone =
-                    worker.submit(
-                                    () ->
-                                            remote.evaluate(
-                                                    request(
-                                                            "UNDO",
-                                                            factored.state,
-                                                            FractionMode.DECIMAL)))
+                    worker.submit(() -> remote.evaluate(request("UNDO", factored.state)))
                             .get(15, TimeUnit.SECONDS);
             assertEquals("84", EntryEditor.load(undone.entryState).entry());
-            assertTrue(undone.rows.isEmpty());
+            assertTrue(undone.values.isEmpty());
         } finally {
             remote.close();
             worker.shutdownNow();
@@ -350,10 +345,11 @@ public final class FunctionsTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
             DisplayResult result =
-                    worker.submit(() -> remote.evaluate(request("+", null, FractionMode.DECIMAL)))
+                    worker.submit(() -> remote.evaluate(request("+", null)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals(context.getString(R.string.error_need_values, 2), result.operationError);
-            assertTrue(result.rows.isEmpty());
+            assertEquals(CalculationError.Code.NEED_VALUES, result.operationError);
+            assertEquals(2, result.errorArgument);
+            assertTrue(result.values.isEmpty());
             assertTrue(result.state.length > 0);
         } finally {
             remote.close();

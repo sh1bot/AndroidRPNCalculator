@@ -14,9 +14,7 @@ import android.os.RemoteException;
 import com.android.calculator2.UnifiedReal;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -28,18 +26,7 @@ public class CalculationService extends Service {
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private RpnCalculator cached;
     private String cachedId, cachedSession, cachedStackId;
-    private final ValuePresentationCache texts = new ValuePresentationCache();
-    private Locale profileLocale;
-    private LocaleNumbers localeNumbers;
-
-    private LocaleNumbers profile(Locale locale) {
-        if (!locale.equals(profileLocale)) {
-            profileLocale = locale;
-            localeNumbers = new LocaleNumbers(locale, NumberMode.LOCALE);
-        }
-        return localeNumbers;
-    }
-
+    private final NumericValueCache numbers = new NumericValueCache();
     private final Messenger messenger =
             new Messenger(
                     new Handler(
@@ -84,12 +71,15 @@ public class CalculationService extends Service {
             Command command = request.command;
             readOnly = false;
             loadCheckpoint(request, response);
-            readOnly = command.kind == Command.Kind.COPY_ROWS;
+            readOnly = command.kind == Command.Kind.READ_VALUES;
             byte[] display;
             if (readOnly) {
-                DisplayResult copy = new DisplayResult();
-                copy.copyText = copyRows(request, command);
-                display = DisplayResult.encode(copy, null);
+                DisplayResult result = new DisplayResult();
+                result.readOnly = true;
+                result.stackId = cachedStackId;
+                for (UnifiedReal value : cached.selectedValues(command.rows()))
+                    result.values.add(NumericEvaluator.read(value, request.numbers));
+                display = DisplayResult.encode(result, null);
             } else {
                 display = arithmeticResult(request);
             }
@@ -104,14 +94,13 @@ public class CalculationService extends Service {
             if (!intact) {
                 // Mutating requests must reload the last accepted state after a failure.
                 cached = null;
-                texts.clear();
+                numbers.clear();
             }
             if (ex instanceof DeviceAccess.Locked) response.putBoolean("deviceLocked", true);
-            else if (ex instanceof CalculationError) {
-                CalculationError failure = (CalculationError) ex;
-                response.putString("errorCode", failure.code().name());
-                response.putInt("errorArgument", failure.argument());
-            } else response.putString("error", ErrorMessages.describe(this, ex));
+            else {
+                response.putString("errorCode", ErrorCodes.code(ex).name());
+                response.putInt("errorArgument", ErrorCodes.argument(ex));
+            }
         }
         Message result = Message.obtain(null, EVALUATE);
         result.arg1 = requestId;
@@ -141,15 +130,6 @@ public class CalculationService extends Service {
         return encoded;
     }
 
-    private String copyRows(CalculationRequest request, Command command) {
-        ValueFormatter.Notation notation = request.notation;
-        FractionMode fraction = request.fractionMode;
-        java.util.StringJoiner result = new java.util.StringJoiner("\n");
-        for (UnifiedReal value : cached.selectedValues(command.rows()))
-            result.add(ValueFormatter.clipboard(value, notation, fraction));
-        return result.toString();
-    }
-
     private void loadCheckpoint(CalculationRequest request, Bundle response) throws IOException {
         checkAccess();
         String input = request.inputId;
@@ -171,7 +151,7 @@ public class CalculationService extends Service {
             cachedId = input;
             cachedSession = session;
             cachedStackId = UUID.randomUUID().toString();
-            texts.clear();
+            numbers.clear();
         }
     }
 
@@ -187,16 +167,16 @@ public class CalculationService extends Service {
         final RpnCalculator candidate;
         final String stackId;
         final Command command;
+        final NumericRequest precision;
         final EntryEditor.State beforeEntry;
         final boolean sameStack;
-        ValueFormatter.Notation notation;
-        NumberMode numberMode;
-        FractionMode fractionMode;
-        String operationError = "";
+        CalculationError.Code operationError;
+        int errorArgument;
 
         Evaluation(CalculationRequest request) {
             Command key = request.command;
             command = key;
+            precision = request.numbers;
             List<UnifiedReal> before = cached.values();
             candidate = cached;
             byte[] draft = request.entryDraft;
@@ -209,27 +189,14 @@ public class CalculationService extends Service {
                 }
             }
             beforeEntry = candidate.entryState();
-            Locale locale = Locale.forLanguageTag(request.locale);
-            numberMode = request.numberMode;
-            fractionMode = request.fractionMode;
-            notation = request.notation;
-            LocaleNumbers local = profile(locale);
-            if (key.is(Command.RESTORE)) {
-                /* No arithmetic operation. */
-            } else if (key.is("FORMAT"))
-                notation =
-                        notation == ValueFormatter.Notation.SCIENTIFIC
-                                ? ValueFormatter.Notation.ENGINEERING
-                                : ValueFormatter.Notation.SCIENTIFIC;
-            else if (key.is("NUMBER_FORMAT")) numberMode = numberMode.next();
-            else if (key.is("FRACTION")) fractionMode = fractionMode.next();
-            else {
+            if (!key.is(Command.RESTORE)) {
                 try {
-                    key.apply(candidate, local.profile());
+                    key.apply(candidate);
                 } catch (IllegalArgumentException | ArithmeticException ex) {
                     // The engine may have committed valid entry before the operator failed.
                     // Publish that state together with the error, rather than losing the entry.
-                    operationError = ErrorMessages.describe(CalculationService.this, ex);
+                    operationError = ErrorCodes.code(ex);
+                    errorArgument = ErrorCodes.argument(ex);
                 }
             }
             sameStack = candidate.sameStack(before);
@@ -237,7 +204,7 @@ public class CalculationService extends Service {
         }
 
         boolean keepEditor(EntryEditor returned) {
-            if (command.isDisplayOnly()) return true;
+            if (command.is("ANGLE")) return true;
             return !command.is(Command.RESTORE)
                     && !command.is(Command.UNDO)
                     && !command.is(Command.REDO)
@@ -247,25 +214,13 @@ public class CalculationService extends Service {
 
         DisplayResult presentation() {
             List<UnifiedReal> values = candidate.values();
-            texts.setMode(notation, fractionMode);
-            texts.retain(values);
-            ArrayList<String> rows = new ArrayList<>(values.size());
-            String compactTop = "";
-            for (int i = 0; i < values.size(); i++) {
-                UnifiedReal value = values.get(i);
-                boolean newest = i == values.size() - 1;
-                rows.add(texts.row(value, newest));
-                if (newest) compactTop = texts.compactTop(value);
-            }
+            numbers.retain(values);
             DisplayResult display = new DisplayResult();
+            for (UnifiedReal value : values) display.values.add(numbers.read(value, precision));
             display.operationError = operationError;
+            display.errorArgument = errorArgument;
             display.stackId = stackId;
-            display.rows = rows;
-            display.compactTop = compactTop;
             display.angle = candidate.angleUnit();
-            display.notation = notation;
-            display.numberMode = numberMode;
-            display.fractionMode = fractionMode;
             return display;
         }
     }

@@ -21,9 +21,7 @@ final class CommandTest {
         assertEquals("13", editor.entry());
         TestCalculator calculator = new TestCalculator();
         calculator.key("π");
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> edit.apply(calculator.engine, NumberText.COMPUTER));
+        assertThrows(IllegalArgumentException.class, () -> edit.apply(calculator.engine));
         assertEquals(1, calculator.values().size());
         assertFalse(calculator.isEditing());
     }

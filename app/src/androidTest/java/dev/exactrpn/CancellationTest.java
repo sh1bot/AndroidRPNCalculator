@@ -31,8 +31,7 @@ public final class CancellationTest {
         CalculationRequest request = new CalculationRequest(Command.key(key));
         request.input = input;
         request.angle = RpnCalculator.AngleUnit.RAD;
-        request.notation = ValueFormatter.Notation.SCIENTIFIC;
-        request.locale = "en-US";
+
         return request;
     }
 
@@ -47,7 +46,7 @@ public final class CancellationTest {
                     DisplayResult result =
                             worker.submit(() -> remote.evaluate(request("RESTORE", null)))
                                     .get(20, TimeUnit.SECONDS);
-                    assertTrue(result.rows.isEmpty());
+                    assertTrue(result.values.isEmpty());
                     assertTrue(result.state.length > 0);
                 } finally {
                     remote.close();
@@ -107,11 +106,11 @@ public final class CancellationTest {
             DisplayResult cleared =
                     worker.submit(() -> remote.evaluate(request("CLEAR", accepted)))
                             .get(15, TimeUnit.SECONDS);
-            assertTrue("A fresh worker must accept new operations", cleared.rows.isEmpty());
+            assertTrue("A fresh worker must accept new operations", cleared.values.isEmpty());
             DisplayResult undone =
                     worker.submit(() -> remote.evaluate(request("UNDO", cleared.state)))
                             .get(15, TimeUnit.SECONDS);
-            assertEquals("Cancellation preserves the old stack and undo", 1, undone.rows.size());
+            assertEquals("Cancellation preserves the old stack and undo", 1, undone.values.size());
         } finally {
             remote.close();
             worker.shutdownNow();

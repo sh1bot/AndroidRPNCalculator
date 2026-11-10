@@ -13,11 +13,11 @@ final class FormattingRegressionTest extends RegressionSupport {
         TestCalculator c = new TestCalculator();
         assertEquals(
                 "0.3",
-                ValueFormatter.format(RpnCalculator.parse("0.3"), true, sci),
+                TestValueFormatter.format(RpnCalculator.parse("0.3"), true, sci),
                 "exact decimal display");
         assertEquals(
                 "≈ 56123456789.5",
-                ValueFormatter.format(RpnCalculator.parse("56123456789.456"), false, sci),
+                TestValueFormatter.format(RpnCalculator.parse("56123456789.456"), false, sci),
                 "large decimal rounds with guard digits");
         for (int tail = 100; tail < 1000; tail += 7) {
             String input = "56789012345." + tail;
@@ -32,26 +32,26 @@ final class FormattingRegressionTest extends RegressionSupport {
                                     ? ""
                                     : "≈ ")
                             + expected,
-                    ValueFormatter.format(RpnCalculator.parse(input), false, sci),
+                    TestValueFormatter.format(RpnCalculator.parse(input), false, sci),
                     "large decimal rounding " + input);
         }
         assertEquals(
                 "56565642624.456",
-                ValueFormatter.clipboard(RpnCalculator.parse("56565642624.456"), sci),
+                TestValueFormatter.clipboard(RpnCalculator.parse("56565642624.456"), sci),
                 "copy preserves large exact decimal");
         assertEquals(
                 "-0.0000000000001234567890123456",
-                ValueFormatter.clipboard(
+                TestValueFormatter.clipboard(
                         RpnCalculator.parse("-0.0000000000001234567890123456"), eng),
                 "copy preserves tiny exact decimal");
         assertEquals(
                 "0.125",
-                ValueFormatter.clipboard(
+                TestValueFormatter.clipboard(
                         RpnCalculator.parse("1").divide(RpnCalculator.parse("8")), sci),
                 "copy exact terminating rational result");
         assertEquals(
                 "56565642624.456",
-                ValueFormatter.format(RpnCalculator.parse("56565642624.456"), true, sci),
+                TestValueFormatter.format(RpnCalculator.parse("56565642624.456"), true, sci),
                 "newest terminating decimal stays exact");
         TestCalculator toggled = new TestCalculator();
         number(toggled, "56565642624.456");
@@ -65,38 +65,40 @@ final class FormattingRegressionTest extends RegressionSupport {
                 "repeated fraction formatting preserves exact input");
         assertEquals(
                 "56565642624.456",
-                ValueFormatter.clipboard(top(toggled), sci),
+                TestValueFormatter.clipboard(top(toggled), sci),
                 "copy stays exact after fraction toggles");
 
         assertEquals(
                 "123456789012345678901234567890",
-                ValueFormatter.format(huge, true, sci),
+                TestValueFormatter.format(huge, true, sci),
                 "newest integer expanded");
         assertEquals(
                 "≈ 1.23456789012e+29",
-                ValueFormatter.format(huge, false, sci),
+                TestValueFormatter.format(huge, false, sci),
                 "older integer compact scientific");
         assertEquals(
                 "≈ 123.456789012e+27",
-                ValueFormatter.format(huge, false, eng),
+                TestValueFormatter.format(huge, false, eng),
                 "engineering multiple of three");
         assertEquals(
                 "-10e−9",
-                ValueFormatter.format(RpnCalculator.parse("-0.00000001"), false, eng),
+                TestValueFormatter.format(RpnCalculator.parse("-0.00000001"), false, eng),
                 "negative engineering exponent");
-        assertEquals("0", ValueFormatter.format(UnifiedReal.ZERO, true, sci), "zero formatting");
-        String exponential = ValueFormatter.format(RpnCalculator.parse("234.56").exp(), true, sci);
+        assertEquals(
+                "0", TestValueFormatter.format(UnifiedReal.ZERO, true, sci), "zero formatting");
+        String exponential =
+                TestValueFormatter.format(RpnCalculator.parse("234.56").exp(), true, sci);
         assertTrue(
                 exponential.length() < 30 && exponential.contains("e+101"),
                 "large noninteger exponential stays compact");
         assertEquals(
                 "1e−20",
-                ValueFormatter.format(RpnCalculator.parse("1e-20"), false, sci),
+                TestValueFormatter.format(RpnCalculator.parse("1e-20"), false, sci),
                 "tiny rational remains visible");
 
         assertEquals(
                 "≈ 0.333333333333",
-                ValueFormatter.format(third, true, sci),
+                TestValueFormatter.format(third, true, sci),
                 "recurring fraction limited precision");
         keys(c, "CLEAR", "1", "eˣ");
         assertTrue(top(c).definitelyEquals(UnifiedReal.E), "e to x key");
@@ -109,15 +111,16 @@ final class FormattingRegressionTest extends RegressionSupport {
     void fractionFormattingAndCopy() throws Exception {
         assertEquals(
                 "3/10",
-                ValueFormatter.format(RpnCalculator.parse("0.3"), true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(
+                        RpnCalculator.parse("0.3"), true, sci, FractionMode.IMPROPER),
                 "fraction mode displays exact decimal rational");
         assertEquals(
                 "1/3",
-                ValueFormatter.format(third, true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(third, true, sci, FractionMode.IMPROPER),
                 "fraction mode preserves recurring rational");
         assertEquals(
                 "-3/4",
-                ValueFormatter.format(
+                TestValueFormatter.format(
                         new UnifiedReal(new com.android.calculator2.BoundedRational(6, -8)),
                         true,
                         sci,
@@ -125,31 +128,31 @@ final class FormattingRegressionTest extends RegressionSupport {
                 "fraction sign and reduction");
         assertEquals(
                 "2",
-                ValueFormatter.format(UnifiedReal.TWO, true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(UnifiedReal.TWO, true, sci, FractionMode.IMPROPER),
                 "fraction mode leaves integers natural");
         assertEquals(
                 "0",
-                ValueFormatter.format(UnifiedReal.ZERO, true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(UnifiedReal.ZERO, true, sci, FractionMode.IMPROPER),
                 "fraction mode zero");
         assertEquals(
                 huge.bigIntegerValue().toString(),
-                ValueFormatter.format(huge, true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(huge, true, sci, FractionMode.IMPROPER),
                 "fraction mode retains full newest integer");
         assertTrue(
-                ValueFormatter.format(huge, false, sci, FractionMode.IMPROPER).contains("e+29"),
+                TestValueFormatter.format(huge, false, sci, FractionMode.IMPROPER).contains("e+29"),
                 "older integer remains compact in fraction mode");
 
         assertEquals(
-                ValueFormatter.format(rootTwo, true, sci),
-                ValueFormatter.format(rootTwo, true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(rootTwo, true, sci),
+                TestValueFormatter.format(rootTwo, true, sci, FractionMode.IMPROPER),
                 "irrational fraction fallback");
         assertEquals(
-                ValueFormatter.format(UnifiedReal.PI, true, sci),
-                ValueFormatter.format(UnifiedReal.PI, true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(UnifiedReal.PI, true, sci),
+                TestValueFormatter.format(UnifiedReal.PI, true, sci, FractionMode.IMPROPER),
                 "pi fraction fallback");
         assertEquals(
                 "1/100000000000000000000",
-                ValueFormatter.format(
+                TestValueFormatter.format(
                         RpnCalculator.parse("1e-20"), true, eng, FractionMode.IMPROPER),
                 "tiny rational remains exact fraction");
         TestCalculator fractions = new TestCalculator();
@@ -167,30 +170,31 @@ final class FormattingRegressionTest extends RegressionSupport {
                 "display mode leaves exact arithmetic unchanged");
         assertEquals(
                 "1/3",
-                ValueFormatter.clipboard(top(fractions), sci, FractionMode.IMPROPER),
+                TestValueFormatter.clipboard(top(fractions), sci, FractionMode.IMPROPER),
                 "fraction display copies exact fraction");
         assertEquals(
                 "1/8",
-                ValueFormatter.clipboard(RpnCalculator.parse("0.125"), sci, FractionMode.IMPROPER),
+                TestValueFormatter.clipboard(
+                        RpnCalculator.parse("0.125"), sci, FractionMode.IMPROPER),
                 "terminating decimal copies as fraction");
         assertEquals(
                 "-3/4",
-                ValueFormatter.clipboard(
+                TestValueFormatter.clipboard(
                         new UnifiedReal(new com.android.calculator2.BoundedRational(6, -8)),
                         sci,
                         FractionMode.IMPROPER),
                 "copied fraction is reduced with positive denominator");
         assertEquals(
                 "2",
-                ValueFormatter.clipboard(UnifiedReal.TWO, sci, FractionMode.IMPROPER),
+                TestValueFormatter.clipboard(UnifiedReal.TWO, sci, FractionMode.IMPROPER),
                 "fraction mode copies integer without denominator");
         assertEquals(
-                ValueFormatter.clipboard(UnifiedReal.PI, sci, FractionMode.DECIMAL),
-                ValueFormatter.clipboard(UnifiedReal.PI, sci, FractionMode.IMPROPER),
+                TestValueFormatter.clipboard(UnifiedReal.PI, sci, FractionMode.DECIMAL),
+                TestValueFormatter.clipboard(UnifiedReal.PI, sci, FractionMode.IMPROPER),
                 "fraction mode copies irrational decimal fallback");
         assertEquals(
                 "0.3333333333333333333333333333333333333333",
-                ValueFormatter.clipboard(top(fractions), sci, FractionMode.DECIMAL),
+                TestValueFormatter.clipboard(top(fractions), sci, FractionMode.DECIMAL),
                 "decimal mode retains decimal copy");
     }
 
@@ -199,27 +203,27 @@ final class FormattingRegressionTest extends RegressionSupport {
         UnifiedReal sevenThirds = RpnCalculator.parse("7").divide(RpnCalculator.parse("3"));
         assertEquals(
                 "7/3",
-                ValueFormatter.format(sevenThirds, true, sci, FractionMode.IMPROPER),
+                TestValueFormatter.format(sevenThirds, true, sci, FractionMode.IMPROPER),
                 "improper fraction display");
         assertEquals(
                 "2 1/3",
-                ValueFormatter.format(sevenThirds, true, sci, FractionMode.MIXED),
+                TestValueFormatter.format(sevenThirds, true, sci, FractionMode.MIXED),
                 "mixed fraction display");
         assertEquals(
                 "-2 1/3",
-                ValueFormatter.clipboard(sevenThirds.negate(), sci, FractionMode.MIXED),
+                TestValueFormatter.clipboard(sevenThirds.negate(), sci, FractionMode.MIXED),
                 "mixed negative sign applies to whole value");
         assertEquals(
                 "-1/3",
-                ValueFormatter.format(third.negate(), true, sci, FractionMode.MIXED),
+                TestValueFormatter.format(third.negate(), true, sci, FractionMode.MIXED),
                 "proper fraction remains proper in mixed mode");
         assertEquals(
                 "2",
-                ValueFormatter.format(UnifiedReal.TWO, true, sci, FractionMode.MIXED),
+                TestValueFormatter.format(UnifiedReal.TWO, true, sci, FractionMode.MIXED),
                 "mixed mode leaves integer natural");
         assertEquals(
-                ValueFormatter.format(UnifiedReal.PI, true, sci),
-                ValueFormatter.format(UnifiedReal.PI, true, sci, FractionMode.MIXED),
+                TestValueFormatter.format(UnifiedReal.PI, true, sci),
+                TestValueFormatter.format(UnifiedReal.PI, true, sci, FractionMode.MIXED),
                 "mixed mode irrational fallback");
         for (String[] example :
                 new String[][] {

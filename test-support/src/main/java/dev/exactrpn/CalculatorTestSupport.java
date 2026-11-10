@@ -45,7 +45,7 @@ final class CalculatorTestSupport {
         List<String> result = new ArrayList<>();
         for (int i = 0; i < values.size(); i++)
             result.add(
-                    ValueFormatter.format(
+                    TestValueFormatter.format(
                             values.get(i),
                             !calculator.isEditing() && i == values.size() - 1,
                             notation,

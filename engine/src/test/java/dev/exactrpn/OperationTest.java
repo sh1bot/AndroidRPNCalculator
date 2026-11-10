@@ -25,8 +25,8 @@ final class OperationTest {
             UnifiedReal live = op.evaluate(a, b, unit);
             UnifiedReal saved = new SavedValue(op.savedName(unit), "", null, null).evaluate(a, b);
             assertEquals(
-                    ValueFormatter.clipboard(live, ValueFormatter.Notation.SCIENTIFIC),
-                    ValueFormatter.clipboard(saved, ValueFormatter.Notation.SCIENTIFIC),
+                    TestValueFormatter.clipboard(live, ValueFormatter.Notation.SCIENTIFIC),
+                    TestValueFormatter.clipboard(saved, ValueFormatter.Notation.SCIENTIFIC),
                     op + " " + unit);
         }
     }

@@ -15,10 +15,11 @@ public final class Command {
         PICK_ROWS(true),
         SUM_ROWS(true),
         PRODUCT_ROWS(true),
-        COPY_ROWS(true),
+        READ_VALUES(true),
         UNARY_ROWS(true),
         HOLD_DIGIT,
-        PASTE_RAW;
+        PASTE_RAW,
+        PUSH_VALUES;
         final boolean takesRows;
 
         Kind() {
@@ -42,6 +43,7 @@ public final class Command {
     // Only KEY actions have a key identifier; entry text is never interpreted as a command.
     public final String wire;
     public final Operation operation;
+    private RationalValue[] values = new RationalValue[0];
     public final String text;
     public final int start, end;
     public final boolean raw, explicitDecimal;
@@ -123,6 +125,17 @@ public final class Command {
         return new Command(kind, "", "", 0, 0, false, false, rows, null);
     }
 
+    public static Command pushValues(RationalValue[] values) {
+        Command command =
+                new Command(Kind.PUSH_VALUES, "", "", 0, 0, false, false, new int[0], null);
+        command.values = values.clone();
+        return command;
+    }
+
+    public RationalValue[] values() {
+        return values.clone();
+    }
+
     public static Command unaryRows(Operation operation, int... rows) {
         if (operation == null || operation.arity != 1)
             throw new IllegalArgumentException("Not a unary operation");
@@ -188,7 +201,7 @@ public final class Command {
         }
     }
 
-    public void apply(RpnCalculator calculator, NumberText.Profile locale) {
+    public void apply(RpnCalculator calculator) {
         switch (kind) {
             case UNARY_ROWS:
                 calculator.transformRows(operation, rows);
@@ -208,9 +221,11 @@ public final class Command {
             case HOLD_DIGIT:
                 calculator.holdDigit(text);
                 break;
-            case PASTE_RAW:
-                calculator.pasteClipboard(text, locale);
+            case PUSH_VALUES:
+                calculator.pushValues(values);
                 break;
+            case PASTE_RAW:
+                throw new IllegalArgumentException("Clipboard parsing belongs to the caller");
             case SELECT:
             case EDIT:
                 throw new IllegalArgumentException("Entry updates belong to the UI editor");

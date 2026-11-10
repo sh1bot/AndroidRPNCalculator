@@ -128,7 +128,7 @@ final class RemoteCalculator {
     private DisplayResult readResponse(Bundle response, int epoch) throws IOException {
         if (response.getBoolean("deviceLocked")) throw new DeviceAccess.Locked();
         if (response.getBoolean("invalidCheckpoint"))
-            throw new InvalidCheckpoint(response.getString("error"));
+            throw new InvalidCheckpoint("Invalid checkpoint");
         if (CalculationError.Code.TRANSFER_TOO_LARGE.name().equals(response.getString("errorCode")))
             throw CalculationError.invalid(CalculationError.Code.TRANSFER_TOO_LARGE);
         if (response.containsKey("errorCode"))
@@ -137,7 +137,6 @@ final class RemoteCalculator {
                             context,
                             CalculationError.Code.valueOf(response.getString("errorCode")),
                             response.getInt("errorArgument")));
-        if (response.containsKey("error")) throw new UserFailure(response.getString("error"));
         DisplayResult result = DisplayResult.decode(response.getByteArray("payload"));
         synchronized (this) {
             if (closed || epoch != generation) throw new com.hp.creals.CR.AbortedException();

@@ -206,11 +206,11 @@ final class FunctionsRegressionTest extends RegressionSupport {
         }
         assertEquals(
                 "3.141592653589793238462643383279502884197",
-                ValueFormatter.clipboard(UnifiedReal.PI, sci),
+                TestValueFormatter.clipboard(UnifiedReal.PI, sci),
                 "copy pi to forty significant digits");
         assertEquals(
                 "1.41421356237309504880168872420969807857",
-                ValueFormatter.clipboard(UnifiedReal.TWO.sqrt(), sci),
+                TestValueFormatter.clipboard(UnifiedReal.TWO.sqrt(), sci),
                 "copy sqrt2 to forty significant digits");
         BigInteger largeSemi = new BigInteger("1000000007").multiply(new BigInteger("34359738337"));
         assertEquals(
