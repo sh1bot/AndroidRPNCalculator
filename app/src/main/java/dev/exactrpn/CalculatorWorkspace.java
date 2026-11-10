@@ -41,7 +41,9 @@ final class CalculatorWorkspace extends ViewGroup {
                         dp(Math.round(200 * Math.max(1, fontScale))),
                         // The mode row now lives inside the stack; keep the previous
                         // 112dp calculation area plus its 48dp header in vertical layouts.
-                        dp(112 + 48));
+                        dp(112 + 48),
+                        keypad.primaryColumns(),
+                        keypad.primaryRowCount());
         keypad.setGeometry(plan.functionsBesideDigits, plan.primaryWidth);
         stack.measure(
                 MeasureSpec.makeMeasureSpec(plan.stackWidth, MeasureSpec.EXACTLY),

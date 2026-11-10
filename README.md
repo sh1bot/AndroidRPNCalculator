@@ -40,9 +40,9 @@ The constants are π, e and φ (the exact golden ratio). Long-press π/τ to swi
 
 #### Display modes
 
-**RAD/DEG/GRAD** selects radians, degrees or gradians. **SCI/ENG** selects scientific or engineering notation. **DEC/FRAC/IMPR** selects decimals, mixed fractions or improper fractions. Irrational values remain decimal. Exact integers at X use full display only when they fit the available stack area; otherwise they use compact notation while retaining their exact value for arithmetic and copying; older stack values use compact notation. Display modes never replace the stored exact value.
+**RAD/DEG/GRAD** selects radians, degrees or gradians. **SCI/ENG** selects scientific or engineering notation. The base button cycles through **DEC/HEX/DOZ** for base 10, hexadecimal and dozenal entry and display; dozenal uses ↊ and ↋ for ten and eleven. The fraction button cycles through **DEC/FRAC/IMPR** for decimals, mixed fractions and improper fractions. Irrational values remain decimal. Exact integers at X use full display only when they fit the available stack area; otherwise they use compact notation while retaining their exact value for arithmetic and copying; older stack values use compact notation. Display modes never replace the stored exact value.
 
-**LOC/DOT/NONE** selects phone-locale formatting, decimal dot with thin-space grouping, or the locale decimal without grouping. Scientific notation is drawn as ×10 with a raised exponent.
+**LOC/DOT/NONE** selects phone-locale formatting, decimal dot with thin-space grouping, or the locale decimal without grouping. Hexadecimal groups digits in fours. Scientific and engineering notation use the selected base and are drawn as ×10 with a raised exponent, where 10 is read in that base.
 
 #### Copying, pasting and selection
 
@@ -58,7 +58,7 @@ Large calculations or copied text can exceed the app’s 256 KiB data limit. The
 
 #### Keyboard
 
-Digits and the decimal separator enter numbers. `+ - * /` operate. Enter/Space commits or duplicates; Backspace/Delete edits or drops. Left/Right and Home/End move the cursor; Shift selects text. Escape cancels a calculation or entry.
+Digits and the decimal separator enter numbers; A–F enter hexadecimal digits when hexadecimal mode is active. `+ - * /` operate. Enter/Space commits or duplicates; Backspace/Delete edits or drops. Left/Right and Home/End move the cursor; Shift selects text. Escape cancels a calculation or entry.
 
 Ctrl+Z undoes, Ctrl+Y redoes, Ctrl+S swaps, Ctrl+L clears, Ctrl+V pastes, and F9 changes sign. Scientific shortcuts: r (square root), i (reciprocal), s/c/t (sin/cos/tan), l (ln), p (π), e (Euler’s number), E (eˣ), ^ (power), % (remainder), ! (factorial), f (factorisation).
 

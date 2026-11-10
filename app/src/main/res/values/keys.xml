@@ -64,5 +64,11 @@
         <item>""</item> <!-- SEVEN -->
         <item>""</item> <!-- EIGHT -->
         <item>""</item> <!-- NINE -->
+        <item>""</item> <!-- DIGIT_A -->
+        <item>""</item> <!-- DIGIT_B -->
+        <item>""</item> <!-- DIGIT_C -->
+        <item>""</item> <!-- DIGIT_D -->
+        <item>""</item> <!-- DIGIT_E -->
+        <item>""</item> <!-- DIGIT_F -->
     </string-array>
 </resources>

@@ -37,10 +37,12 @@
     <string name="stack_status">STACK</string>
     <string name="angle_description">Angle unit: %1$s. Tap to switch.</string>
     <string name="notation_description">Display notation: %1$s. Tap to switch.</string>
+    <string name="radix_description">Number base: %1$s. Tap to switch.</string>
     <string name="engineering">engineering</string>
     <string name="scientific">scientific</string>
     <string name="ambiguous_entry">Ambiguous number</string>
     <string name="invalid_entry">Invalid number</string>
+    <string name="finish_entry_base">Finish the current entry before changing base</string>
     <string name="ambiguous_status">AMBIGUOUS</string>
     <string name="invalid_status">INVALID</string>
     <string name="select">Select</string>
@@ -65,7 +67,7 @@
     <string name="factorial_description">Factorial of X</string>
     <string name="factor_description">Replace X with prime factors, smallest first</string>
     <string name="remainder_description">Y remainder X</string>
-    <string name="decimal_exponent_description">Decimal separator; long press to enter e for a power of ten</string>
+    <string name="decimal_exponent_description">Decimal separator; long press to enter an exponent in the selected base</string>
     <string name="decimal_separator">Decimal separator</string>
     <string name="power_description">Y to the power of X</string>
     <string name="exp_description">e to the power of X</string>

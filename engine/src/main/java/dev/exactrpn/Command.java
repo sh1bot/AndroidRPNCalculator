@@ -38,7 +38,7 @@ public final class Command {
             CANCEL = "CANCEL",
             PASTE = "PASTE";
     private static final Set<String> PRESENTATION =
-            new HashSet<>(Arrays.asList("FORMAT", "NUMBER_FORMAT", "FRACTION", "ANGLE"));
+            new HashSet<>(Arrays.asList("FORMAT", "NUMBER_FORMAT", "FRACTION", "RADIX", "ANGLE"));
     public final Kind kind;
     // Only KEY actions have a key identifier; entry text is never interpreted as a command.
     public final String wire;
@@ -114,7 +114,7 @@ public final class Command {
     }
 
     public static Command holdDigit(String digit) {
-        if (digit.length() != 1 || digit.charAt(0) < '0' || digit.charAt(0) > '9')
+        if (digit.length() != 1 || Character.digit(digit.charAt(0), 16) < 0)
             throw new IllegalArgumentException("Invalid digit shortcut");
         return new Command(Kind.HOLD_DIGIT, "", digit, 0, 0, false, false, new int[0], null);
     }

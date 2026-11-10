@@ -64,7 +64,7 @@ final class CalculatorSession {
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
             FractionMode fractionMode) {
-        this(n, angle, numberMode, fractionMode, false);
+        this(n, angle, numberMode, fractionMode, RadixMode.DECIMAL, false);
     }
 
     CalculatorSession(
@@ -73,8 +73,18 @@ final class CalculatorSession {
             NumberMode numberMode,
             FractionMode fractionMode,
             boolean temporary) {
+        this(n, angle, numberMode, fractionMode, RadixMode.DECIMAL, temporary);
+    }
+
+    CalculatorSession(
+            ValueFormatter.Notation n,
+            RpnCalculator.AngleUnit angle,
+            NumberMode numberMode,
+            FractionMode fractionMode,
+            RadixMode radixMode,
+            boolean temporary) {
         this.temporary = temporary;
-        display = new Display(n, angle, numberMode, fractionMode);
+        display = new Display(n, angle, numberMode, fractionMode, radixMode);
     }
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -148,7 +158,12 @@ final class CalculatorSession {
     private NumberText.Profile inputProfile(NumberMode mode) {
         return inputProfiles.computeIfAbsent(
                 mode,
-                m -> new LocaleNumbers(java.util.Locale.forLanguageTag(localeTag), m).profile());
+                m ->
+                        new LocaleNumbers(
+                                        java.util.Locale.forLanguageTag(localeTag),
+                                        m,
+                                        display.radixMode)
+                                .profile());
     }
 
     private boolean editLocally(Command key, long generation) {
@@ -268,6 +283,7 @@ final class CalculatorSession {
                 return;
             }
             if (onMain(() -> editLocally(key, generation))) return;
+            if (changeRadix(key, generation)) return;
             if (changeFormat(key, generation)) return;
             Display settings = display;
             DisplayResult result = remote.evaluate(request(key));
@@ -325,6 +341,57 @@ final class CalculatorSession {
         return true;
     }
 
+    private boolean changeRadix(Command key, long generation) {
+        if (!key.is("RADIX")) return false;
+        Display current = display;
+        if (current.editing) {
+            setError(
+                    generation,
+                    context.getString(
+                            R.string.error_prefix, context.getString(R.string.finish_entry_base)));
+            return true;
+        }
+        RadixMode radix = current.radixMode.next();
+        EntryEditor entry = onMain(() -> editor == null ? new EntryEditor() : editor.copy());
+        Display next;
+        if (current.values.isEmpty()) {
+            next =
+                    new Display(
+                            current,
+                            current.notation,
+                            current.numberMode,
+                            current.fractionMode,
+                            radix,
+                            entry);
+        } else {
+            int[] rows = new int[current.values.size()];
+            for (int i = 0; i < rows.length; i++) rows[i] = i;
+            CalculationRequest request = request(Command.rows(Command.Kind.READ_VALUES, rows));
+            request.numbers = NumericRequest.display(radix);
+            DisplayResult result = remote.evaluate(request);
+            result.angle = current.angleUnit;
+            Display settings =
+                    new Display(
+                            current,
+                            current.notation,
+                            current.numberMode,
+                            current.fractionMode,
+                            radix,
+                            entry);
+            next = new Display(result, entry, settings);
+        }
+        Display accepted = next;
+        onMain(
+                () -> {
+                    inputProfiles.clear();
+                    arithmeticDisplay = accepted;
+                    display = new Display(accepted, editor == null ? entry : editor);
+                    setError(generation, "");
+                    return null;
+                });
+        return true;
+    }
+
     private CalculationRequest request(Command key) {
         Command action =
                 key.kind == Command.Kind.PASTE_RAW
@@ -332,7 +399,10 @@ final class CalculatorSession {
                                 ClipboardNumbers.parse(key.text, inputProfile(NumberMode.LOCALE)))
                         : key.forEntry(editor != null && editor.isEditing());
         CalculationRequest request = new CalculationRequest(action);
-        if (key.kind == Command.Kind.READ_VALUES) request.numbers = NumericRequest.PRECISE;
+        request.numbers =
+                key.kind == Command.Kind.READ_VALUES
+                        ? NumericRequest.precise(display.radixMode)
+                        : NumericRequest.display(display.radixMode);
         if (!key.is(Command.RESTORE)
                 && !key.isDisplayOnly()
                 && key.kind != Command.Kind.READ_VALUES) {

@@ -67,7 +67,13 @@ public enum CalculatorKey {
     SIX,
     SEVEN,
     EIGHT,
-    NINE;
+    NINE,
+    DIGIT_A,
+    DIGIT_B,
+    DIGIT_C,
+    DIGIT_D,
+    DIGIT_E,
+    DIGIT_F;
     public final String wire, label;
     public final int preferredSp;
     private final String inverseName, unicode;
@@ -166,6 +172,12 @@ public enum CalculatorKey {
                 SEVEN|7||||||151
                 EIGHT|8||||||152
                 NINE|9||||||153
+                DIGIT_A|A|A
+                DIGIT_B|B|B
+                DIGIT_C|C|C
+                DIGIT_D|D|D
+                DIGIT_E|E|E
+                DIGIT_F|F|F
                 """
                         .split("\n");
     }

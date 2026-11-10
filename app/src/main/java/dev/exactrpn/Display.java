@@ -14,6 +14,7 @@ final class Display {
     final boolean editing, raw;
     final FractionMode fractionMode;
     final NumberMode numberMode;
+    final RadixMode radixMode;
     final int start, end;
     final RpnCalculator.AngleUnit angleUnit;
 
@@ -22,6 +23,15 @@ final class Display {
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
             FractionMode fractionMode) {
+        this(notation, angle, numberMode, fractionMode, RadixMode.DECIMAL);
+    }
+
+    Display(
+            ValueFormatter.Notation notation,
+            RpnCalculator.AngleUnit angle,
+            NumberMode numberMode,
+            FractionMode fractionMode,
+            RadixMode radixMode) {
         this(
                 Collections.emptyList(),
                 "initial",
@@ -29,6 +39,7 @@ final class Display {
                 notation,
                 numberMode,
                 fractionMode,
+                radixMode,
                 new EntryEditor());
     }
 
@@ -40,6 +51,7 @@ final class Display {
                 settings.notation,
                 settings.numberMode,
                 settings.fractionMode,
+                settings.radixMode,
                 editor);
     }
 
@@ -49,6 +61,16 @@ final class Display {
             NumberMode numberMode,
             FractionMode fractionMode,
             EntryEditor editor) {
+        this(stack, notation, numberMode, fractionMode, stack.radixMode, editor);
+    }
+
+    Display(
+            Display stack,
+            ValueFormatter.Notation notation,
+            NumberMode numberMode,
+            FractionMode fractionMode,
+            RadixMode radixMode,
+            EntryEditor editor) {
         this(
                 stack.values,
                 stack.stackId,
@@ -56,6 +78,7 @@ final class Display {
                 notation,
                 numberMode,
                 fractionMode,
+                radixMode,
                 editor);
     }
 
@@ -66,6 +89,7 @@ final class Display {
             ValueFormatter.Notation notation,
             NumberMode numberMode,
             FractionMode fractionMode,
+            RadixMode radixMode,
             EntryEditor editor) {
         this.values = values;
         ArrayList<String> full = new ArrayList<>(values.size());
@@ -93,6 +117,7 @@ final class Display {
         angleUnit = angle;
         this.numberMode = numberMode;
         this.fractionMode = fractionMode;
+        this.radixMode = radixMode;
         entry = editor.entry();
         problem = editor.entryProblem();
         editing = editor.isEditing();
@@ -111,6 +136,7 @@ final class Display {
         angleUnit = stack.angleUnit;
         numberMode = stack.numberMode;
         fractionMode = stack.fractionMode;
+        radixMode = stack.radixMode;
         editing = editor.isEditing();
         rows = editing ? compactRows : fullRows;
         entry = editor.entry();
