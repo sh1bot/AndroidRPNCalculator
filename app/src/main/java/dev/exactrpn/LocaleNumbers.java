@@ -163,6 +163,74 @@ public final class LocaleNumbers {
         return styleDozenal(text);
     }
 
+    /** Add invisible, numerically meaningful opportunities for Android's balanced line breaker. */
+    CharSequence breakable(CharSequence formatted) {
+        SpannableStringBuilder text = new SpannableStringBuilder(formatted);
+        java.util.NavigableSet<Integer> breaks = new java.util.TreeSet<>();
+        boolean[] handled = new boolean[text.length()];
+        int point = -1;
+        for (int i = 0; i < text.length(); i++)
+            if (text.charAt(i) == decimalSeparator()) {
+                point = i;
+                break;
+            }
+        if (point >= 0) {
+            int start = point, end = point + 1;
+            while (start > 0 && numeric(text.charAt(start - 1))) start--;
+            while (end < text.length() && numeric(text.charAt(end))) end++;
+            addIntegerBreaks(text, start, point, breaks);
+            addFractionBreaks(text, point + 1, end, breaks);
+            java.util.Arrays.fill(handled, start, end, true);
+        }
+        for (int start = 0; start < text.length(); ) {
+            if (handled[start] || !numeric(text.charAt(start))) {
+                start++;
+                continue;
+            }
+            int end = start + 1;
+            while (end < text.length() && !handled[end] && numeric(text.charAt(end))) end++;
+            addIntegerBreaks(text, start, end, breaks);
+            start = end;
+        }
+        for (int position : breaks.descendingSet()) text.insert(position, "\u200b");
+        return text;
+    }
+
+    private boolean numeric(char character) {
+        return Character.digit(character, radixMode.radix) >= 0
+                || character == '\u218a'
+                || character == '\u218b'
+                || character == symbols.getGroupingSeparator();
+    }
+
+    private boolean digit(char character) {
+        return Character.digit(character, radixMode.radix) >= 0
+                || character == '\u218a'
+                || character == '\u218b';
+    }
+
+    private void addIntegerBreaks(
+            CharSequence text, int start, int end, java.util.Set<Integer> breaks) {
+        boolean grouped = false;
+        for (int i = start; i < end; i++)
+            if (text.charAt(i) == symbols.getGroupingSeparator()) {
+                breaks.add(i + 1);
+                grouped = true;
+            }
+        if (grouped) return;
+        java.util.List<Integer> digits = new java.util.ArrayList<>();
+        for (int i = start; i < end; i++) if (digit(text.charAt(i))) digits.add(i);
+        for (int fromRight = 3; fromRight < digits.size(); fromRight += 3)
+            breaks.add(digits.get(digits.size() - fromRight));
+    }
+
+    private void addFractionBreaks(
+            CharSequence text, int start, int end, java.util.Set<Integer> breaks) {
+        int digits = 0;
+        for (int i = start; i < end; i++)
+            if (digit(text.charAt(i)) && ++digits % 3 == 0 && i + 1 < end) breaks.add(i + 1);
+    }
+
     private void appendExponent(SpannableStringBuilder text, String exponent) {
         int start = text.length();
         text.append("\u2009×").append(entry("10"));
@@ -294,7 +362,20 @@ public final class LocaleNumbers {
     }
 
     public String copy(String canonical) {
-        return entry(canonical);
+        if (radixMode != RadixMode.DOZENAL) return entry(canonical);
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < canonical.length(); i++) {
+            char c = canonical.charAt(i);
+            text.append(
+                    c >= '0' && c <= '9'
+                            ? (char) (symbols.getZeroDigit() + c - '0')
+                            : c == '.'
+                                    ? decimalSeparator()
+                                    : c == 'a' || c == 'A' || c == '\u218a'
+                                            ? 'A'
+                                            : c == 'b' || c == 'B' || c == '\u218b' ? 'B' : c);
+        }
+        return text.toString();
     }
 
     public String canonicalEntry(String visible) {

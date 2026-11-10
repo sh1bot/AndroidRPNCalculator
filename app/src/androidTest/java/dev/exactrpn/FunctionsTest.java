@@ -126,7 +126,17 @@ public final class FunctionsTest {
         numbers.styleEntry(entry);
         assertEquals("↊↋", entry.toString());
         assertEquals(2, entry.getSpans(0, entry.length(), TurnedDigitSpan.class).length);
-        assertEquals("↊↋", numbers.copy("AB"));
+        assertEquals("AB", numbers.copy("AB"));
+
+        LocaleNumbers ungrouped =
+                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
+        assertEquals(
+                "123\u200b456.123\u200b456",
+                ungrouped.breakable(ungrouped.stack("123456.123456", 0)).toString());
+        LocaleNumbers grouped = new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.DECIMAL);
+        assertEquals(
+                "123\u2009\u200b456.123\u200b456",
+                grouped.breakable(grouped.stack("123456.123456", 0)).toString());
     }
 
     @Test

@@ -75,7 +75,7 @@ final class StackRowRenderer {
                         : (approximate
                                 ? R.string.select_level_approximate
                                 : R.string.select_level_value);
-        return context.getString(id, depth, value);
+        return context.getString(id, depth, value.toString().replace("\u200b", ""));
     }
 
     private int fittedSize(CharSequence text, android.text.TextPaint paint, int width) {
@@ -98,7 +98,8 @@ final class StackRowRenderer {
             int depth) {
         View viewport = (View) stackRows.getParent();
         String fullNumber = display.rows.get(index), compactNumber = display.compactRows.get(index);
-        CharSequence full = numbers.stack(withoutApproximation(fullNumber), colors.muted);
+        CharSequence full =
+                numbers.breakable(numbers.stack(withoutApproximation(fullNumber), colors.muted));
         CharSequence compact = numbers.stack(withoutApproximation(compactNumber), colors.muted);
         int[] previousSize = {-1, -1};
         Runnable fit =
@@ -115,29 +116,21 @@ final class StackRowRenderer {
                     previousSize[0] = width;
                     previousSize[1] = height;
                     android.text.TextPaint measure = new android.text.TextPaint(value.getPaint());
-                    boolean singleLine =
-                            !fullNumber.contains("/")
-                                    && (fullNumber.startsWith("≈")
-                                            || fullNumber.contains(".")
-                                            || fullNumber.contains("e"));
-                    int fullSize = singleLine ? fittedSize(full, measure, width) : 32;
+                    int fullSize = 32;
                     measure.setTextSize(sp(fullSize));
                     android.text.StaticLayout layout =
                             android.text.StaticLayout.Builder.obtain(
                                             full, 0, full.length(), measure, width)
                                     .setIncludePad(value.getIncludeFontPadding())
-                                    .setBreakStrategy(value.getBreakStrategy())
+                                    .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
                                     .setHyphenationFrequency(value.getHyphenationFrequency())
                                     .setLineSpacing(
                                             value.getLineSpacingExtra(),
                                             value.getLineSpacingMultiplier())
                                     .build();
                     boolean fits =
-                            (!singleLine || layout.getLineCount() == 1)
-                                    && layout.getHeight()
-                                                    + value.getPaddingTop()
-                                                    + value.getPaddingBottom()
-                                            <= height;
+                            layout.getHeight() + value.getPaddingTop() + value.getPaddingBottom()
+                                    <= height;
                     for (int line = 0; fits && line < layout.getLineCount(); line++)
                         if (layout.getLineWidth(line) > width) fits = false;
                     CharSequence chosen = fits ? full : compact;
@@ -242,6 +235,7 @@ final class StackRowRenderer {
             TextView value = text(result ? 32 : 22);
             digits(value);
             value.setGravity(Gravity.END);
+            value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
             // Fit from a bounded first layout. A huge exact fraction must never briefly
             // expand the stack before the viewport-aware fitter chooses its fallback.
             String initial = result ? display.compactRows.get(i) : display.rows.get(i);
