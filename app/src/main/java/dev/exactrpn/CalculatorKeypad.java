@@ -274,7 +274,9 @@ public final class CalculatorKeypad extends ViewGroup {
         boolean enabled =
                 !selecting || !key.equals("Factor") && (operation == null || operation.arity != 2);
         if (EntryEditor.isEntryKey(key)) {
-            label = numbers.entry(label.toString());
+            android.text.SpannableString digit =
+                    new android.text.SpannableString(numbers.entry(label.toString()));
+            label = numbers.styleDozenal(digit);
             if (key.equals(".")) {
                 description =
                         getContext()
