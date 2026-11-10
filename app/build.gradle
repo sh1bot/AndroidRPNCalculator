@@ -10,7 +10,7 @@ android {
         minSdk 26
         targetSdk 36
         versionCode = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
-        versionName = System.getenv('GITHUB_RUN_NUMBER') ? "0.1-dev.${System.getenv('GITHUB_RUN_NUMBER')}" : '0.1-dev'
+        versionName = System.getenv('RELEASE_VERSION') ?: (System.getenv('GITHUB_RUN_NUMBER') ? "0.10-dev.${System.getenv('GITHUB_RUN_NUMBER')}" : '0.10-dev')
     }
     signingConfigs {
         if (signingFile) {

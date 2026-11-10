@@ -4,6 +4,14 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Stable release version (leave empty for a development build)'
+        required: false
+        type: string
+
+env:
+  RELEASE_VERSION: ${{ inputs.release_version }}
 
 permissions:
   contents: read
@@ -199,8 +207,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag="v0.1-dev.$BUILD_NUMBER"
+          tag="v0.10-dev.$BUILD_NUMBER"
           (cd dist && sha256sum ExactRPN.apk ExactRPN.aab > SHA256SUMS.txt)
+          if [[ -n "$RELEASE_VERSION" ]]; then
+            [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "Invalid release version"; exit 1; }
+            cat > "$RUNNER_TEMP/release-notes.md" <<EOF
+          Exact RPN $RELEASE_VERSION.
+
+          Exact arithmetic RPN calculator for Android, using Google's arithmetic engine. Includes scientific functions, decimal and fraction display, stack selection, keyboard support, and offline help and licenses.
+
+          Download **ExactRPN.apk** to install or update. **ExactRPN.aab** is for uploading to Google Play. Both use the project's permanent signing key.
+
+          Source commit: $BUILD_SHA
+          EOF
+            gh release create "v$RELEASE_VERSION" dist/ExactRPN.apk dist/ExactRPN.aab dist/SHA256SUMS.txt --target "$BUILD_SHA" --title "Exact RPN $RELEASE_VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
+            exit 0
+          fi
           cat > "$RUNNER_TEMP/release-notes.md" <<EOF
           Latest development build from main.
           Commit: $BUILD_SHA
