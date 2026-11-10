@@ -32,14 +32,15 @@ final class NumericCodec {
         }
     }
 
-    static void writeValue(DataOutputStream out, NumericValue value) throws IOException {
+    static void writeValue(DataOutputStream out, NumericValue value, boolean includeExact)
+            throws IOException {
         writeInteger(out, value.num);
         out.writeInt(value.base);
         out.writeInt(value.scale);
         out.writeBoolean(value.exact);
         out.writeInt(value.zeroBound);
-        out.writeBoolean(value.rational != null);
-        if (value.rational != null) writeRational(out, value.rational);
+        out.writeBoolean(includeExact && value.rational != null);
+        if (includeExact && value.rational != null) writeRational(out, value.rational);
     }
 
     static NumericValue readValue(DataInputStream in) throws IOException {

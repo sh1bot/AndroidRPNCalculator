@@ -28,7 +28,8 @@ For `base=10, limit=100000`, exact examples include `(123, 0)` for 123,
 and non-power limits such as 2000 use the same contract. A bound smaller than the
 radix can produce a rounded zero at a coarse scale.
 
-Exact rational data is omitted when it exceeds the optional budget. A strict exact
+Exact rational data is omitted when it exceeds the optional budget or remaining
+message space; recent values take precedence. A strict exact
 request instead fails if a known rational cannot fit; an irrational still receives
 a scaled approximation. No calculation is silently replaced with an approximation.
 Whole Binder messages remain limited to 256 KiB.
