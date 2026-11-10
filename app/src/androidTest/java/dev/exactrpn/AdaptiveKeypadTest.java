@@ -21,6 +21,7 @@ import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
+import java.util.Locale;
 import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
@@ -246,6 +247,49 @@ public final class AdaptiveKeypadTest {
                             keypad.setCalculating(true);
                             find(keypad, "Cancel").performLongClick();
                             assertEquals("CANCEL", command.get().wire);
+                        });
+    }
+
+    @Test
+    public void radixDigitsStayInsideTheDecimalFootprintWithoutMovingTheStack() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            View stack = new View(context);
+                            CalculatorKeypad keypad =
+                                    new CalculatorKeypad(
+                                            context, key -> {}, false, (open, inverse) -> {});
+                            CalculatorWorkspace workspace =
+                                    new CalculatorWorkspace(context, stack, keypad);
+                            size(context, workspace, 392, 700);
+                            int stackHeight = stack.getHeight(), keypadHeight = keypad.getHeight();
+                            Rect digitArea = bounds(find(keypad, "7"), workspace);
+                            digitArea.union(bounds(find(keypad, "3"), workspace));
+                            Rect multiply = bounds(find(keypad, "×"), workspace);
+
+                            keypad.setNumberFormat(
+                                    new LocaleNumbers(
+                                            Locale.US, NumberMode.DOT, RadixMode.DOZENAL));
+                            size(context, workspace, 392, 700);
+                            assertEquals(stackHeight, stack.getHeight());
+                            assertEquals(keypadHeight, keypad.getHeight());
+                            assertTrue(digitArea.contains(bounds(find(keypad, "↊"), workspace)));
+                            assertEquals(multiply, bounds(find(keypad, "×"), workspace));
+
+                            keypad.setNumberFormat(
+                                    new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.HEX));
+                            size(context, workspace, 392, 700);
+                            assertEquals(stackHeight, stack.getHeight());
+                            assertEquals(keypadHeight, keypad.getHeight());
+                            assertTrue(digitArea.contains(bounds(find(keypad, "F"), workspace)));
+                            assertEquals(multiply, bounds(find(keypad, "×"), workspace));
+
+                            find(keypad, "f()").performClick();
+                            size(context, workspace, 392, 700);
+                            assertTrue(
+                                    bounds(find(keypad, "×"), workspace).height()
+                                            > bounds(find(keypad, "sin"), workspace).height());
                         });
     }
 

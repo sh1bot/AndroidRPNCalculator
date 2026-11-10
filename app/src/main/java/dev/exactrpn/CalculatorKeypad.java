@@ -25,7 +25,7 @@ import java.util.function.Consumer;
 
 /** Round primary keys become shorter capsules to make room for scientific functions. */
 public final class CalculatorKeypad extends ViewGroup {
-    private final List<LinearLayout> primaryRows = new ArrayList<>();
+    private final List<ViewGroup> primaryRows = new ArrayList<>();
     private final List<LinearLayout> scientificRows = new ArrayList<>();
     private final Button functions, complements;
     private final ThemeColors colors;
@@ -66,6 +66,79 @@ public final class CalculatorKeypad extends ViewGroup {
                         hold.run();
                         return true;
                     });
+        }
+    }
+
+    /** Keeps radix digits inside the decimal 3-by-3 footprint beside fixed operators. */
+    private final class DigitBand extends ViewGroup {
+        private final int columns, digitCount;
+
+        DigitBand(CalculatorKey[] digits, int columns) {
+            super(CalculatorKeypad.this.getContext());
+            this.columns = columns;
+            digitCount = digits.length;
+            for (CalculatorKey digit : digits) addView(button(digit));
+            addView(button(CalculatorKey.MULTIPLY));
+            addView(button(CalculatorKey.SUBTRACT));
+            addView(button(CalculatorKey.ADD));
+        }
+
+        @Override
+        protected void onMeasure(int widthSpec, int heightSpec) {
+            int width = MeasureSpec.getSize(widthSpec), height = MeasureSpec.getSize(heightSpec);
+            int digitWidth = width * 3 / 4;
+            int digitRows = digitCount / columns;
+            for (int i = 0; i < digitCount; i++) {
+                int column = i % columns, row = i / columns;
+                measureBandButton(
+                        (Button) getChildAt(i),
+                        digitWidth * (column + 1) / columns - digitWidth * column / columns,
+                        height * (row + 1) / digitRows - height * row / digitRows);
+            }
+            for (int i = 0; i < 3; i++)
+                measureBandButton(
+                        (Button) getChildAt(digitCount + i),
+                        width - digitWidth,
+                        height * (i + 1) / 3 - height * i / 3);
+            setMeasuredDimension(width, height);
+        }
+
+        private void measureBandButton(Button button, int cellWidth, int cellHeight) {
+            int gap = Math.min(dp(8), cellHeight / 6);
+            int width = Math.max(1, cellWidth - gap), height = Math.max(1, cellHeight - gap);
+            if (!expanded) width = height = Math.min(width, height);
+            fitLabel(button, width, height);
+            button.measure(
+                    MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY));
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            int width = right - left, height = bottom - top, digitWidth = width * 3 / 4;
+            int digitRows = digitCount / columns;
+            for (int i = 0; i < digitCount; i++) {
+                int column = i % columns, row = i / columns;
+                layoutBandButton(
+                        (Button) getChildAt(i),
+                        digitWidth * column / columns,
+                        height * row / digitRows,
+                        digitWidth * (column + 1) / columns,
+                        height * (row + 1) / digitRows);
+            }
+            for (int i = 0; i < 3; i++)
+                layoutBandButton(
+                        (Button) getChildAt(digitCount + i),
+                        digitWidth,
+                        height * i / 3,
+                        width,
+                        height * (i + 1) / 3);
+        }
+
+        private void layoutBandButton(Button button, int left, int top, int right, int bottom) {
+            int x = left + (right - left - button.getMeasuredWidth()) / 2;
+            int y = top + (bottom - top - button.getMeasuredHeight()) / 2;
+            button.layout(x, y, x + button.getMeasuredWidth(), y + button.getMeasuredHeight());
         }
     }
 
@@ -170,11 +243,11 @@ public final class CalculatorKeypad extends ViewGroup {
     }
 
     public int primaryColumns() {
-        return radixMode == RadixMode.DECIMAL ? 4 : 5;
+        return 4;
     }
 
     public int primaryRowCount() {
-        return primaryRows.size();
+        return 5;
     }
 
     public void setMode(InteractionMode mode) {
@@ -416,131 +489,110 @@ public final class CalculatorKeypad extends ViewGroup {
 
     private void addRows(CalculatorKey[][] keys, List<LinearLayout> rows) {
         for (CalculatorKey[] entries : keys) {
-            LinearLayout row = new LinearLayout(getContext());
-            for (CalculatorKey definition : entries) {
-                String key = definition.wire;
-                FrameLayout cell = new FrameLayout(getContext());
-                Button b = button(definition);
-                cell.addView(b, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
-                float weight =
-                        radixMode != RadixMode.DECIMAL
-                                        && entries.length == 3
-                                        && (definition == CalculatorKey.DECIMAL
-                                                || definition == CalculatorKey.ENTER)
-                                ? 1.5f
-                                : 1;
-                row.addView(cell, new LinearLayout.LayoutParams(0, -1, weight));
-            }
+            LinearLayout row = row(entries);
             rows.add(row);
             addView(row);
         }
     }
 
+    private LinearLayout row(CalculatorKey[] entries) {
+        LinearLayout row = new LinearLayout(getContext());
+        for (CalculatorKey definition : entries) {
+            FrameLayout cell = new FrameLayout(getContext());
+            Button b = button(definition);
+            cell.addView(b, new FrameLayout.LayoutParams(dp(48), dp(48), Gravity.CENTER));
+            float weight =
+                    radixMode != RadixMode.DECIMAL
+                                    && entries.length == 3
+                                    && (definition == CalculatorKey.DECIMAL
+                                            || definition == CalculatorKey.ENTER)
+                            ? 1.5f
+                            : 1;
+            row.addView(cell, new LinearLayout.LayoutParams(0, -1, weight));
+        }
+        return row;
+    }
+
     private void rebuildPrimaryRows() {
-        for (LinearLayout row : primaryRows) removeView(row);
+        for (ViewGroup row : primaryRows) removeView(row);
         primaryRows.clear();
         for (CalculatorKey key : PRIMARY_KEYS) buttons.remove(key);
-        CalculatorKey[][] rows =
+        CalculatorKey[] digits =
                 switch (radixMode) {
                     case DECIMAL ->
-                            new CalculatorKey[][] {
-                                {
-                                    CalculatorKey.CLEAR,
-                                    CalculatorKey.BACK,
-                                    CalculatorKey.SWAP,
-                                    CalculatorKey.DIVIDE
-                                },
-                                {
-                                    CalculatorKey.SEVEN,
-                                    CalculatorKey.EIGHT,
-                                    CalculatorKey.NINE,
-                                    CalculatorKey.MULTIPLY
-                                },
-                                {
-                                    CalculatorKey.FOUR,
-                                    CalculatorKey.FIVE,
-                                    CalculatorKey.SIX,
-                                    CalculatorKey.SUBTRACT
-                                },
-                                {
-                                    CalculatorKey.ONE,
-                                    CalculatorKey.TWO,
-                                    CalculatorKey.THREE,
-                                    CalculatorKey.ADD
-                                },
-                                {
+                            new CalculatorKey[] {
+                                CalculatorKey.SEVEN,
+                                CalculatorKey.EIGHT,
+                                CalculatorKey.NINE,
+                                CalculatorKey.FOUR,
+                                CalculatorKey.FIVE,
+                                CalculatorKey.SIX,
+                                CalculatorKey.ONE,
+                                CalculatorKey.TWO,
+                                CalculatorKey.THREE
+                            };
+                    case DOZENAL ->
+                            new CalculatorKey[] {
+                                CalculatorKey.EIGHT,
+                                CalculatorKey.NINE,
+                                CalculatorKey.DIGIT_A,
+                                CalculatorKey.DIGIT_B,
+                                CalculatorKey.FOUR,
+                                CalculatorKey.FIVE,
+                                CalculatorKey.SIX,
+                                CalculatorKey.SEVEN,
+                                CalculatorKey.ZERO,
+                                CalculatorKey.ONE,
+                                CalculatorKey.TWO,
+                                CalculatorKey.THREE
+                            };
+                    case HEX ->
+                            new CalculatorKey[] {
+                                CalculatorKey.DIGIT_C,
+                                CalculatorKey.DIGIT_D,
+                                CalculatorKey.DIGIT_E,
+                                CalculatorKey.DIGIT_F,
+                                CalculatorKey.EIGHT,
+                                CalculatorKey.NINE,
+                                CalculatorKey.DIGIT_A,
+                                CalculatorKey.DIGIT_B,
+                                CalculatorKey.FOUR,
+                                CalculatorKey.FIVE,
+                                CalculatorKey.SIX,
+                                CalculatorKey.SEVEN,
+                                CalculatorKey.ZERO,
+                                CalculatorKey.ONE,
+                                CalculatorKey.TWO,
+                                CalculatorKey.THREE
+                            };
+                };
+        LinearLayout commandRow =
+                row(
+                        new CalculatorKey[] {
+                            CalculatorKey.CLEAR,
+                            CalculatorKey.BACK,
+                            CalculatorKey.SWAP,
+                            CalculatorKey.DIVIDE
+                        });
+        DigitBand digitBand = new DigitBand(digits, radixMode == RadixMode.DECIMAL ? 3 : 4);
+        LinearLayout bottomRow =
+                row(
+                        radixMode == RadixMode.DECIMAL
+                                ? new CalculatorKey[] {
                                     CalculatorKey.ZERO,
                                     CalculatorKey.DECIMAL,
                                     CalculatorKey.NEGATE,
                                     CalculatorKey.ENTER
                                 }
-                            };
-                    case DOZENAL ->
-                            new CalculatorKey[][] {
-                                {
-                                    CalculatorKey.CLEAR,
-                                    CalculatorKey.BACK,
-                                    CalculatorKey.SWAP,
-                                    CalculatorKey.DIVIDE
-                                },
-                                {
-                                    CalculatorKey.EIGHT,
-                                    CalculatorKey.NINE,
-                                    CalculatorKey.DIGIT_A,
-                                    CalculatorKey.DIGIT_B,
-                                    CalculatorKey.MULTIPLY
-                                },
-                                {
-                                    CalculatorKey.FOUR,
-                                    CalculatorKey.FIVE,
-                                    CalculatorKey.SIX,
-                                    CalculatorKey.SEVEN,
-                                    CalculatorKey.SUBTRACT
-                                },
-                                {
-                                    CalculatorKey.ZERO,
-                                    CalculatorKey.ONE,
-                                    CalculatorKey.TWO,
-                                    CalculatorKey.THREE,
-                                    CalculatorKey.ADD
-                                },
-                                {CalculatorKey.DECIMAL, CalculatorKey.NEGATE, CalculatorKey.ENTER}
-                            };
-                    case HEX ->
-                            new CalculatorKey[][] {
-                                {CalculatorKey.CLEAR, CalculatorKey.BACK, CalculatorKey.SWAP},
-                                {
-                                    CalculatorKey.DIGIT_C,
-                                    CalculatorKey.DIGIT_D,
-                                    CalculatorKey.DIGIT_E,
-                                    CalculatorKey.DIGIT_F,
-                                    CalculatorKey.DIVIDE
-                                },
-                                {
-                                    CalculatorKey.EIGHT,
-                                    CalculatorKey.NINE,
-                                    CalculatorKey.DIGIT_A,
-                                    CalculatorKey.DIGIT_B,
-                                    CalculatorKey.MULTIPLY
-                                },
-                                {
-                                    CalculatorKey.FOUR,
-                                    CalculatorKey.FIVE,
-                                    CalculatorKey.SIX,
-                                    CalculatorKey.SEVEN,
-                                    CalculatorKey.SUBTRACT
-                                },
-                                {
-                                    CalculatorKey.ZERO,
-                                    CalculatorKey.ONE,
-                                    CalculatorKey.TWO,
-                                    CalculatorKey.THREE,
-                                    CalculatorKey.ADD
-                                },
-                                {CalculatorKey.DECIMAL, CalculatorKey.NEGATE, CalculatorKey.ENTER}
-                            };
-                };
-        addRows(rows, primaryRows);
+                                : new CalculatorKey[] {
+                                    CalculatorKey.DECIMAL, CalculatorKey.NEGATE, CalculatorKey.ENTER
+                                });
+        primaryRows.add(commandRow);
+        primaryRows.add(digitBand);
+        primaryRows.add(bottomRow);
+        addView(commandRow);
+        addView(digitBand);
+        addView(bottomRow);
         requestLayout();
     }
 
@@ -691,20 +743,28 @@ public final class CalculatorKeypad extends ViewGroup {
                 MeasureSpec.makeMeasureSpec(digitsWidth, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(controlHeight, MeasureSpec.EXACTLY));
         int body = Math.max(1, height - controlHeight);
-        int rows = primaryRows.size() + (expanded && !functionsBeside ? 3 : 0);
+        int functionBody = expanded && !functionsBeside ? body * 36 / 100 : 0;
+        int primaryBody = body - functionBody;
+        int unit = 0;
         for (int i = 0; i < primaryRows.size(); i++) {
-            int index = i + (expanded && !functionsBeside ? 3 : 0);
-            measureRow(
-                    primaryRows.get(i),
-                    digitsWidth,
-                    body * (index + 1) / rows - body * index / rows,
-                    !expanded);
+            ViewGroup primary = primaryRows.get(i);
+            int span = primary instanceof DigitBand ? 3 : 1;
+            int rowHeight = primaryBody * (unit + span) / 5 - primaryBody * unit / 5;
+            if (primary instanceof LinearLayout)
+                measureRow((LinearLayout) primary, digitsWidth, rowHeight, !expanded);
+            else
+                primary.measure(
+                        MeasureSpec.makeMeasureSpec(digitsWidth, MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(rowHeight, MeasureSpec.EXACTLY));
+            unit += span;
         }
         if (expanded)
             for (int i = 0; i < scientificRows.size(); i++) {
                 int functionWidth = functionsBeside ? width - digitsWidth - dp(12) : width;
                 int rowHeight =
-                        functionsBeside ? body / 5 : body * (i + 1) / rows - body * i / rows;
+                        functionsBeside
+                                ? body / 5
+                                : functionBody * (i + 1) / 3 - functionBody * i / 3;
                 measureRow(
                         scientificRows.get(i),
                         Math.max(1, functionWidth),
@@ -750,7 +810,7 @@ public final class CalculatorKeypad extends ViewGroup {
             }
             if (!functionsBeside) y = fy;
         }
-        for (LinearLayout row : primaryRows) {
+        for (ViewGroup row : primaryRows) {
             row.layout(digitsX, y, getWidth(), y + row.getMeasuredHeight());
             y += row.getMeasuredHeight();
         }
