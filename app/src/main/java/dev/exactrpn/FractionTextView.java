@@ -51,6 +51,18 @@ final class FractionTextView extends android.widget.TextView {
         return height + getPaddingTop() + getPaddingBottom();
     }
 
+    boolean stackedComponentsFit(LocaleNumbers.FractionParts parts, int width) {
+        LocaleNumbers.FractionParts previous = fraction;
+        fraction = parts;
+        buildLayouts(Math.max(1, width));
+        boolean fits =
+                (wholeLayout == null || wholeLayout.getLineCount() == 1)
+                        && numeratorLayout.getLineCount() == 1
+                        && denominatorLayout.getLineCount() == 1;
+        fraction = previous;
+        return fits;
+    }
+
     private int dp(float value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }

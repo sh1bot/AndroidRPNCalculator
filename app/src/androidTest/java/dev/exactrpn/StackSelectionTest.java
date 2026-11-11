@@ -164,6 +164,36 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void upperFractionStacksOnlyWhileEachComponentFits() throws Exception {
+        MainActivity activity = open();
+        CalculatorSession state = session(activity);
+        try {
+            for (Command command :
+                    new Command[] {
+                        Command.paste("123456789012"),
+                        Command.key("ENTER"),
+                        Command.paste("700000000003"),
+                        Command.key("÷"),
+                        Command.paste("1"),
+                        Command.key("ENTER"),
+                        Command.key("FRACTION")
+                    }) {
+                instrumentation.runOnMainSync(() -> state.enqueue(command));
+                await(() -> !state.busy);
+            }
+            await(
+                    () -> {
+                        View upper = tagged(activity, "stack-value:0");
+                        return upper instanceof FractionTextView
+                                && ((FractionTextView) upper).isStackedFraction()
+                                && ((android.widget.TextView) upper).getText().toString().contains("/");
+                    });
+        } finally {
+            finish(activity);
+        }
+    }
+
+    @Test
     public void copyingAndCyclingHugeFractionModesKeepsOneStableLayout() throws Exception {
         MainActivity activity = open();
         CalculatorSession state = session(activity);
