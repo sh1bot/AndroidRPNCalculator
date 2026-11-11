@@ -80,6 +80,11 @@ public final class FunctionsTest {
                         styled.getSpans(
                                 0, styled.length(), android.text.style.SuperscriptSpan.class);
                 assertEquals(1, powers.length);
+                android.text.style.TypefaceSpan[] markerFaces =
+                        styled.getSpans(
+                                0, styled.length(), android.text.style.TypefaceSpan.class);
+                assertEquals(1, markerFaces.length);
+                assertEquals("sans-serif", markerFaces[0].getFamily());
                 assertEquals(
                         numbers.entry(input.substring(marker + 1).replace('-', '−')),
                         styled.subSequence(

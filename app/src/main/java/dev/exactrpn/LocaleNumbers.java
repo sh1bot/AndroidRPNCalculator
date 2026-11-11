@@ -11,6 +11,7 @@ import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.SubscriptSpan;
 import android.text.style.SuperscriptSpan;
+import android.text.style.TypefaceSpan;
 
 import java.util.Locale;
 
@@ -237,6 +238,11 @@ public final class LocaleNumbers {
         text.append("\u2009×").append(entry("10"));
         text.setSpan(
                 new RelativeSizeSpan(ExponentMarkerSpan.MARKER_SCALE),
+                start,
+                text.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.setSpan(
+                new TypefaceSpan("sans-serif"),
                 start,
                 text.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
