@@ -456,8 +456,7 @@ public final class CalculatorKeypad extends ViewGroup {
         if (EntryEditor.isEntryKey(key)) {
             button.setTypeface(
                     android.graphics.Typeface.create(
-                            radixMode == RadixMode.DECIMAL ? "sans-serif" : "monospace",
-                            android.graphics.Typeface.NORMAL));
+                            "monospace", android.graphics.Typeface.NORMAL));
             button.setFontFeatureSettings("tnum");
         }
         bindButton(definition, button);

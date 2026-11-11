@@ -349,12 +349,18 @@ public final class LocaleNumbers {
         int start = text.length();
         text.append(localized);
         for (int i = 0; i < localized.length(); i++) {
-            if (localized.charAt(i) == symbols.getGroupingSeparator())
+            if (localized.charAt(i) == symbols.getGroupingSeparator()) {
+                text.setSpan(
+                        new GroupingSeparatorSpan(),
+                        start + i,
+                        start + i + 1,
+                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 text.setSpan(
                         new ForegroundColorSpan(groupingColor),
                         start + i,
                         start + i + 1,
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
         }
     }
 

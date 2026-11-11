@@ -48,10 +48,8 @@ final class StackRowRenderer {
                 context.getResources().getDisplayMetrics());
     }
 
-    private void digits(TextView value, RadixMode radix) {
-        value.setTypeface(
-                Typeface.create(
-                        radix == RadixMode.DECIMAL ? "sans-serif" : "monospace", Typeface.NORMAL));
+    private void digits(TextView value) {
+        value.setTypeface(Typeface.create("monospace", Typeface.NORMAL));
         value.setFontFeatureSettings("tnum");
     }
 
@@ -233,7 +231,7 @@ final class StackRowRenderer {
                 row.addView(selected, new LinearLayout.LayoutParams(dp(40), dp(40)));
             }
             TextView label = text(12);
-            digits(label, RadixMode.DECIMAL);
+            digits(label);
             label.setSingleLine(true);
             updateStackLabel(label, depth, display.rows.get(i));
             label.setTag("stack-label:" + i);
@@ -248,7 +246,7 @@ final class StackRowRenderer {
             row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
             boolean result = !display.editing && depth == 1;
             TextView value = text(result ? 32 : 22);
-            digits(value, numbers.radixMode());
+            digits(value);
             value.setGravity(Gravity.END);
             value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
             // Fit from a bounded first layout. A huge exact fraction must never briefly
