@@ -193,7 +193,7 @@ public final class StackSelectionTest {
     }
 
     @Test
-    public void copyingAndCyclingHugeFractionModesKeepsOneStableLayout() throws Exception {
+    public void copyingAndCyclingHugeFractionModesKeepsEachModeStable() throws Exception {
         MainActivity activity = open();
         CalculatorSession state = session(activity);
         try {
@@ -212,17 +212,17 @@ public final class StackSelectionTest {
                 await(() -> !state.busy);
             }
             await(() -> tagged(activity, "stack-value:0") != null);
-            java.util.concurrent.atomic.AtomicReference<String> firstText =
-                    new java.util.concurrent.atomic.AtomicReference<>();
-            float[] firstSize = {0};
-            int[] firstHeight = {0}, firstLines = {0};
+            String[] firstText = new String[3];
+            float[] firstSize = new float[3];
+            int[] firstHeight = new int[3], firstLines = new int[3];
             ClipboardManager clipboard =
                     (ClipboardManager)
                             instrumentation
                                     .getTargetContext()
                                     .getSystemService(Context.CLIPBOARD_SERVICE);
             for (int mode = 0; mode < 7; mode++) {
-                String expectedMode = new String[] {"DEC", "FRAC", "IMPR"}[mode % 3];
+                int slot = mode % 3;
+                String expectedMode = new String[] {"DEC", "FRAC", "IMPR"}[slot];
                 await(
                         () -> {
                             android.widget.TextView modeButton =
@@ -233,27 +233,27 @@ public final class StackSelectionTest {
                                     (android.widget.TextView) tagged(activity, "stack-label:0");
                             return expectedMode.contentEquals(modeButton.getText())
                                     && label != null
-                                    && "x≈".contentEquals(label.getText())
+                                    && (slot == 0 ? "x≈" : "x:")
+                                            .contentEquals(label.getText())
                                     && value != null
                                     && value.getText().length() < 100
                                     && value.getLayout() != null;
                         });
                 instrumentation.waitForIdleSync();
-                int pass = mode;
                 instrumentation.runOnMainSync(
                         () -> {
                             android.widget.TextView value =
                                     (android.widget.TextView) tagged(activity, "stack-value:0");
-                            if (pass == 0) {
-                                firstText.set(value.getText().toString());
-                                firstSize[0] = value.getTextSize();
-                                firstHeight[0] = value.getHeight();
-                                firstLines[0] = value.getLayout().getLineCount();
+                            if (firstText[slot] == null) {
+                                firstText[slot] = value.getText().toString();
+                                firstSize[slot] = value.getTextSize();
+                                firstHeight[slot] = value.getHeight();
+                                firstLines[slot] = value.getLayout().getLineCount();
                             } else {
-                                assertEquals(firstText.get(), value.getText().toString());
-                                assertEquals(firstSize[0], value.getTextSize(), .01f);
-                                assertEquals(firstHeight[0], value.getHeight());
-                                assertEquals(firstLines[0], value.getLayout().getLineCount());
+                                assertEquals(firstText[slot], value.getText().toString());
+                                assertEquals(firstSize[slot], value.getTextSize(), .01f);
+                                assertEquals(firstHeight[slot], value.getHeight());
+                                assertEquals(firstLines[slot], value.getLayout().getLineCount());
                             }
                             for (int line = 0; line < value.getLayout().getLineCount(); line++)
                                 assertEquals(0, value.getLayout().getEllipsisCount(line));
