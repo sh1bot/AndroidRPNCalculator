@@ -86,6 +86,12 @@ public final class FunctionsTest {
                 assertEquals(1, markerFaces.length);
                 assertEquals("sans-serif", markerFaces[0].getFamily());
                 assertEquals(
+                        "\u2009×",
+                        styled.subSequence(
+                                        styled.getSpanStart(markerFaces[0]),
+                                        styled.getSpanEnd(markerFaces[0]))
+                                .toString());
+                assertEquals(
                         numbers.entry(input.substring(marker + 1).replace('-', '−')),
                         styled.subSequence(
                                         styled.getSpanStart(powers[0]),
