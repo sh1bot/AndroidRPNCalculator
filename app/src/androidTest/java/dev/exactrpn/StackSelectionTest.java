@@ -193,6 +193,34 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void fittingLargeIntegerStaysPlainAboveTheBottomRow() throws Exception {
+        MainActivity activity = open();
+        CalculatorSession state = session(activity);
+        try {
+            for (Command command :
+                    new Command[] {
+                        Command.paste("1234567890123"),
+                        Command.key("ENTER"),
+                        Command.paste("2"),
+                        Command.key("ENTER")
+                    }) {
+                instrumentation.runOnMainSync(() -> state.enqueue(command));
+                await(() -> !state.busy);
+            }
+            await(
+                    () -> {
+                        android.widget.TextView upper =
+                                (android.widget.TextView) tagged(activity, "stack-value:0");
+                        return upper != null
+                                && upper.getText().length() >= 13
+                                && upper.getText().toString().indexOf('×') < 0;
+                    });
+        } finally {
+            finish(activity);
+        }
+    }
+
+    @Test
     public void copyingAndCyclingHugeFractionModesKeepsEachModeStable() throws Exception {
         MainActivity activity = open();
         CalculatorSession state = session(activity);

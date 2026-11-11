@@ -96,7 +96,7 @@ final class Display {
         for (int i = 0; i < values.size(); i++) {
             NumericValue value = values.get(i);
             String formatted =
-                    ValueFormatter.format(value, i == values.size() - 1, notation, fractionMode);
+                    ValueFormatter.format(value, true, notation, fractionMode);
             String fraction = ValueFormatter.exactFraction(value, fractionMode);
             full.add(fraction == null ? formatted : fraction);
             compact.add(ValueFormatter.compact(value, notation, fractionMode));

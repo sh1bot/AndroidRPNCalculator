@@ -233,32 +233,32 @@ final class StackRowRenderer {
                     int width = value.getWidth() - value.getPaddingLeft() - value.getPaddingRight();
                     if (width <= 0 || width == previousWidth[0]) return;
                     previousWidth[0] = width;
-                    boolean exact = false;
-                    int fractionSize = 22;
-                    if (fraction != null) {
-                        android.text.TextPaint paint = new android.text.TextPaint(value.getPaint());
-                        paint.setTextSize(sp(22));
-                        if (android.text.Layout.getDesiredWidth(full, paint) <= width) exact = true;
-                        else {
-                            for (; fractionSize >= 12; fractionSize--) {
-                                value.setTextSize(fractionSize);
-                                if (value.stackedComponentsFit(fraction, width)) {
-                                    exact = true;
-                                    break;
-                                }
+                    android.text.TextPaint paint = new android.text.TextPaint(value.getPaint());
+                    int fullSize = 22;
+                    for (; fullSize >= 12; fullSize--) {
+                        paint.setTextSize(sp(fullSize));
+                        if (android.text.Layout.getDesiredWidth(full, paint) <= width) break;
+                    }
+                    boolean fullChosen = fullSize >= 12;
+                    boolean stacked = false;
+                    if (!fullChosen && fraction != null)
+                        for (fullSize = 22; fullSize >= 12; fullSize--) {
+                            value.setTextSize(fullSize);
+                            if (value.stackedComponentsFit(fraction, width)) {
+                                fullChosen = stacked = true;
+                                break;
                             }
                         }
-                    }
                     value.setAutoSizeTextTypeWithDefaults(
-                            exact
+                            fullChosen
                                     ? TextView.AUTO_SIZE_TEXT_TYPE_NONE
                                     : TextView.AUTO_SIZE_TEXT_TYPE_UNIFORM);
-                    if (exact) {
-                        value.setTextSize(fractionSize);
-                        value.setMaxLines(Integer.MAX_VALUE);
+                    if (fullChosen) {
+                        value.setTextSize(fullSize);
+                        value.setMaxLines(stacked ? Integer.MAX_VALUE : 1);
                         value.setEllipsize(null);
-                        if (fractionSize == 22) value.inlineText(full);
-                        else value.stackedFraction(fraction, full);
+                        if (stacked) value.stackedFraction(fraction, full);
+                        else value.inlineText(full);
                     } else {
                         value.inlineText(compact);
                         value.setMaxLines(1);
@@ -266,8 +266,8 @@ final class StackRowRenderer {
                         value.setAutoSizeTextTypeUniformWithConfiguration(
                                 12, 22, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
                     }
-                    String chosenNumber = exact ? fullNumber : compactNumber;
-                    CharSequence chosen = exact ? full : compact;
+                    String chosenNumber = fullChosen ? fullNumber : compactNumber;
+                    CharSequence chosen = fullChosen ? full : compact;
                     updateStackLabel(label, depth, chosenNumber);
                     row.setContentDescription(
                             rowDescription(
