@@ -69,7 +69,7 @@ public final class EntryOperatorTest {
             CalculationSnapshot checkpoint = session.checkpoint;
             java.util.List<NumericValue> values = session.display.values;
             key(session, "FRACTION");
-            assertEquals("2 1/3", session.display.rows.get(0));
+            assertEquals("2+1/3", session.display.rows.get(0));
             key(session, "FRACTION");
             assertEquals("7/3", session.display.rows.get(0));
             key(session, "FORMAT");
