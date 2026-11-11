@@ -23,6 +23,13 @@ final class TurnedDigitSpan extends ReplacementSpan {
         return paint.measureText("0");
     }
 
+    private int baseline(Paint paint, int baseline) {
+        return baseline
+                + (paint instanceof android.text.TextPaint
+                        ? ((android.text.TextPaint) paint).baselineShift
+                        : 0);
+    }
+
     @Override
     public int getSize(
             Paint paint, CharSequence text, int start, int end, Paint.FontMetricsInt metrics) {
@@ -43,17 +50,22 @@ final class TurnedDigitSpan extends ReplacementSpan {
             Paint paint) {
         if (supported(paint)) {
             String rendered = Character.toString(glyph);
+            int baseline = baseline(paint, y);
             canvas.drawText(
-                    rendered, x + (cellWidth(paint) - paint.measureText(rendered)) / 2, y, paint);
+                    rendered,
+                    x + (cellWidth(paint) - paint.measureText(rendered)) / 2,
+                    baseline,
+                    paint);
             return;
         }
+        int baseline = baseline(paint, y);
         float width = cellWidth(paint), glyphWidth = paint.measureText(fallback);
         float offset = (width - glyphWidth) / 2;
         Paint.FontMetrics metrics = paint.getFontMetrics();
-        float centerY = y + (metrics.ascent + metrics.descent) / 2;
+        float centerY = baseline + (metrics.ascent + metrics.descent) / 2;
         canvas.save();
         canvas.rotate(180, x + width / 2, centerY);
-        canvas.drawText(fallback, x + offset, y, paint);
+        canvas.drawText(fallback, x + offset, baseline, paint);
         canvas.restore();
     }
 }

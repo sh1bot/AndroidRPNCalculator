@@ -8,10 +8,24 @@ import android.text.style.ReplacementSpan;
 
 /** Keeps grouping marks narrow while the surrounding numerical text uses a monospace grid. */
 final class GroupingSeparatorSpan extends ReplacementSpan {
+    private final int color;
+
+    GroupingSeparatorSpan(int color) {
+        this.color = color;
+    }
+
     private Paint proportional(Paint source) {
         Paint paint = new Paint(source);
         paint.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        paint.setColor(color);
         return paint;
+    }
+
+    private int baseline(Paint paint, int baseline) {
+        return baseline
+                + (paint instanceof android.text.TextPaint
+                        ? ((android.text.TextPaint) paint).baselineShift
+                        : 0);
     }
 
     @Override
@@ -33,6 +47,6 @@ final class GroupingSeparatorSpan extends ReplacementSpan {
             int y,
             int bottom,
             Paint paint) {
-        canvas.drawText(text, start, end, x, y, proportional(paint));
+        canvas.drawText(text, start, end, x, baseline(paint, y), proportional(paint));
     }
 }
