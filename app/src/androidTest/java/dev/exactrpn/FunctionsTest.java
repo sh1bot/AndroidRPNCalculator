@@ -137,6 +137,16 @@ public final class FunctionsTest {
         assertEquals(
                 "123\u2009\u200b456.123\u200b456",
                 grouped.breakable(grouped.stack("123456.123456", 0)).toString());
+        android.text.Spanned groupedDisplay = (android.text.Spanned) grouped.stack("123456", 0);
+        GroupingSeparatorSpan[] groupingSpans =
+                groupedDisplay.getSpans(0, groupedDisplay.length(), GroupingSeparatorSpan.class);
+        assertEquals(1, groupingSpans.length);
+        android.text.TextPaint monospace = new android.text.TextPaint();
+        monospace.setTypeface(android.graphics.Typeface.MONOSPACE);
+        monospace.setTextSize(40);
+        assertTrue(
+                groupingSpans[0].getSize(monospace, groupedDisplay, 3, 4, null)
+                        < monospace.measureText("0"));
         LocaleNumbers hexadecimal =
                 new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.HEX);
         assertEquals(

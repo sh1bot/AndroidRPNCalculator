@@ -197,13 +197,7 @@ public class MainActivity extends Activity {
     }
 
     private void digits(TextView t) {
-        digits(t, RadixMode.DECIMAL);
-    }
-
-    private void digits(TextView t, RadixMode radix) {
-        t.setTypeface(
-                Typeface.create(
-                        radix == RadixMode.DECIMAL ? "sans-serif" : "monospace", Typeface.NORMAL));
+        t.setTypeface(Typeface.create("monospace", Typeface.NORMAL));
         t.setFontFeatureSettings("tnum");
     }
 
@@ -861,7 +855,7 @@ public class MainActivity extends Activity {
     private void refreshEntry(Display display) {
         changingEntry = true;
         try {
-            digits(entryView, display.radixMode);
+            digits(entryView);
             entryShowsRaw = display.raw;
             entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
             String entry = display.raw ? display.entry : numbers.entry(display.entry);
