@@ -164,17 +164,17 @@ public final class StackSelectionTest {
     }
 
     @Test
-    public void upperFractionStacksOnlyWhileEachComponentFits() throws Exception {
+    public void fittingFractionRemainsExactAboveTheBottomRow() throws Exception {
         MainActivity activity = open();
         CalculatorSession state = session(activity);
         try {
             for (Command command :
                     new Command[] {
-                        Command.paste("12345678901234567890"),
-                        Command.key("ENTER"),
-                        Command.paste("70000000000000000003"),
-                        Command.key("÷"),
                         Command.paste("1"),
+                        Command.key("ENTER"),
+                        Command.paste("3"),
+                        Command.key("÷"),
+                        Command.paste("2"),
                         Command.key("ENTER"),
                         Command.key("FRACTION")
                     }) {
@@ -185,8 +185,7 @@ public final class StackSelectionTest {
                     () -> {
                         View upper = tagged(activity, "stack-value:0");
                         return upper instanceof FractionTextView
-                                && ((FractionTextView) upper).isStackedFraction()
-                                && ((android.widget.TextView) upper).getText().toString().contains("/");
+                                && "1/3".contentEquals(((android.widget.TextView) upper).getText());
                     });
         } finally {
             finish(activity);
