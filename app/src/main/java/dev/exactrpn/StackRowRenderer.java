@@ -51,6 +51,23 @@ final class StackRowRenderer {
                 context.getResources().getDisplayMetrics());
     }
 
+    private static void fitWhileAttached(
+            View view, android.view.ViewTreeObserver.OnPreDrawListener fitter) {
+        view.addOnAttachStateChangeListener(
+                new View.OnAttachStateChangeListener() {
+                    private android.view.ViewTreeObserver observer;
+
+                    public void onViewAttachedToWindow(View ignored) {
+                        observer = view.getViewTreeObserver();
+                        observer.addOnPreDrawListener(fitter);
+                    }
+
+                    public void onViewDetachedFromWindow(View ignored) {
+                        if (observer.isAlive()) observer.removeOnPreDrawListener(fitter);
+                    }
+                });
+    }
+
     private void digits(TextView value) {
         value.setTypeface(Typeface.create("monospace", Typeface.NORMAL));
         value.setFontFeatureSettings("tnum");
@@ -193,19 +210,7 @@ final class StackRowRenderer {
                     }
                     return ready;
                 };
-        value.addOnAttachStateChangeListener(
-                new View.OnAttachStateChangeListener() {
-                    private android.view.ViewTreeObserver observer;
-
-                    public void onViewAttachedToWindow(View v) {
-                        observer = value.getViewTreeObserver();
-                        observer.addOnPreDrawListener(fitted);
-                    }
-
-                    public void onViewDetachedFromWindow(View v) {
-                        if (observer.isAlive()) observer.removeOnPreDrawListener(fitted);
-                    }
-                });
+        fitWhileAttached(value, fitted);
     }
 
     private void fitUpperRow(
@@ -276,19 +281,7 @@ final class StackRowRenderer {
                     fit.run();
                     return !value.isLayoutRequested();
                 };
-        value.addOnAttachStateChangeListener(
-                new View.OnAttachStateChangeListener() {
-                    private android.view.ViewTreeObserver observer;
-
-                    public void onViewAttachedToWindow(View v) {
-                        observer = value.getViewTreeObserver();
-                        observer.addOnPreDrawListener(fitted);
-                    }
-
-                    public void onViewDetachedFromWindow(View v) {
-                        if (observer.isAlive()) observer.removeOnPreDrawListener(fitted);
-                    }
-                });
+        fitWhileAttached(value, fitted);
     }
 
     void render(
