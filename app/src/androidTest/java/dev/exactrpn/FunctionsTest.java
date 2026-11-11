@@ -166,6 +166,36 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void stackedFractionUsesTheResolvedTextColour() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        LocaleNumbers numbers =
+                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
+        FractionTextView view = new FractionTextView(context);
+        int textColor = android.graphics.Color.MAGENTA;
+        view.setTextColor(textColor);
+        view.setTextSize(24);
+        view.stackedFraction(numbers.fractionParts("123456/789", textColor), "123456/789");
+        view.measure(
+                android.view.View.MeasureSpec.makeMeasureSpec(
+                        240, android.view.View.MeasureSpec.EXACTLY),
+                android.view.View.MeasureSpec.makeMeasureSpec(
+                        0, android.view.View.MeasureSpec.UNSPECIFIED));
+        view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+        android.graphics.Bitmap bitmap =
+                android.graphics.Bitmap.createBitmap(
+                        view.getWidth(), view.getHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+        view.draw(new android.graphics.Canvas(bitmap));
+        boolean found = false;
+        for (int y = 0; !found && y < bitmap.getHeight(); y++)
+            for (int x = 0; x < bitmap.getWidth(); x++)
+                if ((bitmap.getPixel(x, y) & 0x00ffffff) == (textColor & 0x00ffffff)) {
+                    found = true;
+                    break;
+                }
+        assertTrue(found);
+    }
+
+    @Test
     public void mixedDisplayCopyAndFactorisationThroughRemoteProcess() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context);
