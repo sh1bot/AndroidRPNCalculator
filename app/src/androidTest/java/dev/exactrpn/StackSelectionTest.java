@@ -170,9 +170,9 @@ public final class StackSelectionTest {
         try {
             for (Command command :
                     new Command[] {
-                        Command.paste("123456789012"),
+                        Command.paste("12345678901234567890"),
                         Command.key("ENTER"),
-                        Command.paste("700000000003"),
+                        Command.paste("70000000000000000003"),
                         Command.key("÷"),
                         Command.paste("1"),
                         Command.key("ENTER"),
