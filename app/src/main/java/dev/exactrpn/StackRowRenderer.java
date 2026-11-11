@@ -79,12 +79,12 @@ final class StackRowRenderer {
     }
 
     private int fittedSize(CharSequence text, android.text.TextPaint paint, int width) {
-        int size = 32;
-        for (; size > 22; size--) {
+        for (int size = 32; size >= 16; size--) {
             paint.setTextSize(sp(size));
-            if (android.text.Layout.getDesiredWidth(text, paint) <= width) break;
+            if (android.text.Layout.getDesiredWidth(text, paint) <= width || size == 16)
+                return size;
         }
-        return size;
+        throw new AssertionError();
     }
 
     private void fitBottomRow(
@@ -252,7 +252,22 @@ final class StackRowRenderer {
             // Fit from a bounded first layout. A huge exact fraction must never briefly
             // expand the stack before the viewport-aware fitter chooses its fallback.
             String initial = result ? display.compactRows.get(i) : display.rows.get(i);
-            value.setText(numbers.stack(withoutApproximation(initial), colors.muted));
+            CharSequence initialText =
+                    numbers.stack(withoutApproximation(initial), colors.muted);
+            if (result) {
+                int initialWidth =
+                        stackRows.getWidth()
+                                - dp(46)
+                                - value.getPaddingLeft()
+                                - value.getPaddingRight();
+                if (initialWidth > 0)
+                    value.setTextSize(
+                            fittedSize(
+                                    numbers.breakable(initialText),
+                                    new android.text.TextPaint(value.getPaint()),
+                                    initialWidth));
+            }
+            value.setText(initialText);
             value.setMaxLines(1);
             value.setEllipsize(android.text.TextUtils.TruncateAt.END);
             if (!result) {
