@@ -59,7 +59,7 @@ final class FractionTextView extends android.widget.TextView {
         return StaticLayout.Builder.obtain(text, 0, text.length(), paint, Math.max(1, width))
                 .setAlignment(Layout.Alignment.ALIGN_OPPOSITE)
                 .setIncludePad(getIncludeFontPadding())
-                .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
+                .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
                 .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
                 .setLineSpacing(getLineSpacingExtra(), getLineSpacingMultiplier())
                 .build();

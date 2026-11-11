@@ -131,7 +131,7 @@ final class StackRowRenderer {
                             android.text.StaticLayout.Builder.obtain(
                                             full, 0, full.length(), measure, width)
                                     .setIncludePad(value.getIncludeFontPadding())
-                                    .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
+                                    .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
                                     .setHyphenationFrequency(value.getHyphenationFrequency())
                                     .setLineSpacing(
                                             value.getLineSpacingExtra(),
@@ -272,7 +272,7 @@ final class StackRowRenderer {
             FractionTextView value = text(new FractionTextView(context), result ? 32 : 22);
             digits(value);
             value.setGravity(Gravity.END);
-            value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
+            value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
             // Fit from a bounded first layout. A huge exact fraction must never briefly
             // expand the stack before the viewport-aware fitter chooses its fallback.
             String initial = result ? display.compactRows.get(i) : display.rows.get(i);
