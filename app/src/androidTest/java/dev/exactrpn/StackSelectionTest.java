@@ -137,6 +137,33 @@ public final class StackSelectionTest {
     }
 
     @Test
+    public void fractionWhichWouldWrapUsesAStackedBar() throws Exception {
+        MainActivity activity = open();
+        CalculatorSession state = session(activity);
+        try {
+            for (Command command :
+                    new Command[] {
+                        Command.paste("123456789012345678901234567890"),
+                        Command.key("ENTER"),
+                        Command.paste("7000000000000000003"),
+                        Command.key("÷"),
+                        Command.key("FRACTION")
+                    }) {
+                instrumentation.runOnMainSync(() -> state.enqueue(command));
+                await(() -> !state.busy);
+            }
+            await(
+                    () -> {
+                        View value = tagged(activity, "stack-value:0");
+                        return value instanceof FractionTextView
+                                && ((FractionTextView) value).isStackedFraction();
+                    });
+        } finally {
+            finish(activity);
+        }
+    }
+
+    @Test
     public void copyingAndCyclingHugeFractionModesKeepsOneStableLayout() throws Exception {
         MainActivity activity = open();
         CalculatorSession state = session(activity);
