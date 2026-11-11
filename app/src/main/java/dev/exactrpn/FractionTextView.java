@@ -56,11 +56,10 @@ final class FractionTextView extends android.widget.TextView {
     }
 
     private StaticLayout layout(CharSequence text, int width, TextPaint paint) {
-        text = BalancedLines.apply(text, paint, width);
         return StaticLayout.Builder.obtain(text, 0, text.length(), paint, Math.max(1, width))
                 .setAlignment(Layout.Alignment.ALIGN_OPPOSITE)
                 .setIncludePad(getIncludeFontPadding())
-                .setBreakStrategy(Layout.BREAK_STRATEGY_SIMPLE)
+                .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
                 .setHyphenationFrequency(Layout.HYPHENATION_FREQUENCY_NONE)
                 .setLineSpacing(getLineSpacingExtra(), getLineSpacingMultiplier())
                 .build();
@@ -76,8 +75,20 @@ final class FractionTextView extends android.widget.TextView {
         // their base paint explicitly.
         paint.setColor(getCurrentTextColor());
         if (fraction.mixed()) {
-            leftWidth = Math.max(1, (contentWidth - fractionGap) / 2);
-            rightWidth = Math.max(1, contentWidth - fractionGap - leftWidth);
+            int shared = Math.max(2, contentWidth - fractionGap);
+            int half = shared / 2;
+            int wholeWanted = (int) Math.ceil(Layout.getDesiredWidth(fraction.whole, paint));
+            int fractionWanted =
+                    (int)
+                            Math.ceil(
+                                    Math.max(
+                                            Layout.getDesiredWidth(fraction.numerator, paint),
+                                            Layout.getDesiredWidth(fraction.denominator, paint)));
+            if (wholeWanted < half) leftWidth = Math.max(1, wholeWanted);
+            else if (fractionWanted < half)
+                leftWidth = Math.max(1, shared - Math.max(1, fractionWanted));
+            else leftWidth = half;
+            rightWidth = Math.max(1, shared - leftWidth);
             wholeLayout = layout(fraction.whole, leftWidth, paint);
         } else {
             leftWidth = 0;

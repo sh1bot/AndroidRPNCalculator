@@ -127,16 +127,11 @@ final class StackRowRenderer {
                     int fullSize =
                             fullNumber.startsWith("≈") ? fittedSize(full, measure, width) : 32;
                     measure.setTextSize(sp(fullSize));
-                    CharSequence balancedFull = BalancedLines.apply(full, measure, width);
                     android.text.StaticLayout layout =
                             android.text.StaticLayout.Builder.obtain(
-                                            balancedFull,
-                                            0,
-                                            balancedFull.length(),
-                                            measure,
-                                            width)
+                                            full, 0, full.length(), measure, width)
                                     .setIncludePad(value.getIncludeFontPadding())
-                                    .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
+                                    .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
                                     .setHyphenationFrequency(value.getHyphenationFrequency())
                                     .setLineSpacing(
                                             value.getLineSpacingExtra(),
@@ -166,16 +161,12 @@ final class StackRowRenderer {
                                     : stacked
                                             ? stackedSize
                                             : fittedSize(compact, measure, width);
-                    measure.setTextSize(sp(size));
-                    CharSequence chosen =
-                            fullChosen
-                                    ? balancedFull
-                                    : BalancedLines.apply(compact, measure, width);
+                    CharSequence chosen = fullChosen ? full : compact;
                     if (value.getTextSize() != sp(size)) value.setTextSize(size);
                     value.setEllipsize(fullChosen ? null : android.text.TextUtils.TruncateAt.END);
                     int lines = fitsInline ? layout.getLineCount() : stacked ? Integer.MAX_VALUE : 1;
                     if (value.getMaxLines() != lines) value.setMaxLines(lines);
-                    if (stacked) value.stackedFraction(fraction, balancedFull);
+                    if (stacked) value.stackedFraction(fraction, full);
                     else value.inlineText(chosen);
                     updateStackLabel(label, depth, fullChosen ? fullNumber : compactNumber);
                     value.requestLayout();
@@ -276,12 +267,22 @@ final class StackRowRenderer {
                     });
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setTextColor(colors.muted);
-            row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
             boolean result = !display.editing && depth == 1;
             FractionTextView value = text(new FractionTextView(context), result ? 32 : 22);
             digits(value);
+            label.setPadding(label.getPaddingLeft(), label.getPaddingTop(), 0, label.getPaddingBottom());
+            int labelWidth =
+                    label.getPaddingLeft()
+                            + (int) Math.ceil(label.getPaint().measureText(label.getText().toString()));
+            row.addView(label, new LinearLayout.LayoutParams(labelWidth, -2));
+            int labelGap = (int) Math.ceil(label.getPaint().measureText("\u2002"));
+            value.setPadding(
+                    labelGap,
+                    value.getPaddingTop(),
+                    value.getPaddingRight(),
+                    value.getPaddingBottom());
             value.setGravity(Gravity.END);
-            value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
+            value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
             // Fit from a bounded first layout. A huge exact fraction must never briefly
             // expand the stack before the viewport-aware fitter chooses its fallback.
             String initial = result ? display.compactRows.get(i) : display.rows.get(i);
@@ -290,7 +291,7 @@ final class StackRowRenderer {
             if (result) {
                 int initialWidth =
                         stackRows.getWidth()
-                                - dp(46)
+                                - labelWidth
                                 - value.getPaddingLeft()
                                 - value.getPaddingRight();
                 if (initialWidth > 0)
@@ -304,7 +305,7 @@ final class StackRowRenderer {
             value.setMaxLines(1);
             value.setEllipsize(android.text.TextUtils.TruncateAt.END);
             if (!result) {
-                value.setPadding(dp(4), dp(5), dp(4), dp(5));
+                value.setPadding(labelGap, dp(5), dp(4), dp(5));
                 value.setSingleLine(true);
                 value.setHorizontallyScrolling(false);
                 value.setEllipsize(android.text.TextUtils.TruncateAt.END);

@@ -196,23 +196,6 @@ public final class FunctionsTest {
     }
 
     @Test
-    public void balancingUsesTheMinimumLineCountAndWholeDigitGroups() {
-        LocaleNumbers numbers =
-                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
-        CharSequence grouped =
-                numbers.breakable(numbers.stack("111111111111111111", android.graphics.Color.GRAY));
-        android.text.TextPaint paint = new android.text.TextPaint();
-        paint.setTypeface(android.graphics.Typeface.MONOSPACE);
-        paint.setTextSize(32);
-        int width = (int) Math.ceil(android.text.Layout.getDesiredWidth("111111111", paint));
-        String balanced = BalancedLines.apply(grouped, paint, width).toString();
-        String[] lines = balanced.split("\n", -1);
-        assertEquals(2, lines.length);
-        for (String line : lines)
-            assertEquals(9, line.replace("\u2060", "").length());
-    }
-
-    @Test
     public void mixedDisplayCopyAndFactorisationThroughRemoteProcess() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context);
@@ -399,6 +382,73 @@ public final class FunctionsTest {
                             sine.performClick();
                             assertEquals("sin", command.get().wire);
                         });
+    }
+
+    @Test
+    public void logarithmAndItsInverseFollowTheDisplayedRadix() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        AtomicReference<Command> command = new AtomicReference<>();
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            CalculatorKeypad keypad =
+                                    new CalculatorKeypad(
+                                            context, command::set, true, (expanded, inverse) -> {});
+                            for (RadixMode radix : RadixMode.values()) {
+                                int base = radix.radix;
+                                keypad.setNumberFormat(
+                                        new LocaleNumbers(Locale.US, NumberMode.DOT, radix));
+                                keypad.setInverse(false);
+                                Button logarithm = find(keypad, "log" + base);
+                                assertNotNull(logarithm);
+                                logarithm.performClick();
+                                assertEquals("log" + base, command.get().wire);
+                                android.text.Spanned label =
+                                        (android.text.Spanned) logarithm.getText();
+                                android.text.style.SubscriptSpan[] subscripts =
+                                        label.getSpans(
+                                                0,
+                                                label.length(),
+                                                android.text.style.SubscriptSpan.class);
+                                assertEquals(1, subscripts.length);
+                                assertEquals(
+                                        Integer.toString(base),
+                                        label.subSequence(
+                                                        label.getSpanStart(subscripts[0]),
+                                                        label.getSpanEnd(subscripts[0]))
+                                                .toString());
+                                keypad.setInverse(true);
+                                Button power = find(keypad, base + "ˣ");
+                                assertNotNull(power);
+                                power.performClick();
+                                assertEquals(base + "ˣ", command.get().wire);
+                            }
+                        });
+    }
+
+    @Test
+    public void androidBalancesTheExtraDigitGroupOntoTheFirstLine() {
+        LocaleNumbers numbers =
+                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
+        CharSequence text =
+                numbers.breakable(numbers.stack("111111111111111", android.graphics.Color.GRAY));
+        android.text.TextPaint paint = new android.text.TextPaint();
+        paint.setTypeface(android.graphics.Typeface.MONOSPACE);
+        paint.setTextSize(32);
+        int width = (int) Math.ceil(android.text.Layout.getDesiredWidth("111111111", paint));
+        android.text.StaticLayout layout =
+                android.text.StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
+                        .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
+                        .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
+                        .build();
+        assertEquals(2, layout.getLineCount());
+        int firstDigits = 0, secondDigits = 0;
+        for (int i = layout.getLineStart(0); i < layout.getLineEnd(0); i++)
+            if (Character.isDigit(text.charAt(i))) firstDigits++;
+        for (int i = layout.getLineStart(1); i < layout.getLineEnd(1); i++)
+            if (Character.isDigit(text.charAt(i))) secondDigits++;
+        assertEquals(9, firstDigits);
+        assertEquals(6, secondDigits);
     }
 
     @Test

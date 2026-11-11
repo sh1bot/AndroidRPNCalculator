@@ -115,6 +115,8 @@
     <string name="floor_description">Floor of X: greatest integer no larger than X</string>
     <string name="log10_description">Base ten logarithm of X</string>
     <string name="ten_power_description">Ten to the power of X</string>
+    <string name="logarithm_description">Base %1$d logarithm of X</string>
+    <string name="base_power_description">%1$d to the power of X</string>
     <string name="phi_description">Golden ratio</string>
     <string name="modulo_description">Y modulo X, with the sign of X</string>
     <string name="open_functions">Open functions</string>
