@@ -13,7 +13,7 @@ import android.util.AttributeSet;
 final class FractionTextView extends android.widget.TextView {
     private LocaleNumbers.FractionParts fraction;
     private StaticLayout wholeLayout, numeratorLayout, denominatorLayout;
-    private int contentWidth, leftWidth, rightWidth, fractionGap;
+    private int contentWidth, contentOffset, leftWidth, rightWidth, fractionGap;
 
     FractionTextView(Context context) {
         super(context);
@@ -84,13 +84,21 @@ final class FractionTextView extends android.widget.TextView {
                                     Math.max(
                                             Layout.getDesiredWidth(fraction.numerator, paint),
                                             Layout.getDesiredWidth(fraction.denominator, paint)));
-            if (wholeWanted < half) leftWidth = Math.max(1, wholeWanted);
-            else if (fractionWanted < half)
-                leftWidth = Math.max(1, shared - Math.max(1, fractionWanted));
-            else leftWidth = half;
-            rightWidth = Math.max(1, shared - leftWidth);
+            if (wholeWanted < half && fractionWanted < half) {
+                leftWidth = Math.max(1, wholeWanted);
+                rightWidth = Math.max(1, fractionWanted);
+                contentOffset = Math.max(0, shared - leftWidth - rightWidth);
+            } else {
+                if (wholeWanted < half) leftWidth = Math.max(1, wholeWanted);
+                else if (fractionWanted < half)
+                    leftWidth = Math.max(1, shared - Math.max(1, fractionWanted));
+                else leftWidth = half;
+                rightWidth = Math.max(1, shared - leftWidth);
+                contentOffset = 0;
+            }
             wholeLayout = layout(fraction.whole, leftWidth, paint);
         } else {
+            contentOffset = 0;
             leftWidth = 0;
             rightWidth = contentWidth;
             wholeLayout = null;
@@ -142,11 +150,12 @@ final class FractionTextView extends android.widget.TextView {
         int totalHeight = desiredContentHeight();
         if (wholeLayout != null) {
             canvas.save();
-            canvas.translate(0, (totalHeight - wholeLayout.getHeight()) / 2f);
+            canvas.translate(contentOffset, (totalHeight - wholeLayout.getHeight()) / 2f);
             wholeLayout.draw(canvas);
             canvas.restore();
         }
-        float fractionLeft = wholeLayout == null ? 0 : leftWidth + fractionGap;
+        float fractionLeft =
+                wholeLayout == null ? 0 : contentOffset + leftWidth + fractionGap;
         float fractionTop = (totalHeight - fractionHeight()) / 2f;
         canvas.save();
         canvas.translate(fractionLeft, fractionTop);
