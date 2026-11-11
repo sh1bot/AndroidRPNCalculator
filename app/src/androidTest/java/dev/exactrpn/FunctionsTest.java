@@ -137,6 +137,11 @@ public final class FunctionsTest {
         assertEquals(
                 "123\u2009\u200b456.123\u200b456",
                 grouped.breakable(grouped.stack("123456.123456", 0)).toString());
+        LocaleNumbers hexadecimal =
+                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.HEX);
+        assertEquals(
+                "ABCD\u200bEF01.2345\u200b6789",
+                hexadecimal.breakable(hexadecimal.stack("ABCDEF01.23456789", 0)).toString());
     }
 
     @Test

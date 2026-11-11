@@ -276,6 +276,17 @@ public final class AdaptiveKeypadTest {
                             assertEquals(keypadHeight, keypad.getHeight());
                             assertTrue(digitArea.contains(bounds(find(keypad, "↊"), workspace)));
                             assertEquals(multiply, bounds(find(keypad, "×"), workspace));
+                            Button dozenal = find(keypad, "↊");
+                            android.text.Spanned dozenalLabel =
+                                    (android.text.Spanned) dozenal.getText();
+                            TurnedDigitSpan[] turned =
+                                    dozenalLabel.getSpans(
+                                            0, dozenalLabel.length(), TurnedDigitSpan.class);
+                            assertEquals(1, turned.length);
+                            assertEquals(
+                                    (int) Math.ceil(dozenal.getPaint().measureText("0")),
+                                    turned[0].getSize(
+                                            dozenal.getPaint(), dozenalLabel, 0, 1, null));
 
                             keypad.setNumberFormat(
                                     new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.HEX));
@@ -284,6 +295,10 @@ public final class AdaptiveKeypadTest {
                             assertEquals(keypadHeight, keypad.getHeight());
                             assertTrue(digitArea.contains(bounds(find(keypad, "F"), workspace)));
                             assertEquals(multiply, bounds(find(keypad, "×"), workspace));
+                            assertEquals(
+                                    find(keypad, "0").getPaint().measureText("0"),
+                                    find(keypad, "F").getPaint().measureText("F"),
+                                    .01f);
 
                             find(keypad, "f()").performClick();
                             size(context, workspace, 392, 700);

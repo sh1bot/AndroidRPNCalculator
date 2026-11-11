@@ -220,15 +220,16 @@ public final class LocaleNumbers {
         if (grouped) return;
         java.util.List<Integer> digits = new java.util.ArrayList<>();
         for (int i = start; i < end; i++) if (digit(text.charAt(i))) digits.add(i);
-        for (int fromRight = 3; fromRight < digits.size(); fromRight += 3)
+        int group = radixMode.grouping;
+        for (int fromRight = group; fromRight < digits.size(); fromRight += group)
             breaks.add(digits.get(digits.size() - fromRight));
     }
 
     private void addFractionBreaks(
             CharSequence text, int start, int end, java.util.Set<Integer> breaks) {
-        int digits = 0;
+        int digits = 0, group = radixMode.grouping;
         for (int i = start; i < end; i++)
-            if (digit(text.charAt(i)) && ++digits % 3 == 0 && i + 1 < end) breaks.add(i + 1);
+            if (digit(text.charAt(i)) && ++digits % group == 0 && i + 1 < end) breaks.add(i + 1);
     }
 
     private void appendExponent(SpannableStringBuilder text, String exponent) {

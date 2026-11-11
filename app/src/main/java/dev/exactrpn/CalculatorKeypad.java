@@ -453,7 +453,13 @@ public final class CalculatorKeypad extends ViewGroup {
         button.setTag(key);
         buttons.put(definition, button);
         styleKey(key, button);
-        if (EntryEditor.isEntryKey(key)) button.setFontFeatureSettings("tnum");
+        if (EntryEditor.isEntryKey(key)) {
+            button.setTypeface(
+                    android.graphics.Typeface.create(
+                            radixMode == RadixMode.DECIMAL ? "sans-serif" : "monospace",
+                            android.graphics.Typeface.NORMAL));
+            button.setFontFeatureSettings("tnum");
+        }
         bindButton(definition, button);
         return button;
     }

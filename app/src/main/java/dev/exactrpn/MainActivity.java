@@ -197,7 +197,13 @@ public class MainActivity extends Activity {
     }
 
     private void digits(TextView t) {
-        t.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        digits(t, RadixMode.DECIMAL);
+    }
+
+    private void digits(TextView t, RadixMode radix) {
+        t.setTypeface(
+                Typeface.create(
+                        radix == RadixMode.DECIMAL ? "sans-serif" : "monospace", Typeface.NORMAL));
         t.setFontFeatureSettings("tnum");
     }
 
@@ -432,6 +438,7 @@ public class MainActivity extends Activity {
         if (rendered != display || selectionDirty) {
             numbers = numberFormat(display.numberMode, display.radixMode);
             keys.setNumberFormat(numbers);
+            boolean selectionChange = selectionDirty;
             boolean stackChanged =
                     selectionDirty
                             || rendered == null
@@ -440,18 +447,15 @@ public class MainActivity extends Activity {
                             || rendered.radixMode != display.radixMode
                             || rendered.editing != display.editing
                             || !rendered.rows.equals(display.rows);
+            boolean follow = stackChanged && !selectionChange;
             selectionDirty = false;
             if (stackChanged) {
-                rowRenderer.render(stackRows, display, numbers, session.selectedRows);
+                rowRenderer.render(stackRows, display, numbers, session.selectedRows, follow);
             }
 
             refreshEntry(display);
             refreshModes(display);
             saveDisplayPreferences(display);
-            boolean follow =
-                    rendered == null
-                            || rendered.editing != display.editing
-                            || !rendered.rows.equals(display.rows);
             rendered = display;
             // A second post runs after the updated rows have been measured. Do not repeatedly
             // scroll on polling ticks: the user must still be able to inspect older entries.
@@ -857,6 +861,7 @@ public class MainActivity extends Activity {
     private void refreshEntry(Display display) {
         changingEntry = true;
         try {
+            digits(entryView, display.radixMode);
             entryShowsRaw = display.raw;
             entryView.setVisibility(display.editing ? View.VISIBLE : View.GONE);
             String entry = display.raw ? display.entry : numbers.entry(display.entry);
