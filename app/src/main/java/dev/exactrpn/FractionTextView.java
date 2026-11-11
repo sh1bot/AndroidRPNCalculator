@@ -6,6 +6,7 @@ import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.text.Layout;
 import android.text.StaticLayout;
+import android.text.TextPaint;
 import android.util.AttributeSet;
 
 /** A TextView which can draw a wrapped fraction with a real horizontal fraction bar. */
@@ -54,8 +55,8 @@ final class FractionTextView extends android.widget.TextView {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
-    private StaticLayout layout(CharSequence text, int width) {
-        return StaticLayout.Builder.obtain(text, 0, text.length(), getPaint(), Math.max(1, width))
+    private StaticLayout layout(CharSequence text, int width, TextPaint paint) {
+        return StaticLayout.Builder.obtain(text, 0, text.length(), paint, Math.max(1, width))
                 .setAlignment(Layout.Alignment.ALIGN_OPPOSITE)
                 .setIncludePad(getIncludeFontPadding())
                 .setBreakStrategy(Layout.BREAK_STRATEGY_BALANCED)
@@ -68,17 +69,22 @@ final class FractionTextView extends android.widget.TextView {
         if (fraction == null) return;
         contentWidth = Math.max(1, width);
         fractionGap = dp(8);
+        TextPaint paint = new TextPaint(getPaint());
+        // TextView normally resolves its ColorStateList immediately before its own draw pass.
+        // These independent layouts bypass that pass, so carry the resolved theme colour in
+        // their base paint explicitly.
+        paint.setColor(getCurrentTextColor());
         if (fraction.mixed()) {
             leftWidth = Math.max(1, (contentWidth - fractionGap) / 2);
             rightWidth = Math.max(1, contentWidth - fractionGap - leftWidth);
-            wholeLayout = layout(fraction.whole, leftWidth);
+            wholeLayout = layout(fraction.whole, leftWidth, paint);
         } else {
             leftWidth = 0;
             rightWidth = contentWidth;
             wholeLayout = null;
         }
-        numeratorLayout = layout(fraction.numerator, rightWidth);
-        denominatorLayout = layout(fraction.denominator, rightWidth);
+        numeratorLayout = layout(fraction.numerator, rightWidth, paint);
+        denominatorLayout = layout(fraction.denominator, rightWidth, paint);
     }
 
     private int fractionHeight() {
@@ -136,6 +142,7 @@ final class FractionTextView extends android.widget.TextView {
         float lineY = numeratorLayout.getHeight() + dp(3);
         float lineWidth = Math.max(widest(numeratorLayout), widest(denominatorLayout));
         Paint line = new Paint(getPaint());
+        line.setColor(getCurrentTextColor());
         line.setStyle(Paint.Style.STROKE);
         line.setStrokeWidth(Math.max(1, dp(1)));
         canvas.drawLine(rightWidth - lineWidth, lineY, rightWidth, lineY, line);
