@@ -98,6 +98,22 @@ public final class LocaleNumbers {
             text.append(")");
             return styleDozenal(text);
         }
+        if (number.startsWith("(")) {
+            int close = number.lastIndexOf(')');
+            if (close > 0 && close + 2 < number.length()) {
+                char marker = number.charAt(close + 1);
+                if (marker == 'e' || marker == 'b') {
+                    text.append("(");
+                    text.append(stack(number.substring(1, close), groupingColor));
+                    text.append(")");
+                    appendExponent(
+                            text,
+                            number.substring(close + 2),
+                            marker == 'b' ? "2" : "10");
+                    return styleDozenal(text);
+                }
+            }
+        }
         if (number.contains("(")) {
             text.append(entry(number));
             return styleDozenal(text);
@@ -248,6 +264,11 @@ public final class LocaleNumbers {
     }
 
     private void appendExponent(SpannableStringBuilder text, String exponent) {
+        appendExponent(text, exponent, "10");
+    }
+
+    private void appendExponent(
+            SpannableStringBuilder text, String exponent, String base) {
         int start = text.length();
         text.append("\u2009×");
         text.setSpan(
@@ -260,7 +281,7 @@ public final class LocaleNumbers {
                 start,
                 text.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        text.append(entry("10"));
+        text.append(entry(base));
         text.setSpan(
                 new RelativeSizeSpan(ExponentMarkerSpan.MARKER_SCALE),
                 start + 2,

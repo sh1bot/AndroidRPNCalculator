@@ -61,6 +61,50 @@ public final class ValueFormatter {
         return fraction(rational, mode == FractionMode.MIXED, value.base);
     }
 
+    /** A one-line fallback which preserves a useful exact power when that is shorter. */
+    public static String compact(
+            NumericValue value, Notation notation, FractionMode mode) {
+        String ordinary = format(value, false, notation);
+        if (mode == FractionMode.DECIMAL || value.rational == null) return ordinary;
+        String active = scaledFraction(value, mode, value.base, 'e');
+        String binary = value.base == 2 ? null : scaledFraction(value, mode, 2, 'b');
+        String scaled = binary != null && (active == null || binary.length() < active.length())
+                ? binary : active;
+        return scaled != null && scaled.length() < ordinary.length() ? scaled : ordinary;
+    }
+
+    private static String scaledFraction(
+            NumericValue value, FractionMode mode, int powerBase, char marker) {
+        RationalValue rational = value.rational;
+        BigInteger numerator = rational.numerator, denominator = rational.denominator;
+        BigInteger base = BigInteger.valueOf(powerBase);
+        int power = 0;
+        if (powerBase == 2) {
+            int numeratorPower = numerator.signum() == 0 ? 0 : numerator.abs().getLowestSetBit();
+            int denominatorPower = denominator.getLowestSetBit();
+            power = numeratorPower - denominatorPower;
+            if (power > 0) numerator = numerator.shiftRight(power);
+            else if (power < 0) denominator = denominator.shiftRight(-power);
+        } else {
+            while (numerator.signum() != 0 && numerator.mod(base).signum() == 0) {
+                numerator = numerator.divide(base);
+                power++;
+            }
+            while (denominator.mod(base).signum() == 0) {
+                denominator = denominator.divide(base);
+                power--;
+            }
+        }
+        if (power == 0) return null;
+        String ratio =
+                fraction(
+                        new RationalValue(numerator, denominator),
+                        mode == FractionMode.MIXED,
+                        value.base);
+        return "(" + ratio + ")" + marker + (power >= 0 ? "+" : "−")
+                + radixDigits(Math.abs(power), value.base);
+    }
+
     public static String clipboard(NumericValue value, Notation notation) {
         return clipboard(value, notation, FractionMode.DECIMAL);
     }

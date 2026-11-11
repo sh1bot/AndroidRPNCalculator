@@ -99,7 +99,7 @@ final class Display {
                     ValueFormatter.format(value, i == values.size() - 1, notation, fractionMode);
             String fraction = ValueFormatter.exactFraction(value, fractionMode);
             full.add(fraction == null ? formatted : fraction);
-            compact.add(ValueFormatter.format(value, false, notation));
+            compact.add(ValueFormatter.compact(value, notation, fractionMode));
         }
         fullRows = Collections.unmodifiableList(full);
         compactRows = Collections.unmodifiableList(compact);

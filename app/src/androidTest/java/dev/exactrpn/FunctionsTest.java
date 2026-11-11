@@ -196,6 +196,14 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void scaledFractionStylesItsFractionAndChosenPowerBase() {
+        LocaleNumbers numbers =
+                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
+        assertEquals("(1/7)\u2009×10+999", numbers.stack("(1/7)e+999", 0).toString());
+        assertEquals("(617/125)\u2009×2+998", numbers.stack("(617/125)b+998", 0).toString());
+    }
+
+    @Test
     public void compactMixedFractionHasNoLargeInternalGap() {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         LocaleNumbers numbers =

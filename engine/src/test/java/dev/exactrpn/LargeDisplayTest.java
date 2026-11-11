@@ -25,6 +25,27 @@ final class LargeDisplayTest {
     }
 
     @Test
+    void compactFractionsRetainShortExactPowers() {
+        var decimal =
+                RpnCalculator.parse("1e999").divide(new com.android.calculator2.UnifiedReal(7));
+        assertEquals(
+                "(1/7)e+999",
+                ValueFormatter.compact(
+                        NumericEvaluator.read(decimal, NumericRequest.DEFAULT),
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        FractionMode.IMPROPER));
+        var binary =
+                RpnCalculator.parse("1.234").multiply(
+                        new com.android.calculator2.UnifiedReal(java.math.BigInteger.TWO.pow(1000)));
+        assertEquals(
+                "(617/125)b+998",
+                ValueFormatter.compact(
+                        NumericEvaluator.read(binary, NumericRequest.DEFAULT),
+                        ValueFormatter.Notation.SCIENTIFIC,
+                        FractionMode.IMPROPER));
+    }
+
+    @Test
     void displayLimitsDoNotTruncateExactDecimalCopies() {
         java.math.BigInteger numerator =
                 java.math.BigInteger.TEN
