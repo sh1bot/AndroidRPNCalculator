@@ -10,7 +10,7 @@ public final class ValueFormatter {
         ENGINEERING
     }
 
-    private static final int DIGITS = 12, MAX_INLINE_DIGITS = 1000;
+    private static final int DIGITS = 12, MAX_WIDE_DIGITS = 40, MAX_INLINE_DIGITS = 1000;
 
     private ValueFormatter() {}
 
@@ -37,7 +37,7 @@ public final class ValueFormatter {
                 if (text != null && text.length() <= MAX_INLINE_DIGITS + 2) return text;
             }
         }
-        return approximation(value, notation, DIGITS, true);
+        return approximation(value, notation, DIGITS, true, newest);
     }
 
     public static String clipboard(NumericValue value, Notation notation, FractionMode mode) {
@@ -47,7 +47,7 @@ public final class ValueFormatter {
             String text = terminating(value.rational, value.base);
             if (text != null) return text;
         }
-        return approximation(value, notation, 40, false).replace('\u2212', '-');
+        return approximation(value, notation, 40, false, false).replace('\u2212', '-');
     }
 
     /** Exact fraction text for a caller which can measure it, or null when none is available. */
@@ -155,7 +155,11 @@ public final class ValueFormatter {
     }
 
     private static String approximation(
-            NumericValue value, Notation notation, int significantDigits, boolean mark) {
+            NumericValue value,
+            Notation notation,
+            int significantDigits,
+            boolean mark,
+            boolean preferPlain) {
         if (value.zeroBound != 0)
             return mark
                     ? "\u2248 0 (|x| < 1"
@@ -169,7 +173,8 @@ public final class ValueFormatter {
         boolean negative = value.num.signum() < 0;
         String number = digits(value.num.abs(), value.base);
         int exponent = number.length() - value.scale - 1;
-        if (exponent >= -6 && exponent < significantDigits)
+        if (exponent >= -6 && exponent < significantDigits
+                || preferPlain && Math.abs((long) exponent) <= MAX_WIDE_DIGITS)
             return prefix + (negative ? "-" : "") + plain(number, value.scale);
         int group = RadixMode.of(value.base).grouping;
         int power =
