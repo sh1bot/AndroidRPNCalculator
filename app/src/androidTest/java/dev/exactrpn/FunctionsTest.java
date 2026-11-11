@@ -196,6 +196,23 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void balancingUsesTheMinimumLineCountAndWholeDigitGroups() {
+        LocaleNumbers numbers =
+                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
+        CharSequence grouped =
+                numbers.breakable(numbers.stack("111111111111111111", android.graphics.Color.GRAY));
+        android.text.TextPaint paint = new android.text.TextPaint();
+        paint.setTypeface(android.graphics.Typeface.MONOSPACE);
+        paint.setTextSize(32);
+        int width = (int) Math.ceil(android.text.Layout.getDesiredWidth("111111111", paint));
+        String balanced = BalancedLines.apply(grouped, paint, width).toString();
+        String[] lines = balanced.split("\n", -1);
+        assertEquals(2, lines.length);
+        for (String line : lines)
+            assertEquals(9, line.replace("\u2060", "").length());
+    }
+
+    @Test
     public void mixedDisplayCopyAndFactorisationThroughRemoteProcess() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context);

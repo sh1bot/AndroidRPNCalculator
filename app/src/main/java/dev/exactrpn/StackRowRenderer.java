@@ -127,9 +127,14 @@ final class StackRowRenderer {
                     int fullSize =
                             fullNumber.startsWith("≈") ? fittedSize(full, measure, width) : 32;
                     measure.setTextSize(sp(fullSize));
+                    CharSequence balancedFull = BalancedLines.apply(full, measure, width);
                     android.text.StaticLayout layout =
                             android.text.StaticLayout.Builder.obtain(
-                                            full, 0, full.length(), measure, width)
+                                            balancedFull,
+                                            0,
+                                            balancedFull.length(),
+                                            measure,
+                                            width)
                                     .setIncludePad(value.getIncludeFontPadding())
                                     .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE)
                                     .setHyphenationFrequency(value.getHyphenationFrequency())
@@ -155,18 +160,22 @@ final class StackRowRenderer {
                         }
                     }
                     boolean fullChosen = fitsInline || stacked;
-                    CharSequence chosen = fullChosen ? full : compact;
                     int size =
                             fitsInline
                                     ? fullSize
                                     : stacked
                                             ? stackedSize
                                             : fittedSize(compact, measure, width);
+                    measure.setTextSize(sp(size));
+                    CharSequence chosen =
+                            fullChosen
+                                    ? balancedFull
+                                    : BalancedLines.apply(compact, measure, width);
                     if (value.getTextSize() != sp(size)) value.setTextSize(size);
                     value.setEllipsize(fullChosen ? null : android.text.TextUtils.TruncateAt.END);
                     int lines = fitsInline ? layout.getLineCount() : stacked ? Integer.MAX_VALUE : 1;
                     if (value.getMaxLines() != lines) value.setMaxLines(lines);
-                    if (stacked) value.stackedFraction(fraction, full);
+                    if (stacked) value.stackedFraction(fraction, balancedFull);
                     else value.inlineText(chosen);
                     updateStackLabel(label, depth, fullChosen ? fullNumber : compactNumber);
                     value.requestLayout();
