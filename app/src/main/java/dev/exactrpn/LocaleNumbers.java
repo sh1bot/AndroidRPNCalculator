@@ -249,7 +249,7 @@ public final class LocaleNumbers {
 
     private void appendExponent(SpannableStringBuilder text, String exponent) {
         int start = text.length();
-        text.append("\u2009×").append(entry("10"));
+        text.append("\u2009×");
         text.setSpan(
                 new RelativeSizeSpan(ExponentMarkerSpan.MARKER_SCALE),
                 start,
@@ -258,6 +258,12 @@ public final class LocaleNumbers {
         text.setSpan(
                 new TypefaceSpan("sans-serif"),
                 start,
+                text.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        text.append(entry("10"));
+        text.setSpan(
+                new RelativeSizeSpan(ExponentMarkerSpan.MARKER_SCALE),
+                start + 2,
                 text.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         start = text.length();
@@ -377,6 +383,38 @@ public final class LocaleNumbers {
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
+    }
+
+    static final class FractionParts {
+        final CharSequence whole, numerator, denominator;
+
+        FractionParts(CharSequence whole, CharSequence numerator, CharSequence denominator) {
+            this.whole = whole;
+            this.numerator = numerator;
+            this.denominator = denominator;
+        }
+
+        boolean mixed() {
+            return whole.length() != 0;
+        }
+    }
+
+    FractionParts fractionParts(String canonical, int groupingColor) {
+        int slash = canonical.indexOf('/');
+        if (slash < 0) return null;
+        int space = canonical.indexOf(' ');
+        String whole = space >= 0 && space < slash ? canonical.substring(0, space) : "";
+        String numerator = canonical.substring(space >= 0 && space < slash ? space + 1 : 0, slash);
+        return new FractionParts(
+                breakable(integer(whole, groupingColor)),
+                breakable(integer(numerator, groupingColor)),
+                breakable(integer(canonical.substring(slash + 1), groupingColor)));
+    }
+
+    private CharSequence integer(String canonical, int groupingColor) {
+        SpannableStringBuilder text = new SpannableStringBuilder();
+        if (!canonical.isEmpty()) appendInteger(text, canonical, groupingColor);
+        return styleDozenal(text);
     }
 
     public NumberText.Profile profile() {

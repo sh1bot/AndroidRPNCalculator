@@ -10,15 +10,17 @@ import android.text.style.ReplacementSpan;
 final class ExponentMarkerSpan extends ReplacementSpan {
     static final float MARKER_SCALE = .75f, INDEX_SCALE = .72f;
     private final String marker;
+    private final int operatorLength;
 
     ExponentMarkerSpan(String localizedTen) {
         marker = "\u2009×" + localizedTen;
+        operatorLength = 2;
     }
 
-    private Paint markerPaint(Paint paint) {
+    private Paint markerPaint(Paint paint, boolean operator) {
         Paint result = new Paint(paint);
         result.setTextSize(paint.getTextSize() * MARKER_SCALE);
-        result.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+        if (operator) result.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         return result;
     }
 
@@ -26,7 +28,11 @@ final class ExponentMarkerSpan extends ReplacementSpan {
     public int getSize(
             Paint paint, CharSequence text, int start, int end, Paint.FontMetricsInt metrics) {
         if (metrics != null) paint.getFontMetricsInt(metrics);
-        return (int) Math.ceil(markerPaint(paint).measureText(marker));
+        Paint operator = markerPaint(paint, true), digits = markerPaint(paint, false);
+        return (int)
+                Math.ceil(
+                        operator.measureText(marker, 0, operatorLength)
+                                + digits.measureText(marker, operatorLength, marker.length()));
     }
 
     @Override
@@ -40,6 +46,14 @@ final class ExponentMarkerSpan extends ReplacementSpan {
             int y,
             int bottom,
             Paint paint) {
-        canvas.drawText(marker, x, y, markerPaint(paint));
+        Paint operator = markerPaint(paint, true), digits = markerPaint(paint, false);
+        canvas.drawText(marker, 0, operatorLength, x, y, operator);
+        canvas.drawText(
+                marker,
+                operatorLength,
+                marker.length(),
+                x + operator.measureText(marker, 0, operatorLength),
+                y,
+                digits);
     }
 }

@@ -33,12 +33,15 @@ final class StackRowRenderer {
         return Math.round(n * context.getResources().getDisplayMetrics().density);
     }
 
-    private TextView text(int size) {
-        TextView value = new TextView(context);
+    private <T extends TextView> T text(T value, int size) {
         value.setTextSize(size);
         value.setTextColor(colors.text);
         value.setPadding(dp(4), dp(6), dp(4), dp(6));
         return value;
+    }
+
+    private TextView text(int size) {
+        return text(new TextView(context), size);
     }
 
     private float sp(int size) {
@@ -89,7 +92,7 @@ final class StackRowRenderer {
     }
 
     private void fitBottomRow(
-            TextView value,
+            FractionTextView value,
             TextView label,
             LinearLayout row,
             LinearLayout stackRows,
@@ -104,6 +107,8 @@ final class StackRowRenderer {
                 numbers.breakable(numbers.stack(withoutApproximation(fullNumber), colors.muted));
         CharSequence compact =
                 numbers.breakable(numbers.stack(withoutApproximation(compactNumber), colors.muted));
+        LocaleNumbers.FractionParts fraction =
+                numbers.fractionParts(withoutApproximation(fullNumber), colors.muted);
         int[] previousSize = {-1, -1};
         Runnable fit =
                 () -> {
@@ -132,26 +137,43 @@ final class StackRowRenderer {
                                             value.getLineSpacingExtra(),
                                             value.getLineSpacingMultiplier())
                                     .build();
-                    boolean fits =
+                    boolean fitsInline =
                             layout.getHeight() + value.getPaddingTop() + value.getPaddingBottom()
                                     <= height;
-                    for (int line = 0; fits && line < layout.getLineCount(); line++)
-                        if (layout.getLineWidth(line) > width) fits = false;
-                    CharSequence chosen = fits ? full : compact;
-                    int size = fits ? fullSize : fittedSize(compact, measure, width);
+                    for (int line = 0; fitsInline && line < layout.getLineCount(); line++)
+                        if (layout.getLineWidth(line) > width) fitsInline = false;
+                    boolean stacked = false;
+                    int stackedSize = 32;
+                    if (!fitsInline && fraction != null) {
+                        for (; stackedSize >= 16; stackedSize--) {
+                            value.setTextSize(stackedSize);
+                            if (value.stackedHeight(fraction, width) <= height) {
+                                stacked = true;
+                                break;
+                            }
+                        }
+                    }
+                    boolean fullChosen = fitsInline || stacked;
+                    CharSequence chosen = fullChosen ? full : compact;
+                    int size =
+                            fitsInline
+                                    ? fullSize
+                                    : stacked
+                                            ? stackedSize
+                                            : fittedSize(compact, measure, width);
                     if (value.getTextSize() != sp(size)) value.setTextSize(size);
-                    value.setEllipsize(fits ? null : android.text.TextUtils.TruncateAt.END);
-                    int lines = fits ? layout.getLineCount() : 1;
+                    value.setEllipsize(fullChosen ? null : android.text.TextUtils.TruncateAt.END);
+                    int lines = fitsInline ? layout.getLineCount() : stacked ? Integer.MAX_VALUE : 1;
                     if (value.getMaxLines() != lines) value.setMaxLines(lines);
-                    if (!value.getText().toString().equals(chosen.toString()))
-                        value.setText(chosen);
-                    updateStackLabel(label, depth, fits ? fullNumber : compactNumber);
+                    if (stacked) value.stackedFraction(fraction, full);
+                    else value.inlineText(chosen);
+                    updateStackLabel(label, depth, fullChosen ? fullNumber : compactNumber);
                     value.requestLayout();
                     row.setContentDescription(
                             rowDescription(
                                     false,
                                     depth,
-                                    (fits ? fullNumber : compactNumber).startsWith("≈ "),
+                                    (fullChosen ? fullNumber : compactNumber).startsWith("≈ "),
                                     chosen));
                 };
         // Fit before drawing, and let a requested relayout finish before showing the row.
@@ -246,7 +268,7 @@ final class StackRowRenderer {
             label.setTextColor(colors.muted);
             row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
             boolean result = !display.editing && depth == 1;
-            TextView value = text(result ? 32 : 22);
+            FractionTextView value = text(new FractionTextView(context), result ? 32 : 22);
             digits(value);
             value.setGravity(Gravity.END);
             value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
@@ -268,7 +290,7 @@ final class StackRowRenderer {
                                     new android.text.TextPaint(value.getPaint()),
                                     initialWidth));
             }
-            value.setText(initialText);
+            value.inlineText(initialText);
             value.setMaxLines(1);
             value.setEllipsize(android.text.TextUtils.TruncateAt.END);
             if (!result) {
