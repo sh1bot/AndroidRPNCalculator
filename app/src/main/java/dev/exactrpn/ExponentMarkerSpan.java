@@ -3,6 +3,7 @@ package dev.exactrpn;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Typeface;
 import android.text.style.ReplacementSpan;
 
 /** Render the single editable e/E character as a small multiplication-by-ten marker. */
@@ -17,6 +18,7 @@ final class ExponentMarkerSpan extends ReplacementSpan {
     private Paint markerPaint(Paint paint) {
         Paint result = new Paint(paint);
         result.setTextSize(paint.getTextSize() * MARKER_SCALE);
+        result.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
         return result;
     }
 
