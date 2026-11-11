@@ -29,6 +29,10 @@ public enum Operation {
     CEIL(CalculatorKey.CEIL, 1),
     LOG10(CalculatorKey.LOG10, 1),
     TEN_POWER(CalculatorKey.TEN_POWER, 1),
+    LOG12(CalculatorKey.LOG12, 1),
+    TWELVE_POWER(CalculatorKey.TWELVE_POWER, 1),
+    LOG16(CalculatorKey.LOG16, 1),
+    SIXTEEN_POWER(CalculatorKey.SIXTEEN_POWER, 1),
     LN(CalculatorKey.LN, 1),
     EXP(CalculatorKey.EXP, 1),
     SIN(CalculatorKey.SIN, 1, true),
@@ -55,7 +59,11 @@ public enum Operation {
     }
 
     Operation(CalculatorKey key, int arity, boolean angle) {
-        this.key = key.wire;
+        this(key.wire, arity, angle);
+    }
+
+    Operation(String key, int arity, boolean angle) {
+        this.key = key;
         this.arity = arity;
         this.angle = angle;
     }
@@ -104,6 +112,14 @@ public enum Operation {
                 return a.ln().divide(new UnifiedReal(10).ln());
             case TEN_POWER:
                 return new UnifiedReal(10).pow(a);
+            case LOG12:
+                return a.ln().divide(new UnifiedReal(12).ln());
+            case TWELVE_POWER:
+                return new UnifiedReal(12).pow(a);
+            case LOG16:
+                return a.ln().divide(new UnifiedReal(16).ln());
+            case SIXTEEN_POWER:
+                return new UnifiedReal(16).pow(a);
             case ADD:
                 return a.add(b);
             case SUBTRACT:
