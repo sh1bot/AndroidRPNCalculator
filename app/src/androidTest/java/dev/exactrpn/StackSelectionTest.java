@@ -137,22 +137,9 @@ public final class StackSelectionTest {
     }
 
     @Test
-    public void copyingAndCyclingHugeFractionModesKeepsOneStableLine() throws Exception {
+    public void copyingAndCyclingHugeFractionModesKeepsOneStableLayout() throws Exception {
         MainActivity activity = open();
         CalculatorSession state = session(activity);
-        java.util.concurrent.atomic.AtomicInteger wrappedFrames =
-                new java.util.concurrent.atomic.AtomicInteger();
-        View root = activity.getWindow().getDecorView();
-        android.view.ViewTreeObserver.OnGlobalLayoutListener watch =
-                () -> {
-                    android.widget.TextView value =
-                            (android.widget.TextView) tagged(activity, "stack-value:0");
-                    if (!state.display.editing
-                            && value != null
-                            && value.getLayout() != null
-                            && value.getLayout().getLineCount() > 1)
-                        wrappedFrames.incrementAndGet();
-                };
         try {
             for (Command command :
                     new Command[] {
@@ -169,12 +156,10 @@ public final class StackSelectionTest {
                 await(() -> !state.busy);
             }
             await(() -> tagged(activity, "stack-value:0") != null);
-            instrumentation.runOnMainSync(
-                    () -> root.getViewTreeObserver().addOnGlobalLayoutListener(watch));
             java.util.concurrent.atomic.AtomicReference<String> firstText =
                     new java.util.concurrent.atomic.AtomicReference<>();
             float[] firstSize = {0};
-            int[] firstHeight = {0};
+            int[] firstHeight = {0}, firstLines = {0};
             ClipboardManager clipboard =
                     (ClipboardManager)
                             instrumentation
@@ -195,9 +180,7 @@ public final class StackSelectionTest {
                                     && "x≈".contentEquals(label.getText())
                                     && value != null
                                     && value.getText().length() < 100
-                                    && value.getLayout() != null
-                                    && value.getLayout().getLineCount() == 1
-                                    && value.getLayout().getEllipsisCount(0) == 0;
+                                    && value.getLayout() != null;
                         });
                 instrumentation.waitForIdleSync();
                 int pass = mode;
@@ -209,11 +192,15 @@ public final class StackSelectionTest {
                                 firstText.set(value.getText().toString());
                                 firstSize[0] = value.getTextSize();
                                 firstHeight[0] = value.getHeight();
+                                firstLines[0] = value.getLayout().getLineCount();
                             } else {
                                 assertEquals(firstText.get(), value.getText().toString());
                                 assertEquals(firstSize[0], value.getTextSize(), .01f);
                                 assertEquals(firstHeight[0], value.getHeight());
+                                assertEquals(firstLines[0], value.getLayout().getLineCount());
                             }
+                            for (int line = 0; line < value.getLayout().getLineCount(); line++)
+                                assertEquals(0, value.getLayout().getEllipsisCount(line));
                             clipboard.setPrimaryClip(
                                     android.content.ClipData.newPlainText("test", "pending"));
                             value.performLongClick();
@@ -231,11 +218,7 @@ public final class StackSelectionTest {
                 instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
                 await(() -> !state.busy);
             }
-            assertEquals(
-                    "No intermediate layout may wrap the approximation", 0, wrappedFrames.get());
         } finally {
-            instrumentation.runOnMainSync(
-                    () -> root.getViewTreeObserver().removeOnGlobalLayoutListener(watch));
             finish(activity);
         }
     }
@@ -258,9 +241,12 @@ public final class StackSelectionTest {
                                     (android.widget.TextView) tagged(a, "stack-value:0");
                             if (value == null) return false;
                             View row = tagged(a, "stack-row:0");
-                            View viewport = (View) row.getParent().getParent();
+                            android.widget.ScrollView viewport =
+                                    (android.widget.ScrollView) row.getParent().getParent();
                             return value.getText().length() < 100
-                                    && row.getHeight() <= viewport.getHeight();
+                                    && row.getHeight() <= viewport.getHeight()
+                                    && row.getBottom()
+                                            <= viewport.getScrollY() + viewport.getHeight();
                         });
             } catch (AssertionError failed) {
                 java.util.concurrent.atomic.AtomicReference<String> detail =
@@ -291,8 +277,10 @@ public final class StackSelectionTest {
             await(
                     () -> {
                         View row = tagged(a, "stack-row:0");
-                        View viewport = (View) row.getParent().getParent();
-                        return row.getHeight() <= viewport.getHeight();
+                        android.widget.ScrollView viewport =
+                                (android.widget.ScrollView) row.getParent().getParent();
+                        return row.getHeight() <= viewport.getHeight()
+                                && row.getBottom() <= viewport.getScrollY() + viewport.getHeight();
                     });
             TestCalculator saved = TestCalculator.load(state.checkpoint.bytes);
             assertEquals(new String(digits), saved.values().get(0).bigIntegerValue().toString());

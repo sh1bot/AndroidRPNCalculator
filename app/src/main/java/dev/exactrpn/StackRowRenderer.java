@@ -48,8 +48,10 @@ final class StackRowRenderer {
                 context.getResources().getDisplayMetrics());
     }
 
-    private void digits(TextView value) {
-        value.setTypeface(Typeface.create("sans-serif", Typeface.NORMAL));
+    private void digits(TextView value, RadixMode radix) {
+        value.setTypeface(
+                Typeface.create(
+                        radix == RadixMode.DECIMAL ? "sans-serif" : "monospace", Typeface.NORMAL));
         value.setFontFeatureSettings("tnum");
     }
 
@@ -95,7 +97,8 @@ final class StackRowRenderer {
             Display display,
             LocaleNumbers numbers,
             int index,
-            int depth) {
+            int depth,
+            boolean followBottom) {
         View viewport = (View) stackRows.getParent();
         String fullNumber = display.rows.get(index), compactNumber = display.compactRows.get(index);
         CharSequence full =
@@ -152,10 +155,19 @@ final class StackRowRenderer {
                 };
         // Fit before drawing, and let a requested relayout finish before showing the row.
         // This avoids painting either the unbounded value or a stale font size for a frame.
+        boolean[] pendingFollow = {followBottom};
         android.view.ViewTreeObserver.OnPreDrawListener fitted =
                 () -> {
                     fit.run();
-                    return !value.isLayoutRequested();
+                    boolean ready = !value.isLayoutRequested();
+                    if (ready && pendingFollow[0]) {
+                        pendingFollow[0] = false;
+                        viewport.post(
+                                () ->
+                                        ((android.widget.ScrollView) viewport)
+                                                .fullScroll(View.FOCUS_DOWN));
+                    }
+                    return ready;
                 };
         value.addOnAttachStateChangeListener(
                 new View.OnAttachStateChangeListener() {
@@ -176,7 +188,8 @@ final class StackRowRenderer {
             LinearLayout stackRows,
             Display display,
             LocaleNumbers numbers,
-            SortedSet<Integer> selectedRows) {
+            SortedSet<Integer> selectedRows,
+            boolean followBottom) {
         selectedRows.removeIf(index -> index >= display.rows.size());
         stackRows.removeAllViews();
         if (display.rows.isEmpty()) {
@@ -218,7 +231,7 @@ final class StackRowRenderer {
                 row.addView(selected, new LinearLayout.LayoutParams(dp(40), dp(40)));
             }
             TextView label = text(12);
-            digits(label);
+            digits(label, RadixMode.DECIMAL);
             label.setSingleLine(true);
             updateStackLabel(label, depth, display.rows.get(i));
             label.setTag("stack-label:" + i);
@@ -233,7 +246,7 @@ final class StackRowRenderer {
             row.addView(label, new LinearLayout.LayoutParams(dp(46), -2));
             boolean result = !display.editing && depth == 1;
             TextView value = text(result ? 32 : 22);
-            digits(value);
+            digits(value, numbers.radixMode());
             value.setGravity(Gravity.END);
             value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
             // Fit from a bounded first layout. A huge exact fraction must never briefly
@@ -250,7 +263,9 @@ final class StackRowRenderer {
                 value.setAutoSizeTextTypeUniformWithConfiguration(
                         12, 22, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
             }
-            if (result) fitBottomRow(value, label, row, stackRows, display, numbers, i, depth);
+            if (result)
+                fitBottomRow(
+                        value, label, row, stackRows, display, numbers, i, depth, followBottom);
             value.setTextIsSelectable(false);
             row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
             value.setTag("stack-value:" + i);
