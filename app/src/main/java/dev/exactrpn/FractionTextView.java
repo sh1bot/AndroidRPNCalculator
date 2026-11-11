@@ -56,6 +56,7 @@ final class FractionTextView extends android.widget.TextView {
     }
 
     private StaticLayout layout(CharSequence text, int width, TextPaint paint) {
+        text = BalancedLines.apply(text, paint, width);
         return StaticLayout.Builder.obtain(text, 0, text.length(), paint, Math.max(1, width))
                 .setAlignment(Layout.Alignment.ALIGN_OPPOSITE)
                 .setIncludePad(getIncludeFontPadding())
