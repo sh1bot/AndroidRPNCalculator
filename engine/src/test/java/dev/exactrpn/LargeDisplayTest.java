@@ -7,6 +7,22 @@ import org.junit.jupiter.api.Test;
 
 final class LargeDisplayTest {
     @Test
+    void exponentialFallbackUsesTheRequestedPrecision() {
+        NumericValue value =
+                new NumericValue(
+                        java.math.BigInteger.valueOf(123456), 10, 3, true, 0, null);
+        assertEquals(
+                "1.23456e+2",
+                ValueFormatter.exponential(value, ValueFormatter.Notation.SCIENTIFIC, 6));
+        assertEquals(
+                "≈ 1.2346e+2",
+                ValueFormatter.exponential(value, ValueFormatter.Notation.SCIENTIFIC, 5));
+        assertEquals(
+                "≈ 123.46e+0",
+                ValueFormatter.exponential(value, ValueFormatter.Notation.ENGINEERING, 5));
+    }
+
+    @Test
     void largeFractionsUseCompactOlderRowsButCopyExactly() {
         var value = RpnCalculator.parse("1e999").divide(new com.android.calculator2.UnifiedReal(7));
         for (FractionMode mode : new FractionMode[] {FractionMode.MIXED, FractionMode.IMPROPER}) {
@@ -22,27 +38,6 @@ final class LargeDisplayTest {
             assertTrue(copied.length() >= 1000);
             assertTrue(copied.endsWith("/7"));
         }
-    }
-
-    @Test
-    void compactFractionsRetainShortExactPowers() {
-        var decimal =
-                RpnCalculator.parse("1e999").divide(new com.android.calculator2.UnifiedReal(7));
-        assertEquals(
-                "(1/7)e+999",
-                ValueFormatter.compact(
-                        NumericEvaluator.read(decimal, NumericRequest.DEFAULT),
-                        ValueFormatter.Notation.SCIENTIFIC,
-                        FractionMode.IMPROPER));
-        var binary =
-                RpnCalculator.parse("1.234").multiply(
-                        new com.android.calculator2.UnifiedReal(java.math.BigInteger.TWO.pow(1000)));
-        assertEquals(
-                "(617/125)b+998",
-                ValueFormatter.compact(
-                        NumericEvaluator.read(binary, NumericRequest.DEFAULT),
-                        ValueFormatter.Notation.SCIENTIFIC,
-                        FractionMode.IMPROPER));
     }
 
     @Test

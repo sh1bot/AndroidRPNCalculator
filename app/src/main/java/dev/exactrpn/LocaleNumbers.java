@@ -98,34 +98,18 @@ public final class LocaleNumbers {
             text.append(")");
             return styleDozenal(text);
         }
-        if (number.startsWith("(")) {
-            int close = number.lastIndexOf(')');
-            if (close > 0 && close + 2 < number.length()) {
-                char marker = number.charAt(close + 1);
-                if (marker == 'e' || marker == 'b') {
-                    text.append("(");
-                    text.append(stack(number.substring(1, close), groupingColor));
-                    text.append(")");
-                    appendExponent(
-                            text,
-                            number.substring(close + 2),
-                            marker == 'b' ? "2" : "10");
-                    return styleDozenal(text);
-                }
-            }
-        }
         if (number.contains("(")) {
             text.append(entry(number));
             return styleDozenal(text);
         }
         int slash = number.indexOf('/');
         if (slash >= 0) {
-            int whole = number.indexOf(' ');
-            String numerator = number.substring(0, slash);
-            if (whole >= 0 && whole < slash) {
-                appendInteger(text, number.substring(0, whole), groupingColor);
-                text.append("\u00a0");
-                numerator = number.substring(whole + 1, slash);
+            int operator = fractionOperator(number, slash);
+            String numerator = number.substring(operator >= 0 ? operator + 1 : 0, slash);
+            if (operator >= 0) {
+                appendInteger(text, number.substring(0, operator), groupingColor);
+                char symbol = number.charAt(operator);
+                text.append(symbol == ' ' ? "\u00a0" : symbol == '-' ? " − " : " + ");
             } else if (numerator.startsWith("-")) {
                 text.append(((DecimalFormat) integers).getNegativePrefix());
                 numerator = numerator.substring(1);
@@ -267,8 +251,7 @@ public final class LocaleNumbers {
         appendExponent(text, exponent, "10");
     }
 
-    private void appendExponent(
-            SpannableStringBuilder text, String exponent, String base) {
+    private void appendExponent(SpannableStringBuilder text, String exponent, String base) {
         int start = text.length();
         text.append("\u2009×");
         text.setSpan(
@@ -423,13 +406,28 @@ public final class LocaleNumbers {
     FractionParts fractionParts(String canonical, int groupingColor) {
         int slash = canonical.indexOf('/');
         if (slash < 0) return null;
-        int space = canonical.indexOf(' ');
-        String whole = space >= 0 && space < slash ? canonical.substring(0, space) : "";
-        String numerator = canonical.substring(space >= 0 && space < slash ? space + 1 : 0, slash);
+        int operator = fractionOperator(canonical, slash);
+        String whole = operator >= 0 && operator < slash ? canonical.substring(0, operator) : "";
+        String numerator =
+                canonical.substring(operator >= 0 && operator < slash ? operator + 1 : 0, slash);
+        SpannableStringBuilder displayedWhole =
+                new SpannableStringBuilder(integer(whole, groupingColor));
+        if (!whole.isEmpty())
+            displayedWhole.append(
+                    operator < canonical.length() && canonical.charAt(operator) == '-'
+                            ? " −"
+                            : " +");
         return new FractionParts(
-                breakable(integer(whole, groupingColor)),
+                breakable(displayedWhole),
                 breakable(integer(numerator, groupingColor)),
                 breakable(integer(canonical.substring(slash + 1), groupingColor)));
+    }
+
+    private static int fractionOperator(String canonical, int slash) {
+        int operator = canonical.indexOf('+');
+        if (operator < 0) operator = canonical.indexOf('-', 1);
+        if (operator < 0) operator = canonical.indexOf(' ');
+        return operator < slash ? operator : -1;
     }
 
     private CharSequence integer(String canonical, int groupingColor) {

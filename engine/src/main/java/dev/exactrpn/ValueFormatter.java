@@ -58,50 +58,57 @@ public final class ValueFormatter {
                 || mode == FractionMode.DECIMAL
                 || !fits(rational.numerator, value.base)
                 || !fits(rational.denominator, value.base)) return null;
-        return fraction(rational, mode == FractionMode.MIXED, value.base);
+        if (mode != FractionMode.MIXED) return fraction(rational, false, value.base);
+        BigInteger[] parts = rational.numerator.abs().divideAndRemainder(rational.denominator);
+        if (parts[0].signum() == 0) return fraction(rational, false, value.base);
+        return (rational.numerator.signum() < 0 ? "-" : "")
+                + digits(parts[0], value.base)
+                + (rational.numerator.signum() < 0 ? "-" : "+")
+                + digits(parts[1], value.base)
+                + "/"
+                + digits(rational.denominator, value.base);
     }
 
-    /** A one-line fallback which preserves a useful exact power when that is shorter. */
-    public static String compact(
-            NumericValue value, Notation notation, FractionMode mode) {
-        String ordinary = format(value, false, notation);
-        if (mode == FractionMode.DECIMAL || value.rational == null) return ordinary;
-        String active = scaledFraction(value, mode, value.base, 'e');
-        String binary = value.base == 2 ? null : scaledFraction(value, mode, 2, 'b');
-        String scaled = binary != null && (active == null || binary.length() < active.length())
-                ? binary : active;
-        return scaled != null && scaled.length() < ordinary.length() ? scaled : ordinary;
-    }
-
-    private static String scaledFraction(
-            NumericValue value, FractionMode mode, int powerBase, char marker) {
-        RationalValue rational = value.rational;
-        BigInteger numerator = rational.numerator, denominator = rational.denominator;
-        BigInteger base = BigInteger.valueOf(powerBase);
-        int power = 0;
-        if (powerBase == 2) {
-            int numeratorPower = numerator.signum() == 0 ? 0 : numerator.abs().getLowestSetBit();
-            int denominatorPower = denominator.getLowestSetBit();
-            power = numeratorPower - denominatorPower;
-            if (power > 0) numerator = numerator.shiftRight(power);
-            else if (power < 0) denominator = denominator.shiftRight(-power);
-        } else {
-            while (numerator.signum() != 0 && numerator.mod(base).signum() == 0) {
-                numerator = numerator.divide(base);
-                power++;
-            }
-            while (denominator.mod(base).signum() == 0) {
-                denominator = denominator.divide(base);
-                power--;
+    /** Forced exponential fallback, rounded to at most the requested significant digits. */
+    public static String exponential(NumericValue value, Notation notation, int significantDigits) {
+        if (significantDigits < 1) throw new IllegalArgumentException("No significant digits");
+        if (value.zeroBound != 0)
+            return approximation(value, notation, significantDigits, true, false);
+        if (value.num.signum() == 0) return "0";
+        BigInteger radix = BigInteger.valueOf(value.base);
+        BigInteger coefficient = value.num.abs();
+        int scale = value.scale;
+        boolean exact = value.exact;
+        int length = coefficient.toString(value.base).length();
+        if (length > significantDigits) {
+            int removed = length - significantDigits;
+            BigInteger divisor = radix.pow(removed);
+            BigInteger[] parts = coefficient.divideAndRemainder(divisor);
+            int halfway = parts[1].shiftLeft(1).compareTo(divisor);
+            coefficient =
+                    halfway > 0 || halfway == 0 && parts[0].testBit(0)
+                            ? parts[0].add(BigInteger.ONE)
+                            : parts[0];
+            scale -= removed;
+            exact = false;
+            if (coefficient.toString(value.base).length() > significantDigits) {
+                coefficient = coefficient.divide(radix);
+                scale--;
             }
         }
-        if (power == 0) return null;
-        String ratio =
-                fraction(
-                        new RationalValue(numerator, denominator),
-                        mode == FractionMode.MIXED,
-                        value.base);
-        return "(" + ratio + ")" + marker + (power >= 0 ? "+" : "−")
+        String number = digits(coefficient, value.base);
+        int exponent = number.length() - scale - 1;
+        int group = RadixMode.of(value.base).grouping;
+        int power =
+                notation == Notation.ENGINEERING
+                        ? Math.floorDiv(exponent, group) * group
+                        : exponent;
+        String mantissa = pointAfter(number, exponent - power + 1);
+        return (exact ? "" : "≈ ")
+                + (value.num.signum() < 0 ? "-" : "")
+                + mantissa
+                + exponentMarker(value.base)
+                + (power >= 0 ? "+" : "−")
                 + radixDigits(Math.abs(power), value.base);
     }
 

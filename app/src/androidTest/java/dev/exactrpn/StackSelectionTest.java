@@ -185,7 +185,8 @@ public final class StackSelectionTest {
                     () -> {
                         View upper = tagged(activity, "stack-value:0");
                         return upper instanceof FractionTextView
-                                && "1/3".contentEquals(((android.widget.TextView) upper).getText());
+                                && "1/3".contentEquals(((android.widget.TextView) upper).getText())
+                                && ((FractionTextView) upper).isStackedFraction();
                     });
         } finally {
             finish(activity);
@@ -261,8 +262,7 @@ public final class StackSelectionTest {
                                     (android.widget.TextView) tagged(activity, "stack-label:0");
                             return expectedMode.contentEquals(modeButton.getText())
                                     && label != null
-                                    && (slot == 0 ? "x≈" : "x:")
-                                            .contentEquals(label.getText())
+                                    && "x≈".contentEquals(label.getText())
                                     && value != null
                                     && value.getText().length() < 100
                                     && value.getLayout() != null;
