@@ -37,6 +37,10 @@ final class FractionTextView extends android.widget.TextView {
         invalidate();
     }
 
+    boolean isStackedFraction() {
+        return fraction != null;
+    }
+
     int stackedHeight(LocaleNumbers.FractionParts parts, int width) {
         LocaleNumbers.FractionParts previous = fraction;
         fraction = parts;

@@ -140,6 +140,7 @@ final class StackRowRenderer {
                     boolean fitsInline =
                             layout.getHeight() + value.getPaddingTop() + value.getPaddingBottom()
                                     <= height;
+                    if (fraction != null && layout.getLineCount() > 1) fitsInline = false;
                     for (int line = 0; fitsInline && line < layout.getLineCount(); line++)
                         if (layout.getLineWidth(line) > width) fitsInline = false;
                     boolean stacked = false;
