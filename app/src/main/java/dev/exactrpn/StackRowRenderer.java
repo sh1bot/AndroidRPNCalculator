@@ -103,7 +103,8 @@ final class StackRowRenderer {
         String fullNumber = display.rows.get(index), compactNumber = display.compactRows.get(index);
         CharSequence full =
                 numbers.breakable(numbers.stack(withoutApproximation(fullNumber), colors.muted));
-        CharSequence compact = numbers.stack(withoutApproximation(compactNumber), colors.muted);
+        CharSequence compact =
+                numbers.breakable(numbers.stack(withoutApproximation(compactNumber), colors.muted));
         int[] previousSize = {-1, -1};
         Runnable fit =
                 () -> {
@@ -119,7 +120,8 @@ final class StackRowRenderer {
                     previousSize[0] = width;
                     previousSize[1] = height;
                     android.text.TextPaint measure = new android.text.TextPaint(value.getPaint());
-                    int fullSize = 32;
+                    int fullSize =
+                            fullNumber.startsWith("≈") ? fittedSize(full, measure, width) : 32;
                     measure.setTextSize(sp(fullSize));
                     android.text.StaticLayout layout =
                             android.text.StaticLayout.Builder.obtain(
