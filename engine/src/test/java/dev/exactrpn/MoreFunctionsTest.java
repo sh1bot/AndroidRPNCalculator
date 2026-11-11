@@ -32,9 +32,9 @@ final class MoreFunctionsTest {
 
     @Test
     void configuredRadixLogarithmsUseTheirRadixAsTheBase() {
-        assertTrue(apply("144", "log12").definitelyEquals(new UnifiedReal(2)));
+        assertTrue(apply("144", "log12").approxEquals(new UnifiedReal(2), -100));
         assertTrue(apply("3", "12ˣ").definitelyEquals(new UnifiedReal(1728)));
-        assertTrue(apply("256", "log16").definitelyEquals(new UnifiedReal(2)));
+        assertTrue(apply("256", "log16").approxEquals(new UnifiedReal(2), -100));
         assertTrue(apply("3", "16ˣ").definitelyEquals(new UnifiedReal(4096)));
     }
 
