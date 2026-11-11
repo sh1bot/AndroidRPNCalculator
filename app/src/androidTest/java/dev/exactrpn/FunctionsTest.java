@@ -196,6 +196,46 @@ public final class FunctionsTest {
     }
 
     @Test
+    public void compactMixedFractionHasNoLargeInternalGap() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        LocaleNumbers numbers =
+                new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.DECIMAL);
+        FractionTextView view = new FractionTextView(context);
+        view.setTextColor(android.graphics.Color.MAGENTA);
+        view.setTextSize(24);
+        view.stackedFraction(
+                numbers.fractionParts("1001 13717421/87717347", android.graphics.Color.MAGENTA),
+                "1001 13717421/87717347");
+        int width = 600;
+        view.measure(
+                android.view.View.MeasureSpec.makeMeasureSpec(
+                        width, android.view.View.MeasureSpec.EXACTLY),
+                android.view.View.MeasureSpec.makeMeasureSpec(
+                        0, android.view.View.MeasureSpec.UNSPECIFIED));
+        view.layout(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight());
+        android.graphics.Bitmap bitmap =
+                android.graphics.Bitmap.createBitmap(
+                        view.getWidth(), view.getHeight(), android.graphics.Bitmap.Config.ARGB_8888);
+        view.draw(new android.graphics.Canvas(bitmap));
+        boolean[] occupied = new boolean[width];
+        for (int x = 0; x < width; x++)
+            for (int y = 0; y < bitmap.getHeight(); y++)
+                if (android.graphics.Color.alpha(bitmap.getPixel(x, y)) != 0) {
+                    occupied[x] = true;
+                    break;
+                }
+        int first = 0, last = width - 1;
+        while (first < width && !occupied[first]) first++;
+        while (last >= first && !occupied[last]) last--;
+        int largestGap = 0, gap = 0;
+        for (int x = first; x <= last; x++) {
+            if (occupied[x]) gap = 0;
+            else largestGap = Math.max(largestGap, ++gap);
+        }
+        assertTrue("internal gap " + largestGap, largestGap < width / 5);
+    }
+
+    @Test
     public void mixedDisplayCopyAndFactorisationThroughRemoteProcess() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context);
