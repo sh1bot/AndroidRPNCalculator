@@ -271,14 +271,24 @@ final class StackRowRenderer {
                                     chosenNumber.startsWith("≈ "),
                                     chosen));
                 };
-        value.getViewTreeObserver()
-                .addOnPreDrawListener(
-                        new android.view.ViewTreeObserver.OnPreDrawListener() {
-                            public boolean onPreDraw() {
-                                fit.run();
-                                return !value.isLayoutRequested();
-                            }
-                        });
+        android.view.ViewTreeObserver.OnPreDrawListener fitted =
+                () -> {
+                    fit.run();
+                    return !value.isLayoutRequested();
+                };
+        value.addOnAttachStateChangeListener(
+                new View.OnAttachStateChangeListener() {
+                    private android.view.ViewTreeObserver observer;
+
+                    public void onViewAttachedToWindow(View v) {
+                        observer = value.getViewTreeObserver();
+                        observer.addOnPreDrawListener(fitted);
+                    }
+
+                    public void onViewDetachedFromWindow(View v) {
+                        if (observer.isAlive()) observer.removeOnPreDrawListener(fitted);
+                    }
+                });
     }
 
     void render(
