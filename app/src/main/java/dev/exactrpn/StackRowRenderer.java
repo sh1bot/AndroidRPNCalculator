@@ -208,6 +208,79 @@ final class StackRowRenderer {
                 });
     }
 
+    private void fitUpperRow(
+            FractionTextView value,
+            TextView label,
+            LinearLayout row,
+            Display display,
+            LocaleNumbers numbers,
+            int index,
+            int depth) {
+        String fullNumber = display.fullRows.get(index);
+        String compactNumber = display.compactRows.get(index);
+        CharSequence full = numbers.stack(withoutApproximation(fullNumber), colors.muted);
+        CharSequence compact = numbers.stack(withoutApproximation(compactNumber), colors.muted);
+        LocaleNumbers.FractionParts fraction =
+                numbers.fractionParts(withoutApproximation(fullNumber), colors.muted);
+        int[] previousWidth = {-1};
+        Runnable fit =
+                () -> {
+                    int width = value.getWidth() - value.getPaddingLeft() - value.getPaddingRight();
+                    if (width <= 0 || width == previousWidth[0]) return;
+                    previousWidth[0] = width;
+                    boolean exact = false;
+                    int fractionSize = 22;
+                    if (fraction != null) {
+                        android.text.TextPaint paint = new android.text.TextPaint(value.getPaint());
+                        paint.setTextSize(sp(22));
+                        if (android.text.Layout.getDesiredWidth(full, paint) <= width) exact = true;
+                        else {
+                            for (; fractionSize >= 12; fractionSize--) {
+                                value.setTextSize(fractionSize);
+                                if (value.stackedComponentsFit(fraction, width)) {
+                                    exact = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    value.setAutoSizeTextTypeWithDefaults(
+                            exact
+                                    ? TextView.AUTO_SIZE_TEXT_TYPE_NONE
+                                    : TextView.AUTO_SIZE_TEXT_TYPE_UNIFORM);
+                    if (exact) {
+                        value.setTextSize(fractionSize);
+                        value.setMaxLines(Integer.MAX_VALUE);
+                        value.setEllipsize(null);
+                        if (fractionSize == 22) value.inlineText(full);
+                        else value.stackedFraction(fraction, full);
+                    } else {
+                        value.inlineText(compact);
+                        value.setMaxLines(1);
+                        value.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                        value.setAutoSizeTextTypeUniformWithConfiguration(
+                                12, 22, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+                    }
+                    String chosenNumber = exact ? fullNumber : compactNumber;
+                    CharSequence chosen = exact ? full : compact;
+                    updateStackLabel(label, depth, chosenNumber);
+                    row.setContentDescription(
+                            rowDescription(
+                                    false,
+                                    depth,
+                                    chosenNumber.startsWith("≈ "),
+                                    chosen));
+                };
+        value.getViewTreeObserver()
+                .addOnPreDrawListener(
+                        new android.view.ViewTreeObserver.OnPreDrawListener() {
+                            public boolean onPreDraw() {
+                                fit.run();
+                                return !value.isLayoutRequested();
+                            }
+                        });
+    }
+
     void render(
             LinearLayout stackRows,
             Display display,
@@ -311,6 +384,7 @@ final class StackRowRenderer {
                 value.setEllipsize(android.text.TextUtils.TruncateAt.END);
                 value.setAutoSizeTextTypeUniformWithConfiguration(
                         12, 22, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+                fitUpperRow(value, label, row, display, numbers, i, depth);
             }
             if (result)
                 fitBottomRow(

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-import java.util.AbstractList;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -93,25 +92,17 @@ final class Display {
             EntryEditor editor) {
         this.values = values;
         ArrayList<String> full = new ArrayList<>(values.size());
-        for (int i = 0; i < values.size(); i++)
-            full.add(
-                    ValueFormatter.format(
-                            values.get(i), i == values.size() - 1, notation, fractionMode));
+        ArrayList<String> compact = new ArrayList<>(values.size());
+        for (int i = 0; i < values.size(); i++) {
+            NumericValue value = values.get(i);
+            String formatted =
+                    ValueFormatter.format(value, i == values.size() - 1, notation, fractionMode);
+            String fraction = ValueFormatter.exactFraction(value, fractionMode);
+            full.add(fraction == null ? formatted : fraction);
+            compact.add(ValueFormatter.format(value, false, notation));
+        }
         fullRows = Collections.unmodifiableList(full);
-        String top =
-                values.isEmpty()
-                        ? ""
-                        : ValueFormatter.format(values.get(values.size() - 1), false, notation);
-        compactRows =
-                new AbstractList<String>() {
-                    public int size() {
-                        return fullRows.size();
-                    }
-
-                    public String get(int index) {
-                        return index == size() - 1 ? top : fullRows.get(index);
-                    }
-                };
+        compactRows = Collections.unmodifiableList(compact);
         this.stackId = stackId;
         this.notation = notation;
         angleUnit = angle;

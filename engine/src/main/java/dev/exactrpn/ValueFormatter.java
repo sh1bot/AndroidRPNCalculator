@@ -50,6 +50,17 @@ public final class ValueFormatter {
         return approximation(value, notation, 40, false).replace('\u2212', '-');
     }
 
+    /** Exact fraction text for a caller which can measure it, or null when none is available. */
+    public static String exactFraction(NumericValue value, FractionMode mode) {
+        RationalValue rational = value.rational;
+        if (rational == null
+                || rational.denominator.equals(BigInteger.ONE)
+                || mode == FractionMode.DECIMAL
+                || !fits(rational.numerator, value.base)
+                || !fits(rational.denominator, value.base)) return null;
+        return fraction(rational, mode == FractionMode.MIXED, value.base);
+    }
+
     public static String clipboard(NumericValue value, Notation notation) {
         return clipboard(value, notation, FractionMode.DECIMAL);
     }
