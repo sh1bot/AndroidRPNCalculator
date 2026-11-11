@@ -7,7 +7,6 @@ import android.icu.text.NumberFormat;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.SubscriptSpan;
 import android.text.style.SuperscriptSpan;
@@ -193,8 +192,23 @@ public final class LocaleNumbers {
             addIntegerBreaks(text, start, end, breaks);
             start = end;
         }
-        for (int position : breaks.descendingSet()) text.insert(position, "\u200b");
+        java.util.NavigableSet<Integer> joins = new java.util.TreeSet<>();
+        for (int position = 1; position < text.length(); position++)
+            if (numericBoundary(text, position) && !breaks.contains(position))
+                joins.add(position);
+        java.util.NavigableSet<Integer> insertions = new java.util.TreeSet<>();
+        insertions.addAll(breaks);
+        insertions.addAll(joins);
+        for (int position : insertions.descendingSet())
+            text.insert(position, breaks.contains(position) ? "\u200b" : "\u2060");
         return text;
+    }
+
+    private boolean numericBoundary(CharSequence text, int position) {
+        char left = text.charAt(position - 1), right = text.charAt(position);
+        boolean leftNumeric = numeric(left) || left == decimalSeparator();
+        boolean rightNumeric = numeric(right) || right == decimalSeparator();
+        return leftNumeric && rightNumeric;
     }
 
     private boolean numeric(char character) {
@@ -357,12 +371,7 @@ public final class LocaleNumbers {
         for (int i = 0; i < localized.length(); i++) {
             if (localized.charAt(i) == symbols.getGroupingSeparator()) {
                 text.setSpan(
-                        new GroupingSeparatorSpan(),
-                        start + i,
-                        start + i + 1,
-                        Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                text.setSpan(
-                        new ForegroundColorSpan(groupingColor),
+                        new GroupingSeparatorSpan(groupingColor),
                         start + i,
                         start + i + 1,
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);

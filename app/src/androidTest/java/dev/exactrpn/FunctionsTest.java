@@ -136,11 +136,11 @@ public final class FunctionsTest {
         LocaleNumbers ungrouped =
                 new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
         assertEquals(
-                "123\u200b456.123\u200b456",
+                "1\u20602\u20603\u200b4\u20605\u20606\u2060.\u20601\u20602\u20603\u200b4\u20605\u20606",
                 ungrouped.breakable(ungrouped.stack("123456.123456", 0)).toString());
         LocaleNumbers grouped = new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.DECIMAL);
         assertEquals(
-                "123\u2009\u200b456.123\u200b456",
+                "1\u20602\u20603\u2060\u2009\u200b4\u20605\u20606\u2060.\u20601\u20602\u20603\u200b4\u20605\u20606",
                 grouped.breakable(grouped.stack("123456.123456", 0)).toString());
         android.text.Spanned groupedDisplay = (android.text.Spanned) grouped.stack("123456", 0);
         GroupingSeparatorSpan[] groupingSpans =
@@ -155,7 +155,7 @@ public final class FunctionsTest {
         LocaleNumbers hexadecimal =
                 new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.HEX);
         assertEquals(
-                "ABCD\u200bEF01.2345\u200b6789",
+                "A\u2060B\u2060C\u2060D\u200bE\u2060F\u20600\u20601\u2060.\u20602\u20603\u20604\u20605\u200b6\u20607\u20608\u20609",
                 hexadecimal.breakable(hexadecimal.stack("ABCDEF01.23456789", 0)).toString());
     }
 

@@ -75,7 +75,8 @@ final class StackRowRenderer {
                         : (approximate
                                 ? R.string.select_level_approximate
                                 : R.string.select_level_value);
-        return context.getString(id, depth, value.toString().replace("\u200b", ""));
+        return context.getString(
+                id, depth, value.toString().replace("\u200b", "").replace("\u2060", ""));
     }
 
     private int fittedSize(CharSequence text, android.text.TextPaint paint, int width) {
