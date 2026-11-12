@@ -13,10 +13,6 @@ public final class NumericValueCache {
     private final Map<NumericRequest, IdentityHashMap<UnifiedReal, NumericValue>> values =
             new HashMap<>();
 
-    public NumericValue read(UnifiedReal value) {
-        return read(value, NumericRequest.DEFAULT);
-    }
-
     public NumericValue read(UnifiedReal value, NumericRequest request) {
         // Precise reads are rare copy/export operations. Do not retain their potentially large
         // exact-rational payloads in the display cache.

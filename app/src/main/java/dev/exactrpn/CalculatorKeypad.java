@@ -221,7 +221,6 @@ public final class CalculatorKeypad extends ViewGroup {
                     case ENTER -> R.string.enter;
                     case CLEAR -> R.string.clear;
                     case SWAP -> R.string.swap;
-                    case DUP -> R.string.duplicate;
                     case FACTOR -> R.string.factor;
                     default -> 0;
                 };

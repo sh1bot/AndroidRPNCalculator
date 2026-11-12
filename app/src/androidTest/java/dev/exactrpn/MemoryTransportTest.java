@@ -83,7 +83,8 @@ public final class MemoryTransportTest {
                                 ValueFormatter.Notation.ENGINEERING,
                                 RpnCalculator.AngleUnit.RAD,
                                 NumberMode.UNGROUPED,
-                                FractionMode.IMPROPER));
+                                FractionMode.IMPROPER,
+                                RadixMode.DECIMAL));
         Display editing = new Display(full, restored);
         assertEquals("123456789012345678901234567890", full.rows.get(3799));
         assertEquals("≈ 123.456789012e+27", editing.rows.get(3798));

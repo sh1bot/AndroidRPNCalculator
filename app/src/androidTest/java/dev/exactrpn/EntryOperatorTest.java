@@ -58,6 +58,7 @@ public final class EntryOperatorTest {
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
                         FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
                         true);
         session.attach(instrumentation.getTargetContext());
         try {
@@ -97,6 +98,7 @@ public final class EntryOperatorTest {
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
                         FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
                         true);
         session.attach(instrumentation.getTargetContext());
         try {
@@ -132,6 +134,7 @@ public final class EntryOperatorTest {
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
                         FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
                         true);
         session.attach(instrumentation.getTargetContext());
         try {
@@ -164,6 +167,7 @@ public final class EntryOperatorTest {
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
                         FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
                         true);
         session.attach(instrumentation.getTargetContext());
         try {
@@ -198,6 +202,7 @@ public final class EntryOperatorTest {
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
                         FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
                         true);
         session.attach(instrumentation.getTargetContext());
         try {
@@ -267,6 +272,7 @@ public final class EntryOperatorTest {
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
                         FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
                         true);
         session.attach(context);
         try {
@@ -289,14 +295,16 @@ public final class EntryOperatorTest {
     @Test
     public void onlyLifecycleCheckpointsAndClosePersistForegroundWork() throws Exception {
         android.content.Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         store.clear();
         CalculatorSession session =
                 new CalculatorSession(
                         ValueFormatter.Notation.SCIENTIFIC,
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
-                        FractionMode.DECIMAL);
+                        FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
+                        false);
         session.attach(context);
         boolean closed = false;
         try {
@@ -339,7 +347,9 @@ public final class EntryOperatorTest {
                             ValueFormatter.Notation.SCIENTIFIC,
                             RpnCalculator.AngleUnit.RAD,
                             NumberMode.DOT,
-                            FractionMode.DECIMAL);
+                            FractionMode.DECIMAL,
+                            RadixMode.DECIMAL,
+                            false);
             resumed.attach(context);
             try {
                 key(resumed, "RESTORE");
@@ -368,14 +378,16 @@ public final class EntryOperatorTest {
     public void stoppingSavesAcceptedMemoryWithoutWaitingForOrCancellingArithmetic()
             throws Exception {
         android.content.Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         store.clear();
         CalculatorSession session =
                 new CalculatorSession(
                         ValueFormatter.Notation.SCIENTIFIC,
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
-                        FractionMode.DECIMAL);
+                        FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
+                        false);
         session.attach(context);
         try {
             key(session, "RESTORE");
@@ -418,14 +430,16 @@ public final class EntryOperatorTest {
     @Test
     public void outstandingWorkUpdatesTheSaveAfterFinishingInBackground() throws Exception {
         android.content.Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         store.clear();
         CalculatorSession session =
                 new CalculatorSession(
                         ValueFormatter.Notation.SCIENTIFIC,
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
-                        FractionMode.DECIMAL);
+                        FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
+                        false);
         session.attach(context);
         CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
         try {
@@ -701,6 +715,7 @@ public final class EntryOperatorTest {
                         RpnCalculator.AngleUnit.RAD,
                         NumberMode.DOT,
                         FractionMode.DECIMAL,
+                        RadixMode.DECIMAL,
                         true);
         session.attach(instrumentation.getTargetContext());
         try {

@@ -41,7 +41,7 @@ public final class CancellationTest {
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
             for (int i = 0; i < 4; i++) {
-                RemoteCalculator remote = new RemoteCalculator(context);
+                RemoteCalculator remote = new RemoteCalculator(context, false);
                 try {
                     DisplayResult result =
                             worker.submit(() -> remote.evaluate(request("RESTORE", null)))
@@ -61,9 +61,9 @@ public final class CancellationTest {
     @Test
     public void cancelStopsWorkerAndPreservesCheckpoint() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        RemoteCalculator remote = new RemoteCalculator(context);
+        RemoteCalculator remote = new RemoteCalculator(context, false);
         ExecutorService worker = Executors.newSingleThreadExecutor();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         File seed = File.createTempFile("cancel-test-", ".state", context.getNoBackupFilesDir());
         try {
             // Equal expressions whose equality the constructive-real engine cannot establish.

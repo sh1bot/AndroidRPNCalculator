@@ -356,13 +356,9 @@ public final class EntryEditor {
         out.writeInt(p.radix);
     }
 
-    static NumberText.Profile readProfile(DataInputStream in, boolean legacy) throws IOException {
+    static NumberText.Profile readProfile(DataInputStream in) throws IOException {
         return new NumberText.Profile(
-                in.readChar(),
-                in.readChar(),
-                in.readInt(),
-                in.readInt(),
-                legacy ? 10 : in.readInt());
+                in.readChar(), in.readChar(), in.readInt(), in.readInt(), in.readInt());
     }
 
     public byte[] save() throws IOException {
@@ -396,16 +392,15 @@ public final class EntryEditor {
     public static EntryEditor load(byte[] bytes) throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
         int magic = in.readInt();
-        boolean legacy = magic == 0x45445431;
-        if (!legacy && magic != 0x45445432) throw new IOException("Unknown entry format");
+        if (magic != 0x45445432) throw new IOException("Unknown entry format");
         EntryEditor result = new EntryEditor();
-        result.inputProfile = readProfile(in, legacy);
-        result.restore(readState(in, legacy));
+        result.inputProfile = readProfile(in);
+        result.restore(readState(in));
         int undos = in.readInt(), redos = in.readInt();
         if (undos < 0 || redos < 0 || undos > 100 || redos > 100 || undos + redos > 100)
             throw new IOException("Invalid entry history");
-        for (int i = 0; i < undos; i++) result.undo.addLast(readState(in, legacy));
-        for (int i = 0; i < redos; i++) result.redo.addLast(readState(in, legacy));
+        for (int i = 0; i < undos; i++) result.undo.addLast(readState(in));
+        for (int i = 0; i < redos; i++) result.redo.addLast(readState(in));
         if (in.available() != 0) throw new IOException("Trailing entry data");
         return result;
     }
@@ -419,11 +414,11 @@ public final class EntryEditor {
         writeProfile(out, state.profile);
     }
 
-    static State readState(DataInputStream in, boolean legacy) throws IOException {
+    static State readState(DataInputStream in) throws IOException {
         String text = in.readUTF();
         boolean editing = in.readBoolean(), raw = in.readBoolean();
         int start = in.readInt(), end = in.readInt();
-        NumberText.Profile profile = readProfile(in, legacy);
+        NumberText.Profile profile = readProfile(in);
         if (text.length() > MAX_ENTRY_LENGTH
                 || start < 0
                 || end < 0

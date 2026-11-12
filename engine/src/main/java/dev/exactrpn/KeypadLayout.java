@@ -31,28 +31,6 @@ public final class KeypadLayout {
             int keyMinimum,
             int controlHeight,
             int stackMinimum,
-            int stackHeightMinimum) {
-        return choose(
-                width,
-                height,
-                expanded,
-                gap,
-                keyMinimum,
-                controlHeight,
-                stackMinimum,
-                stackHeightMinimum,
-                4,
-                5);
-    }
-
-    public static KeypadLayout choose(
-            int width,
-            int height,
-            boolean expanded,
-            int gap,
-            int keyMinimum,
-            int controlHeight,
-            int stackMinimum,
             int stackHeightMinimum,
             int columns,
             int primaryRows) {

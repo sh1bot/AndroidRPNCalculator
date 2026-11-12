@@ -44,7 +44,6 @@
         <item>@string/backspace</item> <!-- DELETE -->
         <item>@string/drop_roll_description</item> <!-- DROP -->
         <item>@string/swap_description</item> <!-- SWAP -->
-        <item>""</item> <!-- DUP -->
         <item>@string/clear_entry</item> <!-- SMART_CLEAR -->
         <item>""</item> <!-- PASTE -->
         <item>""</item> <!-- LEFT -->

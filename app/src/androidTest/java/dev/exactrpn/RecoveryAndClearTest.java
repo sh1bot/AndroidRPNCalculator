@@ -60,7 +60,7 @@ public final class RecoveryAndClearTest {
     @Test
     public void invalidSnapshotsRecoverAndRepeatedCeCannotClearStack() throws Exception {
         Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         File seed = File.createTempFile("recovery-test-", ".state", context.getNoBackupFilesDir());
         File corrupt = new File(context.getNoBackupFilesDir(), "calculator-state.corrupt");
         try {

@@ -136,7 +136,7 @@ public final class LockScreenTest {
     @Test
     public void temporaryActivityNeverRestoresOrChangesTheSavedCalculation() throws Exception {
         Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         File seed = seed(context, store), saved = new File(StoreTestSupport.checkpoint(store));
         byte[] before = Files.readAllBytes(saved.toPath());
         AtomicInteger accesses = new AtomicInteger();
@@ -178,7 +178,7 @@ public final class LockScreenTest {
     @Test
     public void temporaryTransportRejectsFilePathsWithoutReadingSavedState() throws Exception {
         Context context = instrumentation.getTargetContext();
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         File seed = seed(context, store);
         String saved = StoreTestSupport.checkpoint(store);
         AtomicInteger accesses = new AtomicInteger();
@@ -213,7 +213,7 @@ public final class LockScreenTest {
                 "Credential transition test is only for disposable emulators",
                 Build.HARDWARE.contains("ranchu") || Build.HARDWARE.contains("goldfish"));
         assumeFalse("Do not alter an existing credential", manager.isDeviceSecure());
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         File seed = seed(context, store), saved = new File(StoreTestSupport.checkpoint(store));
         byte[] before = Files.readAllBytes(saved.toPath());
         AtomicInteger accesses = new AtomicInteger();
@@ -250,7 +250,7 @@ public final class LockScreenTest {
                 fail("Saved state read allowed while locked");
             } catch (DeviceAccess.Locked expected) {
             }
-            RemoteCalculator normalWorker = new RemoteCalculator(context);
+            RemoteCalculator normalWorker = new RemoteCalculator(context, false);
             ExecutorService blockedWorker = Executors.newSingleThreadExecutor();
             try {
                 CalculationRequest blocked = new CalculationRequest(Command.key("RESTORE"));

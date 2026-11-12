@@ -1,16 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="more_options">More options</string>
-    <string name="about">About</string>
-    <string name="about_description">Exact RPN\nAn exact-arithmetic RPN calculator.\n\nArithmetic code comes from AOSP ExactCalculator and Hans-J. Boehm’s constructive-real library. Source credits and full licence texts are included below.</string>
-    <string name="github_repository">GitHub repository</string>
-    <string name="source_credits">Source credits</string>
-    <string name="apache_license">Apache License 2.0</string>
-    <string name="constructive_real_notices">Constructive-real library notices</string>
-    <string name="drop">Drop</string>
-    <string name="copy">Copy</string>
     <string name="pick">Pick</string>
-    <string name="copy_selected">Copy selected values</string>
     <string name="pick_selected">Pick selected values</string>
     <string name="drop_selected">Drop selected values</string>
     <string name="sum_selected">Sum selected values</string>
@@ -45,7 +36,6 @@
     <string name="finish_entry_base">Finish the current entry before changing base</string>
     <string name="ambiguous_status">AMBIGUOUS</string>
     <string name="invalid_status">INVALID</string>
-    <string name="select">Select</string>
     <string name="stack_empty">Stack is empty</string>
     <string name="stack_label_approximate">Stack %1$s, approximate value; tap to select; long press to copy</string>
     <string name="stack_label">Stack %1$s; tap to select; long press to copy</string>
@@ -53,13 +43,11 @@
     <string name="clear" translatable="false">AC</string>
     <string name="clear_entry">Clear entry</string>
     <string name="clear_stack">Clear stack</string>
-    <string name="drop_x">Drop X</string>
     <string name="backspace">Backspace</string>
     <string name="undo" translatable="false">⎌</string>
     <string name="cancel">Cancel</string>
     <string name="swap">Swap</string>
     <string name="enter">Enter</string>
-    <string name="duplicate">Dup</string>
     <string name="cancel_calculation">Cancel calculation</string>
     <string name="undo_description">Undo; long press to redo</string>
     <string name="enter_description">Enter; long press to paste</string>
@@ -75,13 +63,8 @@
     <string name="pi_description">Pi</string>
     <string name="reciprocal_description">Reciprocal of X</string>
     <string name="root_description">Xth root of Y</string>
-    <string name="functions_expanded">Functions ▴</string>
-    <string name="functions_collapsed">Functions ▾</string>
-    <string name="hide_functions">Hide scientific functions</string>
-    <string name="show_functions">Show scientific functions</string>
     <string name="expanded">Expanded</string>
     <string name="collapsed">Collapsed</string>
-    <string name="backspace_roll_description">Backspace; long press to roll X to the top displayed row</string>
     <string name="drop_roll_description">Drop X; long press to roll X to the top displayed row</string>
     <string name="factor">Factorise</string>
     <string name="calculation_cancelled">Calculation cancelled</string>

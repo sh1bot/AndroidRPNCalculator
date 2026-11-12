@@ -35,12 +35,12 @@ public final class RestoreGuardTest {
         File directory = directory();
         byte[] saved = new TestCalculator().save();
         try {
-            CalculatorStore store = new CalculatorStore(directory);
+            CalculatorStore store = new CalculatorStore(directory, () -> true);
             store.save(saved);
             assertArrayEquals(saved, store.beginRestore());
-            assertArrayEquals(saved, new CalculatorStore(directory).beginRestore());
+            assertArrayEquals(saved, new CalculatorStore(directory, () -> true).beginRestore());
             try {
-                new CalculatorStore(directory).beginRestore();
+                new CalculatorStore(directory, () -> true).beginRestore();
                 fail("A third interrupted restore must be blocked");
             } catch (java.io.IOException expected) {
             }
@@ -58,7 +58,7 @@ public final class RestoreGuardTest {
     public void successfulOrCancelledRestoresAndSavesResetTheGuard() throws Exception {
         File directory = directory();
         try {
-            CalculatorStore store = new CalculatorStore(directory);
+            CalculatorStore store = new CalculatorStore(directory, () -> true);
             TestCalculator calculator = new TestCalculator();
             store.save(calculator.save());
             for (int i = 0; i < 5; i++) {
@@ -89,7 +89,7 @@ public final class RestoreGuardTest {
                 file.setLength((long) CalculationLimits.SAVED_BYTES + 1);
             }
             try {
-                new CalculatorStore(directory).beginRestore();
+                new CalculatorStore(directory, () -> true).beginRestore();
                 fail("Oversized snapshot unexpectedly loaded");
             } catch (IllegalArgumentException expected) {
                 assertEquals(

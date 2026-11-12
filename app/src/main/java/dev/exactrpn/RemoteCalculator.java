@@ -69,10 +69,6 @@ final class RemoteCalculator {
                                 return true;
                             }));
 
-    RemoteCalculator(Context context) {
-        this(context, false);
-    }
-
     RemoteCalculator(Context context, boolean temporary) {
         this.context = context.getApplicationContext();
         this.temporary = temporary;

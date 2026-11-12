@@ -51,7 +51,6 @@ public enum Operation {
 
     static {
         for (Operation operation : values()) OPERATIONS.put(operation.key, operation);
-        OPERATIONS.put("exp", EXP); // Historical saved expressions.
     }
 
     Operation(CalculatorKey key, int arity) {

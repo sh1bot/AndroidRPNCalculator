@@ -2,9 +2,7 @@
 package dev.exactrpn;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.android.calculator2.UnifiedReal;
 
@@ -41,15 +39,6 @@ final class OperationTest {
                 IllegalArgumentException.class,
                 () -> factorial.evaluate(RpnCalculator.parse("0.5"), null));
         assertThrows(IllegalArgumentException.class, () -> factorial.evaluate(null, null));
-    }
-
-    @Test
-    void historicalExpNameStillLoads() {
-        assertSame(Operation.EXP, Operation.find("exp"));
-        assertTrue(
-                new SavedValue("exp", "", null, null)
-                        .evaluate(UnifiedReal.ONE, null)
-                        .definitelyEquals(UnifiedReal.E));
     }
 
     @Test

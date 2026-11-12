@@ -21,14 +21,6 @@ final class Display {
             ValueFormatter.Notation notation,
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
-            FractionMode fractionMode) {
-        this(notation, angle, numberMode, fractionMode, RadixMode.DECIMAL);
-    }
-
-    Display(
-            ValueFormatter.Notation notation,
-            RpnCalculator.AngleUnit angle,
-            NumberMode numberMode,
             FractionMode fractionMode,
             RadixMode radixMode) {
         this(
