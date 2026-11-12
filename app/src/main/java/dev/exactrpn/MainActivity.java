@@ -42,7 +42,16 @@ public class MainActivity extends Activity {
     private Display rendered;
     private StackRowRenderer rowRenderer;
     private boolean selectionDirty;
+    private boolean resumed, refreshPosted;
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable sessionChanged =
+            () -> {
+                refreshPosted = false;
+                if (resumed) refresh();
+            };
+    private final Runnable progressTick = () -> {
+        if (resumed) refresh();
+    };
     private final Runnable hideNotice =
             () -> {
                 if (noticeView != null) noticeView.setVisibility(View.GONE);
@@ -285,14 +294,11 @@ public class MainActivity extends Activity {
         else finish();
     }
 
-    private final Runnable tick =
-            new Runnable() {
-                public void run() {
-                    if (!session.background) session.onForeground();
-                    refresh();
-                    handler.postDelayed(this, 100);
-                }
-            };
+    private void requestRefresh() {
+        if (refreshPosted) return;
+        refreshPosted = true;
+        handler.post(sessionChanged);
+    }
 
     private void clearStackSelection(boolean redraw) {
         if (session.selectedRows.isEmpty()) return;
@@ -533,12 +539,19 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        handler.post(tick);
+        resumed = true;
+        session.setListener(this::requestRefresh);
+        session.onForeground();
+        refresh();
     }
 
     @Override
     protected void onPause() {
-        handler.removeCallbacks(tick);
+        resumed = false;
+        session.setListener(null);
+        handler.removeCallbacks(sessionChanged);
+        handler.removeCallbacks(progressTick);
+        refreshPosted = false;
         handler.removeCallbacks(hideNotice);
         hideNotice.run();
         super.onPause();
@@ -926,6 +939,15 @@ public class MainActivity extends Activity {
                         && (session.cancelRequested
                                 || session.operationPending
                                 || SystemClock.elapsedRealtime() - session.busySince >= 250);
+        handler.removeCallbacks(progressTick);
+        if (session.busy && !showProgress)
+            handler.postDelayed(
+                    progressTick,
+                    Math.max(
+                            1,
+                            250
+                                    - (SystemClock.elapsedRealtime()
+                                            - session.busySince)));
         status.setText(
                 showProgress
                         ? (session.cancelRequested

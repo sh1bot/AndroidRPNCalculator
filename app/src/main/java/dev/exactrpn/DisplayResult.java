@@ -24,13 +24,18 @@ final class DisplayResult {
 
     static byte[] encode(DisplayResult result, EntryEditor editor) throws IOException {
         boolean[] exact = new boolean[result.values.size()];
+        byte[] minimumEntry = null;
+        if (!result.readOnly) {
+            EntryEditor current = editor.copy();
+            current.clearUndo();
+            minimumEntry = current.save();
+        }
         if (result.exactRequired) {
             java.util.Arrays.fill(exact, true);
         } else {
-            EntryEditor current = editor == null ? null : editor.copy();
-            if (current != null) current.clearUndo();
             int remaining =
-                    CalculationLimits.TRANSFER_BYTES - packet(result, current, exact).length;
+                    CalculationLimits.TRANSFER_BYTES
+                            - packetSize(result, minimumEntry, exact);
             // Keep recent numerical results first when optional exact data competes for space.
             for (int i = exact.length - 1; i >= 0; i--) {
                 RationalValue rational = result.values.get(i).rational;
@@ -41,10 +46,31 @@ final class DisplayResult {
                 }
             }
         }
-        return require(packet(result, editor, exact));
+        byte[] entry = null;
+        if (!result.readOnly) {
+            int withoutEntry = packetSize(result, new byte[0], exact);
+            entry = editor.save(CalculationLimits.TRANSFER_BYTES - withoutEntry);
+        }
+        return require(packet(result, entry, exact));
     }
 
-    private static byte[] packet(DisplayResult result, EntryEditor editor, boolean[] exact)
+    private static int packetSize(DisplayResult result, byte[] entry, boolean[] exact) {
+        int size = 4 + 1 + textSize(result.stackId) + 4;
+        for (int i = 0; i < result.values.size(); i++)
+            size += NumericCodec.valueSize(result.values.get(i), exact[i]);
+        if (!result.readOnly)
+            size +=
+                    1
+                            + bytesSize(result.state)
+                            + textSize(result.checkpoint)
+                            + 4
+                            + 4
+                            + 1
+                            + bytesSize(entry);
+        return size;
+    }
+
+    private static byte[] packet(DisplayResult result, byte[] entry, boolean[] exact)
             throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
@@ -61,7 +87,7 @@ final class DisplayResult {
                 out.writeInt(result.operationError == null ? -1 : result.operationError.ordinal());
                 out.writeInt(result.errorArgument);
                 out.writeByte(result.angle.ordinal());
-                writeBytes(out, editor.save(CalculationLimits.TRANSFER_BYTES - bytes.size() - 4));
+                writeBytes(out, entry);
             }
         }
         return bytes.toByteArray();

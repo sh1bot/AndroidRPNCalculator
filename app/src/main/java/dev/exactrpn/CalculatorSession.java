@@ -58,6 +58,7 @@ final class CalculatorSession {
     boolean scientificExpanded, inverse;
     volatile long busySince;
     private volatile Thread calculatingThread;
+    private volatile Runnable listener;
 
     CalculatorSession(
             ValueFormatter.Notation n,
@@ -84,6 +85,15 @@ final class CalculatorSession {
             }
             remote = new RemoteCalculator(context, temporary);
         }
+    }
+
+    void setListener(Runnable listener) {
+        this.listener = listener;
+    }
+
+    private void changed() {
+        Runnable current = listener;
+        if (current != null) handler.post(current);
     }
 
     boolean canUseSavedState() {
@@ -135,6 +145,7 @@ final class CalculatorSession {
                 busy = true;
             }
         }
+        if (start) changed();
         if (start) worker.submit(this::drainKeys);
     }
 
@@ -182,9 +193,22 @@ final class CalculatorSession {
         try {
             String before = editor.entry();
             boolean wasEditing = editor.isEditing(), wasRaw = editor.rawEntry();
+            int beforeStart = editor.selectionStart(), beforeEnd = editor.selectionEnd();
             int undos = editor.undoCount(), redos = editor.redoCount();
             editor.setInputProfile(inputProfile(display.numberMode));
             key.apply(editor, inputProfile(NumberMode.LOCALE), inputProfile(display.numberMode));
+            boolean changed =
+                    !before.equals(editor.entry())
+                            || wasEditing != editor.isEditing()
+                            || wasRaw != editor.rawEntry()
+                            || beforeStart != editor.selectionStart()
+                            || beforeEnd != editor.selectionEnd()
+                            || undos != editor.undoCount()
+                            || redos != editor.redoCount();
+            if (!changed) {
+                setError(generation, "");
+                return true;
+            }
             if (checkpoint == null) {
                 try {
                     checkpoint =
@@ -195,12 +219,7 @@ final class CalculatorSession {
                 }
             }
             if (!key.is(Command.UNDO) && !key.is(Command.REDO))
-                localBranch |=
-                        !before.equals(editor.entry())
-                                || wasEditing != editor.isEditing()
-                                || wasRaw != editor.rawEntry()
-                                || undos != editor.undoCount()
-                                || redos != editor.redoCount();
+                localBranch = true;
             loaded = true;
             editorDirty = true;
             editRevision++;
@@ -244,6 +263,7 @@ final class CalculatorSession {
         calculatingThread = null;
         busy = operationPending = false;
         Thread.interrupted();
+        changed();
         return null;
     }
 
@@ -565,6 +585,7 @@ final class CalculatorSession {
         if (generation != inputGeneration) return;
         error = message;
         errorRevision++;
+        changed();
     }
 
     private void checkCancelled() {
@@ -585,6 +606,7 @@ final class CalculatorSession {
             remote.cancel();
             if (calculatingThread != null) calculatingThread.interrupt();
         }
+        changed();
     }
 
     boolean awaitClosed(long timeout, java.util.concurrent.TimeUnit unit)

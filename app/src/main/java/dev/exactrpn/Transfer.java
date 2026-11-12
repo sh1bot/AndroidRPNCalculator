@@ -8,6 +8,14 @@ import java.nio.charset.StandardCharsets;
 
 /** Bounded Binder payloads. No file descriptors or platform-specific fallback. */
 final class Transfer {
+    static int bytesSize(byte[] bytes) {
+        return 4 + (bytes == null ? 0 : bytes.length);
+    }
+
+    static int textSize(String text) {
+        return bytesSize(text == null ? null : text.getBytes(StandardCharsets.UTF_8));
+    }
+
     static byte[] require(byte[] bytes) throws IOException {
         if (bytes == null) throw new IOException("Missing transfer payload");
         CalculationLimits.require(bytes.length, CalculationLimits.TRANSFER_BYTES);

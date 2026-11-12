@@ -13,6 +13,19 @@ final class NumericCodec {
         writeBytes(out, value.toByteArray());
     }
 
+    private static int integerSize(BigInteger value) {
+        return bytesSize(value.toByteArray());
+    }
+
+    static int valueSize(NumericValue value, boolean includeExact) {
+        int size = integerSize(value.num) + 4 + 4 + 1 + 4 + 1;
+        if (includeExact && value.rational != null)
+            size +=
+                    integerSize(value.rational.numerator)
+                            + integerSize(value.rational.denominator);
+        return size;
+    }
+
     static BigInteger readInteger(DataInputStream in) throws IOException {
         byte[] bytes = readBytes(in);
         if (bytes == null || bytes.length == 0) throw new IOException("Missing integer");

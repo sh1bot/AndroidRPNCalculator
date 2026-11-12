@@ -51,21 +51,62 @@ final class StackRowRenderer {
                 context.getResources().getDisplayMetrics());
     }
 
-    private static void fitWhileAttached(
-            View view, android.view.ViewTreeObserver.OnPreDrawListener fitter) {
-        view.addOnAttachStateChangeListener(
-                new View.OnAttachStateChangeListener() {
-                    private android.view.ViewTreeObserver observer;
+    private static void fitWhenSized(View view, java.util.function.BooleanSupplier fitter) {
+        final class Watcher
+                implements View.OnAttachStateChangeListener,
+                        View.OnLayoutChangeListener,
+                        android.view.ViewTreeObserver.OnPreDrawListener {
+            private android.view.ViewTreeObserver observer;
+            private boolean pending;
 
-                    public void onViewAttachedToWindow(View ignored) {
-                        observer = view.getViewTreeObserver();
-                        observer.addOnPreDrawListener(fitter);
-                    }
+            private void schedule() {
+                if (!view.isAttachedToWindow() || pending) return;
+                observer = view.getViewTreeObserver();
+                observer.addOnPreDrawListener(this);
+                pending = true;
+            }
 
-                    public void onViewDetachedFromWindow(View ignored) {
-                        if (observer.isAlive()) observer.removeOnPreDrawListener(fitter);
-                    }
-                });
+            private void remove() {
+                if (pending && observer != null && observer.isAlive())
+                    observer.removeOnPreDrawListener(this);
+                pending = false;
+            }
+
+            @Override
+            public void onViewAttachedToWindow(View ignored) {
+                schedule();
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View ignored) {
+                remove();
+            }
+
+            @Override
+            public void onLayoutChange(
+                    View ignored,
+                    int left,
+                    int top,
+                    int right,
+                    int bottom,
+                    int oldLeft,
+                    int oldTop,
+                    int oldRight,
+                    int oldBottom) {
+                if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop)
+                    schedule();
+            }
+
+            @Override
+            public boolean onPreDraw() {
+                if (fitter.getAsBoolean()) remove();
+                return !pending;
+            }
+        }
+        Watcher watcher = new Watcher();
+        view.addOnAttachStateChangeListener(watcher);
+        view.addOnLayoutChangeListener(watcher);
+        if (view.isAttachedToWindow()) watcher.schedule();
     }
 
     private void digits(TextView value) {
@@ -131,13 +172,16 @@ final class StackRowRenderer {
             int height) {
         for (int size = normal; size >= minimumSize(normal); size--) {
             value.setTextSize(size);
-            if (fraction == null
-                    ? android.text.Layout.getDesiredWidth(
-                                    text, new android.text.TextPaint(value.getPaint()))
-                            <= width
-                    : value.stackedComponentsFit(fraction, width)
-                            && (height == 0 || value.stackedHeight(fraction, width) <= height))
-                return size;
+            if (fraction == null) {
+                if (android.text.Layout.getDesiredWidth(
+                                text, new android.text.TextPaint(value.getPaint()))
+                        <= width) return size;
+            } else {
+                FractionTextView.StackedMeasure measure =
+                        value.measureFraction(fraction, width, false);
+                if (measure.componentsFit()
+                        && (height == 0 || value.measuredHeight(measure) <= height)) return size;
+            }
         }
         return 0;
     }
@@ -162,24 +206,23 @@ final class StackRowRenderer {
             int normalSize,
             int width) {
         android.text.TextPaint paint = new android.text.TextPaint(view.getPaint());
+        String[] canonical = new String[12];
+        CharSequence[] text = new CharSequence[12];
+        for (int digits = 1; digits <= 12; digits++) {
+            canonical[digits - 1] =
+                    ValueFormatter.exponential(
+                            display.values.get(index), display.notation, digits);
+            text[digits - 1] =
+                    numbers.stack(withoutApproximation(canonical[digits - 1]), colors.muted);
+        }
         for (int size = normalSize; size >= minimumSize(normalSize); size--) {
             paint.setTextSize(sp(size));
             for (int digits = 12; digits >= 1; digits--) {
-                String canonical =
-                        ValueFormatter.exponential(
-                                display.values.get(index), display.notation, digits);
-                CharSequence text =
-                        numbers.stack(withoutApproximation(canonical), colors.muted);
-                if (android.text.Layout.getDesiredWidth(text, paint) <= width)
-                    return new RowFit(canonical, text, size);
+                if (android.text.Layout.getDesiredWidth(text[digits - 1], paint) <= width)
+                    return new RowFit(canonical[digits - 1], text[digits - 1], size);
             }
         }
-        String canonical =
-                ValueFormatter.exponential(display.values.get(index), display.notation, 1);
-        return new RowFit(
-                canonical,
-                numbers.stack(withoutApproximation(canonical), colors.muted),
-                minimumSize(normalSize));
+        return new RowFit(canonical[0], text[0], minimumSize(normalSize));
     }
 
     private void fitBottomRow(
@@ -221,7 +264,9 @@ final class StackRowRenderer {
                             value.setTextSize(size);
                             if (fraction != null) {
                                 split = fraction.mixed();
-                                if (value.stackedHeight(fraction, width, split) <= height)
+                                FractionTextView.StackedMeasure measure =
+                                        value.measureFraction(fraction, width, split);
+                                if (value.measuredHeight(measure) <= height)
                                     fullChosen = stacked = true;
                             } else {
                                 android.text.SpannableStringBuilder pointFirst =
@@ -279,7 +324,7 @@ final class StackRowRenderer {
         // Fit before drawing, and let a requested relayout finish before showing the row.
         // This avoids painting either the unbounded value or a stale font size for a frame.
         boolean[] pendingFollow = {followBottom};
-        android.view.ViewTreeObserver.OnPreDrawListener fitted =
+        java.util.function.BooleanSupplier fitted =
                 () -> {
                     fit.run();
                     boolean ready = !value.isLayoutRequested();
@@ -292,7 +337,7 @@ final class StackRowRenderer {
                     }
                     return ready;
                 };
-        fitWhileAttached(value, fitted);
+        fitWhenSized(value, fitted);
     }
 
     private void fitUpperRow(
@@ -342,12 +387,12 @@ final class StackRowRenderer {
                                     chosenNumber.startsWith("≈ "),
                                     chosen));
                 };
-        android.view.ViewTreeObserver.OnPreDrawListener fitted =
+        java.util.function.BooleanSupplier fitted =
                 () -> {
                     fit.run();
                     return !value.isLayoutRequested();
                 };
-        fitWhileAttached(value, fitted);
+        fitWhenSized(value, fitted);
     }
 
     void render(
