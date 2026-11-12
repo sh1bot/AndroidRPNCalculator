@@ -13,7 +13,6 @@ final class HistoryRegressionTest extends RegressionSupport {
         TestCalculator durable = new TestCalculator();
         number(durable, "56565642624.456");
         keys(durable, "ENTER", "π", "2", "√", "+", "1", "ENTER", "3", "÷");
-        durable.key("ANGLE");
         CalculatorTestSupport.paste(durable, "12.345");
         durable.select(2, 5);
         TestCalculator restored = TestCalculator.load(durable.save());
@@ -34,7 +33,6 @@ final class HistoryRegressionTest extends RegressionSupport {
                         && restored.selectionStart() == 2
                         && restored.selectionEnd() == 5,
                 "restore editing and cursor selection");
-        assertTrue(restored.angleUnit() == RpnCalculator.AngleUnit.DEG, "restore angle mode");
         restored.key("UNDO");
         assertTrue(
                 restored.entry().equals("") && restored.values().size() == 3,

@@ -6,7 +6,8 @@ import java.util.Collections;
 import java.util.List;
 
 final class Display {
-    final List<String> rows, fullRows, compactRows;
+    final List<String> rows;
+    final List<FormattedValue> presentations, fullPresentations, compactPresentations;
     final List<NumericValue> values;
     final String entry, problem, stackId;
     final ValueFormatter.Notation notation;
@@ -16,6 +17,25 @@ final class Display {
     final RadixMode radixMode;
     final int start, end;
     final RpnCalculator.AngleUnit angleUnit;
+
+    private static final class Rows extends java.util.AbstractList<String>
+            implements java.util.RandomAccess {
+        private final List<FormattedValue> values;
+
+        Rows(List<FormattedValue> values) {
+            this.values = values;
+        }
+
+        @Override
+        public String get(int index) {
+            return values.get(index).canonical;
+        }
+
+        @Override
+        public int size() {
+            return values.size();
+        }
+    }
 
     Display(
             ValueFormatter.Notation notation,
@@ -38,11 +58,29 @@ final class Display {
         this(
                 Collections.unmodifiableList(result.values),
                 result.stackId,
-                result.angle,
+                settings.angleUnit,
                 settings.notation,
                 settings.numberMode,
                 settings.fractionMode,
                 settings.radixMode,
+                editor);
+    }
+
+    Display(
+            Display stack,
+            RpnCalculator.AngleUnit angle,
+            ValueFormatter.Notation notation,
+            NumberMode numberMode,
+            FractionMode fractionMode,
+            EntryEditor editor) {
+        this(
+                stack.values,
+                stack.stackId,
+                angle,
+                notation,
+                numberMode,
+                fractionMode,
+                stack.radixMode,
                 editor);
     }
 
@@ -83,19 +121,22 @@ final class Display {
             RadixMode radixMode,
             EntryEditor editor) {
         this.values = values;
-        ArrayList<String> full = new ArrayList<>(values.size());
-        ArrayList<String> compact = new ArrayList<>(values.size());
+        ArrayList<FormattedValue> full = new ArrayList<>(values.size());
+        ArrayList<FormattedValue> compact = new ArrayList<>(values.size());
         for (int i = 0; i < values.size(); i++) {
             NumericValue value = values.get(i);
-            String fraction = ValueFormatter.exactFraction(value, fractionMode);
+            FormattedValue fraction =
+                    ValueFormatter.exactFractionPresentation(value, fractionMode);
             full.add(
                     fraction == null
-                            ? ValueFormatter.format(value, true, notation, fractionMode)
+                            ? ValueFormatter.presentation(value, true, notation, fractionMode)
                             : fraction);
-            compact.add(ValueFormatter.format(value, false, notation));
+            compact.add(
+                    ValueFormatter.presentation(
+                            value, false, notation, FractionMode.DECIMAL));
         }
-        fullRows = Collections.unmodifiableList(full);
-        compactRows = Collections.unmodifiableList(compact);
+        fullPresentations = Collections.unmodifiableList(full);
+        compactPresentations = Collections.unmodifiableList(compact);
         this.stackId = stackId;
         this.notation = notation;
         angleUnit = angle;
@@ -108,13 +149,14 @@ final class Display {
         raw = editor.rawEntry();
         start = editor.selectionStart();
         end = editor.selectionEnd();
-        rows = editing ? compactRows : fullRows;
+        presentations = editing ? compactPresentations : fullPresentations;
+        rows = new Rows(presentations);
     }
 
     Display(Display stack, EntryEditor editor) {
         values = stack.values;
-        fullRows = stack.fullRows;
-        compactRows = stack.compactRows;
+        fullPresentations = stack.fullPresentations;
+        compactPresentations = stack.compactPresentations;
         stackId = stack.stackId;
         notation = stack.notation;
         angleUnit = stack.angleUnit;
@@ -122,7 +164,8 @@ final class Display {
         fractionMode = stack.fractionMode;
         radixMode = stack.radixMode;
         editing = editor.isEditing();
-        rows = editing ? compactRows : fullRows;
+        presentations = editing ? compactPresentations : fullPresentations;
+        rows = new Rows(presentations);
         entry = editor.entry();
         problem = editor.entryProblem();
         raw = editor.rawEntry();

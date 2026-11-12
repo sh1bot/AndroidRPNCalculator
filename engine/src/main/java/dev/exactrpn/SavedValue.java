@@ -4,43 +4,69 @@ package dev.exactrpn;
 import com.android.calculator2.BoundedRational;
 import com.android.calculator2.UnifiedReal;
 
-import java.math.BigInteger;
-
-/** Exact expression nodes for persistence; never reconstruct a value from display text. */
+/** Typed exact expression nodes for persistence. */
 final class SavedValue {
-    final String op, literal;
+    final Operation operation;
+    final RpnCalculator.AngleUnit angle;
+    final RationalValue rational;
     final SavedValue left, right;
 
-    SavedValue(String op, String literal, SavedValue left, SavedValue right) {
-        this.op = op;
-        this.literal = literal;
+    private SavedValue(
+            Operation operation,
+            RpnCalculator.AngleUnit angle,
+            RationalValue rational,
+            SavedValue left,
+            SavedValue right) {
+        this.operation = operation;
+        this.angle = angle;
+        this.rational = rational;
         this.left = left;
         this.right = right;
     }
 
-    static SavedValue of(UnifiedReal value, String op, SavedValue left, SavedValue right) {
+    static SavedValue rational(RationalValue value) {
+        return new SavedValue(null, null, value, null, null);
+    }
+
+    static SavedValue rational(UnifiedReal value) {
         BoundedRational rational = value.boundedRationalValue();
-        return rational != null && rational.toString().length() < 60000
-                ? new SavedValue("r", rational.toString(), null, null)
-                : new SavedValue(op, "", left, right);
+        if (rational == null) throw new IllegalArgumentException("Value is not rational");
+        return rational(new RationalValue(rational.numerator(), rational.denominator()));
+    }
+
+    static SavedValue operation(
+            Operation operation,
+            RpnCalculator.AngleUnit angle,
+            SavedValue left,
+            SavedValue right) {
+        return new SavedValue(
+                java.util.Objects.requireNonNull(operation),
+                java.util.Objects.requireNonNull(angle),
+                null,
+                left,
+                right);
+    }
+
+    static SavedValue of(
+            UnifiedReal value,
+            Operation operation,
+            RpnCalculator.AngleUnit angle,
+            SavedValue left,
+            SavedValue right) {
+        BoundedRational bounded = value.boundedRationalValue();
+        if (bounded != null) {
+            RationalValue rational =
+                    new RationalValue(bounded.numerator(), bounded.denominator());
+            if (rational.byteSize() < 60000) return rational(rational);
+        }
+        if (operation == null) throw new IllegalArgumentException("Missing saved operation");
+        return operation(operation, angle, left, right);
     }
 
     UnifiedReal evaluate(UnifiedReal a, UnifiedReal b) {
-        if (op.equals("r")) {
-            String[] parts = literal.split("/", -1);
-            if (parts.length != 2) throw new IllegalArgumentException("Invalid rational");
-            BigInteger denominator = new BigInteger(parts[1]);
-            if (denominator.signum() == 0) throw new IllegalArgumentException("Zero denominator");
-            return new UnifiedReal(new BoundedRational(new BigInteger(parts[0]), denominator));
-        }
-        String[] parts = op.split(":", -1);
-        if (parts.length > 2) throw new IllegalArgumentException("Unknown saved operation");
-        Operation operation = Operation.find(parts[0]);
-        if (operation == null) throw new IllegalArgumentException("Unknown saved operation");
-        RpnCalculator.AngleUnit unit =
-                parts.length == 2
-                        ? RpnCalculator.AngleUnit.valueOf(parts[1])
-                        : RpnCalculator.AngleUnit.RAD;
-        return operation.evaluate(a, b, unit);
+        if (rational != null)
+            return new UnifiedReal(
+                    new BoundedRational(rational.numerator, rational.denominator));
+        return operation.evaluate(a, b, angle);
     }
 }

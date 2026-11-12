@@ -21,7 +21,7 @@ final class OperationTest {
         UnifiedReal b = new UnifiedReal(3);
         for (RpnCalculator.AngleUnit unit : RpnCalculator.AngleUnit.values()) {
             UnifiedReal live = op.evaluate(a, b, unit);
-            UnifiedReal saved = new SavedValue(op.savedName(unit), "", null, null).evaluate(a, b);
+            UnifiedReal saved = SavedValue.operation(op, unit, null, null).evaluate(a, b);
             assertEquals(
                     TestValueFormatter.clipboard(live, ValueFormatter.Notation.SCIENTIFIC),
                     TestValueFormatter.clipboard(saved, ValueFormatter.Notation.SCIENTIFIC),
@@ -31,7 +31,9 @@ final class OperationTest {
 
     @Test
     void replayValidatesFactorial() {
-        SavedValue factorial = new SavedValue("!", "", null, null);
+        SavedValue factorial =
+                SavedValue.operation(
+                        Operation.FACTORIAL, RpnCalculator.AngleUnit.RAD, null, null);
         assertThrows(
                 IllegalArgumentException.class,
                 () -> factorial.evaluate(UnifiedReal.MINUS_ONE, null));

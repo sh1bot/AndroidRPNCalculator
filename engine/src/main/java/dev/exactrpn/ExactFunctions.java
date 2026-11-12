@@ -64,12 +64,11 @@ final class ExactFunctions {
     }
 
     static BigInteger[] parts(UnifiedReal value) {
-        if (value.boundedRationalValue() == null)
+        com.android.calculator2.BoundedRational bounded = value.boundedRationalValue();
+        if (bounded == null)
             throw CalculationError.invalid(CalculationError.Code.RATIONAL_REQUIRED);
-        String[] parts = value.boundedRationalValue().toNiceString().split("/");
-        return new BigInteger[] {
-            new BigInteger(parts[0]), parts.length == 1 ? BigInteger.ONE : new BigInteger(parts[1])
-        };
+        RationalValue rational = new RationalValue(bounded.numerator(), bounded.denominator());
+        return new BigInteger[] {rational.numerator, rational.denominator};
     }
 
     static UnifiedReal root(UnifiedReal base, UnifiedReal index) {

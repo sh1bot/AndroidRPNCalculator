@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
     private ScrollView scroll;
     private Display rendered;
     private StackRowRenderer rowRenderer;
-    private boolean selectionDirty;
+    private boolean selectionDirty, renderedSelecting;
     private boolean resumed, refreshPosted;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable sessionChanged =
@@ -439,9 +439,10 @@ public class MainActivity extends Activity {
             numbers = numberFormat(display.numberMode, display.radixMode);
             keys.setNumberFormat(numbers);
             boolean selectionChange = selectionDirty;
+            boolean selecting = !session.selectedRows.isEmpty();
             boolean stackChanged =
-                    selectionDirty
-                            || rendered == null
+                    rendered == null
+                            || selecting != renderedSelecting
                             || !Objects.equals(rendered.stackId, display.stackId)
                             || rendered.numberMode != display.numberMode
                             || rendered.radixMode != display.radixMode
@@ -451,12 +452,14 @@ public class MainActivity extends Activity {
             selectionDirty = false;
             if (stackChanged) {
                 rowRenderer.render(stackRows, display, numbers, session.selectedRows, follow);
-            }
+            } else if (selectionChange)
+                rowRenderer.updateSelection(stackRows, session.selectedRows);
 
             refreshEntry(display);
             refreshModes(display);
             saveDisplayPreferences(display);
             rendered = display;
+            renderedSelecting = selecting;
             // A second post runs after the updated rows have been measured. Do not repeatedly
             // scroll on polling ticks: the user must still be able to inspect older entries.
             if (follow) scroll.post(() -> scroll.fullScroll(View.FOCUS_DOWN));

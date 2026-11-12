@@ -28,6 +28,41 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class FunctionsTest {
+    private static FormattedValue formatted(String canonical) {
+        return formatted(canonical, 10);
+    }
+
+    private static FormattedValue formatted(String canonical, int base) {
+        boolean approximate = canonical.startsWith("≈ ");
+        String number = approximate ? canonical.substring(2) : canonical;
+        if (number.startsWith("0 (|x| < 1"))
+            return FormattedValue.zeroBound(1000, base, approximate);
+        int slash = number.indexOf('/');
+        if (slash >= 0) {
+            int operator = number.indexOf('+');
+            if (operator < 0) operator = number.indexOf('-', 1);
+            if (operator < 0) operator = number.indexOf(' ');
+            return FormattedValue.fraction(
+                    operator < 0 ? "" : number.substring(0, operator),
+                    operator < 0 ? '\0' : number.charAt(operator),
+                    number.substring(operator < 0 ? 0 : operator + 1, slash),
+                    number.substring(slash + 1),
+                    base,
+                    true);
+        }
+        int marker =
+                Math.max(
+                        Math.max(number.indexOf('e'), number.indexOf('E')),
+                        Math.max(number.indexOf('p'), number.indexOf('P')));
+        return marker < 0
+                ? FormattedValue.decimal(number, approximate, base)
+                : FormattedValue.exponential(
+                        number.substring(0, marker),
+                        number.substring(marker + 1).replace('-', '−'),
+                        approximate,
+                        base);
+    }
+
     private CalculationRequest request(String key, byte[] input) throws java.io.IOException {
         return request(Command.key(key), input);
     }
@@ -68,7 +103,8 @@ public final class FunctionsTest {
                 new Locale[] {Locale.US, Locale.GERMANY, Locale.forLanguageTag("ar-EG")}) {
             LocaleNumbers numbers = new LocaleNumbers(locale, NumberMode.LOCALE);
             for (String input : new String[] {"1.23e+15", "123.4e-12", "1.2E+30"}) {
-                android.text.Spanned styled = (android.text.Spanned) numbers.stack(input, 0);
+                android.text.Spanned styled =
+                        (android.text.Spanned) numbers.stack(formatted(input), 0);
                 int marker = Math.max(input.indexOf('e'), input.indexOf('E'));
                 assertEquals(
                         numbers.entry(input.substring(0, marker))
@@ -116,7 +152,8 @@ public final class FunctionsTest {
                 assertTrue(numbers.entry(input).contains(input.substring(marker, marker + 1)));
             }
             android.text.Spanned bound =
-                    (android.text.Spanned) numbers.stack("≈ 0 (|x| < 1e−1000)", 0);
+                    (android.text.Spanned)
+                            numbers.stack(FormattedValue.zeroBound(1000, 10, true), 0);
             assertEquals(
                     1,
                     bound.getSpans(0, bound.length(), android.text.style.SuperscriptSpan.class)
@@ -128,7 +165,8 @@ public final class FunctionsTest {
     @Test
     public void dozenalDigitsKeepTheirCharactersAndInstallFontFallbacks() {
         LocaleNumbers numbers = new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.DOZENAL);
-        android.text.Spanned stack = (android.text.Spanned) numbers.stack("↊↋", 0);
+        android.text.Spanned stack =
+                (android.text.Spanned) numbers.stack(FormattedValue.decimal("AB", false, 12), 0);
         assertEquals("↊↋", stack.toString());
         assertEquals(2, stack.getSpans(0, stack.length(), TurnedDigitSpan.class).length);
 
@@ -143,12 +181,13 @@ public final class FunctionsTest {
                 new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
         assertEquals(
                 "1\u20602\u20603\u200b4\u20605\u20606\u2060.\u20601\u20602\u20603\u200b4\u20605\u20606",
-                ungrouped.breakable(ungrouped.stack("123456.123456", 0)).toString());
+                ungrouped.breakable(ungrouped.stack(formatted("123456.123456"), 0)).toString());
         LocaleNumbers grouped = new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.DECIMAL);
         assertEquals(
                 "1\u20602\u20603\u2060\u2009\u200b4\u20605\u20606\u2060.\u20601\u20602\u20603\u200b4\u20605\u20606",
-                grouped.breakable(grouped.stack("123456.123456", 0)).toString());
-        android.text.Spanned groupedDisplay = (android.text.Spanned) grouped.stack("123456", 0);
+                grouped.breakable(grouped.stack(formatted("123456.123456"), 0)).toString());
+        android.text.Spanned groupedDisplay =
+                (android.text.Spanned) grouped.stack(formatted("123456"), 0);
         GroupingSeparatorSpan[] groupingSpans =
                 groupedDisplay.getSpans(0, groupedDisplay.length(), GroupingSeparatorSpan.class);
         assertEquals(1, groupingSpans.length);
@@ -162,7 +201,11 @@ public final class FunctionsTest {
                 new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.HEX);
         assertEquals(
                 "A\u2060B\u2060C\u2060D\u200bE\u2060F\u20600\u20601\u2060.\u20602\u20603\u20604\u20605\u200b6\u20607\u20608\u20609",
-                hexadecimal.breakable(hexadecimal.stack("ABCDEF01.23456789", 0)).toString());
+                hexadecimal
+                        .breakable(
+                                hexadecimal.stack(
+                                        formatted("ABCDEF01.23456789", 16), 0))
+                        .toString());
     }
 
     @Test
@@ -174,7 +217,8 @@ public final class FunctionsTest {
         int textColor = android.graphics.Color.MAGENTA;
         view.setTextColor(textColor);
         view.setTextSize(24);
-        view.stackedFraction(numbers.fractionParts("123456/789", textColor), "123456/789");
+        view.stackedFraction(
+                numbers.fractionParts(formatted("123456/789"), textColor), "123456/789");
         view.measure(
                 android.view.View.MeasureSpec.makeMeasureSpec(
                         240, android.view.View.MeasureSpec.EXACTLY),
@@ -204,7 +248,9 @@ public final class FunctionsTest {
         view.setTextColor(android.graphics.Color.MAGENTA);
         view.setTextSize(24);
         view.stackedFraction(
-                numbers.fractionParts("1001+13717421/87717347", android.graphics.Color.MAGENTA),
+                numbers.fractionParts(
+                        formatted("1001+13717421/87717347"),
+                        android.graphics.Color.MAGENTA),
                 "1001+13717421/87717347");
         int width = 600;
         view.measure(
@@ -284,12 +330,13 @@ public final class FunctionsTest {
                             FractionMode.MIXED));
             android.text.Spanned styled =
                     (android.text.Spanned)
-                            new LocaleNumbers(Locale.US, NumberMode.DOT).stack("2 1/3", 0);
+                            new LocaleNumbers(Locale.US, NumberMode.DOT)
+                                    .stack(formatted("2 1/3"), 0);
             assertEquals("2\u00a01/3", styled.toString());
             android.text.Spanned longFraction =
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.UNGROUPED)
-                                    .stack("123456789/12345", 0);
+                                    .stack(formatted("123456789/12345"), 0);
             assertEquals("123456789/12345", longFraction.toString());
             assertTrue(
                     TestCalculator.load(mixed.state)
@@ -437,7 +484,9 @@ public final class FunctionsTest {
         LocaleNumbers numbers =
                 new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
         CharSequence text =
-                numbers.breakable(numbers.stack("111111111111111", android.graphics.Color.GRAY));
+                numbers.breakable(
+                        numbers.stack(
+                                formatted("111111111111111"), android.graphics.Color.GRAY));
         android.text.TextPaint paint = new android.text.TextPaint();
         paint.setTypeface(android.graphics.Typeface.MONOSPACE);
         paint.setTextSize(32);

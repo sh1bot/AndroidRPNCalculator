@@ -114,12 +114,7 @@ final class StackRowRenderer {
         value.setFontFeatureSettings("tnum");
     }
 
-    private static String withoutApproximation(String number) {
-        return number.startsWith("≈ ") ? number.substring(2) : number;
-    }
-
-    private void updateStackLabel(TextView label, int depth, String number) {
-        boolean approximate = number.startsWith("≈ ");
+    private void updateStackLabel(TextView label, int depth, boolean approximate) {
         String name = depth == 1 ? "x" : depth == 2 ? "y" : Integer.toString(depth);
         label.setText(name + (approximate ? "≈" : ":"));
         label.setContentDescription(
@@ -187,14 +182,14 @@ final class StackRowRenderer {
     }
 
     private static final class RowFit {
-        final String canonical;
         final CharSequence text;
         final int size;
+        final boolean approximate;
 
-        RowFit(String canonical, CharSequence text, int size) {
-            this.canonical = canonical;
+        RowFit(CharSequence text, int size, boolean approximate) {
             this.text = text;
             this.size = size;
+            this.approximate = approximate;
         }
     }
 
@@ -206,23 +201,23 @@ final class StackRowRenderer {
             int normalSize,
             int width) {
         android.text.TextPaint paint = new android.text.TextPaint(view.getPaint());
-        String[] canonical = new String[12];
+        FormattedValue[] formatted = new FormattedValue[12];
         CharSequence[] text = new CharSequence[12];
         for (int digits = 1; digits <= 12; digits++) {
-            canonical[digits - 1] =
-                    ValueFormatter.exponential(
+            formatted[digits - 1] =
+                    ValueFormatter.exponentialPresentation(
                             display.values.get(index), display.notation, digits);
-            text[digits - 1] =
-                    numbers.stack(withoutApproximation(canonical[digits - 1]), colors.muted);
+            text[digits - 1] = numbers.stack(formatted[digits - 1], colors.muted);
         }
         for (int size = normalSize; size >= minimumSize(normalSize); size--) {
             paint.setTextSize(sp(size));
             for (int digits = 12; digits >= 1; digits--) {
                 if (android.text.Layout.getDesiredWidth(text[digits - 1], paint) <= width)
-                    return new RowFit(canonical[digits - 1], text[digits - 1], size);
+                    return new RowFit(
+                            text[digits - 1], size, formatted[digits - 1].approximate);
             }
         }
-        return new RowFit(canonical[0], text[0], minimumSize(normalSize));
+        return new RowFit(text[0], minimumSize(normalSize), formatted[0].approximate);
     }
 
     private void fitBottomRow(
@@ -236,11 +231,11 @@ final class StackRowRenderer {
             int depth,
             boolean followBottom) {
         View viewport = (View) stackRows.getParent();
-        String fullNumber = display.fullRows.get(index);
-        CharSequence full = numbers.stack(withoutApproximation(fullNumber), colors.muted);
+        FormattedValue fullValue = display.fullPresentations.get(index);
+        CharSequence full = numbers.stack(fullValue, colors.muted);
         CharSequence breakable = numbers.breakable(full);
         LocaleNumbers.FractionParts fraction =
-                numbers.fractionParts(withoutApproximation(fullNumber), colors.muted);
+                numbers.fractionParts(fullValue, colors.muted);
         int[] previousSize = {-1, -1};
         Runnable fit =
                 () -> {
@@ -294,31 +289,31 @@ final class StackRowRenderer {
                             if (fullChosen) break;
                         }
                     }
-                    String chosenNumber;
                     CharSequence chosen;
+                    boolean approximate;
                     if (fullChosen) {
-                        chosenNumber = fullNumber;
                         chosen = multiline == null ? full : multiline;
+                        approximate = fullValue.approximate;
                         value.setTextSize(size);
                         value.setMaxLines(Integer.MAX_VALUE);
                         if (stacked) value.stackedFraction(fraction, full, split);
                         else value.inlineText(chosen);
                     } else {
                         RowFit compact = exponential(display, numbers, index, value, 32, width);
-                        chosenNumber = compact.canonical;
                         chosen = compact.text;
+                        approximate = compact.approximate;
                         value.setTextSize(compact.size);
                         value.setMaxLines(1);
                         value.inlineText(chosen);
                     }
                     value.setEllipsize(null);
-                    updateStackLabel(label, depth, chosenNumber);
+                    updateStackLabel(label, depth, approximate);
                     value.requestLayout();
                     row.setContentDescription(
                             rowDescription(
                                     false,
                                     depth,
-                                    chosenNumber.startsWith("≈ "),
+                                    approximate,
                                     chosen));
                 };
         // Fit before drawing, and let a requested relayout finish before showing the row.
@@ -348,10 +343,10 @@ final class StackRowRenderer {
             LocaleNumbers numbers,
             int index,
             int depth) {
-        String fullNumber = display.fullRows.get(index);
-        CharSequence full = numbers.stack(withoutApproximation(fullNumber), colors.muted);
+        FormattedValue fullValue = display.fullPresentations.get(index);
+        CharSequence full = numbers.stack(fullValue, colors.muted);
         LocaleNumbers.FractionParts fraction =
-                numbers.fractionParts(withoutApproximation(fullNumber), colors.muted);
+                numbers.fractionParts(fullValue, colors.muted);
         int[] previousWidth = {-1};
         Runnable fit =
                 () -> {
@@ -360,31 +355,31 @@ final class StackRowRenderer {
                     previousWidth[0] = width;
                     int fullSize = naturalSize(value, full, fraction, 22, width, 0);
                     boolean fullChosen = fullSize != 0;
-                    String chosenNumber;
                     CharSequence chosen;
+                    boolean approximate;
                     if (fullChosen) {
-                        chosenNumber = fullNumber;
                         chosen = full;
+                        approximate = fullValue.approximate;
                         value.setTextSize(fullSize);
                         value.setMaxLines(fraction == null ? 1 : Integer.MAX_VALUE);
                         if (fraction != null) value.stackedFraction(fraction, full);
                         else value.inlineText(full);
                     } else {
                         RowFit compact = exponential(display, numbers, index, value, 22, width);
-                        chosenNumber = compact.canonical;
                         chosen = compact.text;
+                        approximate = compact.approximate;
                         value.setTextSize(compact.size);
                         value.setMaxLines(1);
                         value.inlineText(chosen);
                     }
                     value.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
                     value.setEllipsize(null);
-                    updateStackLabel(label, depth, chosenNumber);
+                    updateStackLabel(label, depth, approximate);
                     row.setContentDescription(
                             rowDescription(
                                     false,
                                     depth,
-                                    chosenNumber.startsWith("≈ "),
+                                    approximate,
                                     chosen));
                 };
         java.util.function.BooleanSupplier fitted =
@@ -444,7 +439,7 @@ final class StackRowRenderer {
             TextView label = text(12);
             digits(label);
             label.setSingleLine(true);
-            updateStackLabel(label, depth, display.rows.get(i));
+            updateStackLabel(label, depth, display.presentations.get(i).approximate);
             label.setTag("stack-label:" + i);
             if (!display.editing) label.setOnClickListener(v -> actions.toggle(index, display));
             label.setOnLongClickListener(
@@ -472,9 +467,9 @@ final class StackRowRenderer {
             value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
             // Fit from a bounded first layout. A huge exact fraction must never briefly
             // expand the stack before the viewport-aware fitter chooses its fallback.
-            String initial = result ? display.compactRows.get(i) : display.rows.get(i);
-            CharSequence initialText =
-                    numbers.stack(withoutApproximation(initial), colors.muted);
+            FormattedValue initial =
+                    result ? display.compactPresentations.get(i) : display.presentations.get(i);
+            CharSequence initialText = numbers.stack(initial, colors.muted);
             value.inlineText(initialText);
             value.setMaxLines(1);
             value.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -505,25 +500,27 @@ final class StackRowRenderer {
                     rowDescription(
                             display.editing,
                             depth,
-                            display.rows.get(i).startsWith("≈ "),
+                            display.presentations.get(i).approximate,
                             value.getText()));
             if (display.editing)
                 label.setContentDescription(
                         rowDescription(
                                 true,
                                 depth,
-                                display.rows.get(i).startsWith("≈ "),
+                                display.presentations.get(i).approximate,
                                 value.getText()));
             stackRows.addView(row);
         }
-        showSelection(stackRows, selectedRows);
+        updateSelection(stackRows, selectedRows);
     }
 
-    private void showSelection(LinearLayout stackRows, SortedSet<Integer> selectedRows) {
+    void updateSelection(LinearLayout stackRows, SortedSet<Integer> selectedRows) {
         for (int i = 0; i < stackRows.getChildCount(); i++) {
             View row = stackRows.getChildAt(i);
             if (!("stack-row:" + i).equals(row.getTag())) continue;
             boolean highlighted = selectedRows.contains(i);
+            View checkbox = row.findViewWithTag("stack-checkbox:" + i);
+            if (checkbox instanceof CheckBox) ((CheckBox) checkbox).setChecked(highlighted);
             row.setSelected(highlighted);
             if (highlighted) {
                 android.graphics.drawable.GradientDrawable highlight =

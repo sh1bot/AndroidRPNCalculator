@@ -62,7 +62,6 @@ public final class MemoryTransportTest {
         result.values = new java.util.ArrayList<>(java.util.Collections.nCopies(3800, number));
         result.stackId = "stack";
         result.checkpoint = "checkpoint";
-        result.angle = RpnCalculator.AngleUnit.GRAD;
         result.state = new TestCalculator().save();
         EntryEditor editor = new EntryEditor();
         for (int i = 0; i < 1000; i++) editor.key("9");
@@ -71,7 +70,6 @@ public final class MemoryTransportTest {
         DisplayResult decoded = DisplayResult.decode(packet);
         assertEquals(result.values.size(), decoded.values.size());
         assertEquals(number.rational.numerator, decoded.values.get(3799).rational.numerator);
-        assertEquals(result.angle, decoded.angle);
         EntryEditor restored = EntryEditor.load(decoded.entryState);
         assertEquals(String.join("", java.util.Collections.nCopies(1000, "9")), restored.entry());
         assertTrue(restored.undoCount() > 0 && restored.undoCount() < 100);
@@ -294,9 +292,6 @@ public final class MemoryTransportTest {
             local.key("UNDO");
             noop.entryDraft = local.entryForCommit().save();
             accepted = worker.submit(() -> remote.evaluate(noop)).get(15, TimeUnit.SECONDS);
-            assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
-            CalculationRequest mode = request("ANGLE", accepted);
-            accepted = worker.submit(() -> remote.evaluate(mode)).get(15, TimeUnit.SECONDS);
             assertEquals(DisplayResult.EditorDisposition.KEEP, accepted.editorDisposition);
             local.pasteClipboard("1,234", NumberText.COMPUTER);
             assertThrows(IllegalArgumentException.class, local::prepared);
