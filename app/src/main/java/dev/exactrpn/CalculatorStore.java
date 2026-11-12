@@ -16,10 +16,6 @@ final class CalculatorStore {
     private final File directory;
     private final BooleanSupplier allowed;
 
-    CalculatorStore(File directory) {
-        this(directory, () -> true);
-    }
-
     CalculatorStore(File directory, BooleanSupplier allowed) {
         this.allowed = allowed;
         this.directory = directory;

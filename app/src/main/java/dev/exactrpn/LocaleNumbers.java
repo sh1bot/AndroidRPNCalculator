@@ -8,7 +8,6 @@ import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
 import android.text.style.RelativeSizeSpan;
-import android.text.style.SubscriptSpan;
 import android.text.style.SuperscriptSpan;
 import android.text.style.TypefaceSpan;
 
@@ -114,34 +113,9 @@ public final class LocaleNumbers {
                 text.append(((DecimalFormat) integers).getNegativePrefix());
                 numerator = numerator.substring(1);
             }
-            int fractionStart = text.length();
-            int start = text.length();
             appendInteger(text, numerator, groupingColor);
-            text.setSpan(
-                    new RelativeSizeSpan(.72f),
-                    start,
-                    text.length(),
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            text.setSpan(
-                    new SuperscriptSpan(), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            // Ordinary slash; styling is explicit and covers every digit, rather than
-            // font-dependent.
             text.append("/");
-            start = text.length();
             appendInteger(text, number.substring(slash + 1), groupingColor);
-            text.setSpan(
-                    new RelativeSizeSpan(.72f),
-                    start,
-                    text.length(),
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            text.setSpan(
-                    new SubscriptSpan(), start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            // Apply before digit scaling, so numerator, slash and denominator all rise equally.
-            text.setSpan(
-                    new FractionRaiseSpan(),
-                    fractionStart,
-                    text.length(),
-                    Spanned.SPAN_EXCLUSIVE_EXCLUSIVE | (1 << Spanned.SPAN_PRIORITY_SHIFT));
             return styleDozenal(text);
         }
         int e = exponent(number, 0);

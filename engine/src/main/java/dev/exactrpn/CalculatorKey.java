@@ -48,7 +48,6 @@ public enum CalculatorKey {
     DELETE,
     DROP,
     SWAP,
-    DUP,
     SMART_CLEAR,
     PASTE,
     LEFT,
@@ -149,14 +148,13 @@ public enum CalculatorKey {
                 ATAN|atan||20
                 UNDO|||16|||54
                 REDO|||16|||53
-                ENTER|||18||||66,160,62
+                ENTER|||18|||32|66,160,62
                 CLEAR
                 CE
                 BACK||⌫|||||67
                 DELETE|||||||112
                 DROP
                 SWAP||||||47
-                DUP|||16|||32
                 SMART_CLEAR||||||40
                 PASTE|||18|||50
                 LEFT|||16||||21

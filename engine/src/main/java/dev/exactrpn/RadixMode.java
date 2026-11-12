@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
-import java.math.BigInteger;
-
 /** User-facing numerical radix and digit alphabet. */
 public enum RadixMode {
     DECIMAL(10, 3),
@@ -19,10 +17,6 @@ public enum RadixMode {
         return values()[(ordinal() + 1) % values().length];
     }
 
-    public String digits(BigInteger value) {
-        return digits(value.toString(radix).toUpperCase(java.util.Locale.ROOT));
-    }
-
     public String digits(String canonical) {
         if (this == DECIMAL) return canonical;
         if (this == HEX) return canonical.toUpperCase(java.util.Locale.ROOT);
@@ -31,18 +25,6 @@ public enum RadixMode {
                 .replace('a', '\u218a')
                 .replace('B', '\u218b')
                 .replace('b', '\u218b');
-    }
-
-    public char canonicalDigit(char glyph) {
-        if (glyph == '\u218a') return 'A';
-        if (glyph == '\u218b') return 'B';
-        return Character.toUpperCase(glyph);
-    }
-
-    public int digit(char glyph) {
-        char canonical = canonicalDigit(glyph);
-        int value = Character.digit(canonical, radix);
-        return value;
     }
 
     public static RadixMode of(int radix) {

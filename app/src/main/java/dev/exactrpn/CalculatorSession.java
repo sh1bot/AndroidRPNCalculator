@@ -63,23 +63,6 @@ final class CalculatorSession {
             ValueFormatter.Notation n,
             RpnCalculator.AngleUnit angle,
             NumberMode numberMode,
-            FractionMode fractionMode) {
-        this(n, angle, numberMode, fractionMode, RadixMode.DECIMAL, false);
-    }
-
-    CalculatorSession(
-            ValueFormatter.Notation n,
-            RpnCalculator.AngleUnit angle,
-            NumberMode numberMode,
-            FractionMode fractionMode,
-            boolean temporary) {
-        this(n, angle, numberMode, fractionMode, RadixMode.DECIMAL, temporary);
-    }
-
-    CalculatorSession(
-            ValueFormatter.Notation n,
-            RpnCalculator.AngleUnit angle,
-            NumberMode numberMode,
             FractionMode fractionMode,
             RadixMode radixMode,
             boolean temporary) {

@@ -14,12 +14,13 @@ final class NumericValueCacheTest {
     void keepsLiveValuesWithoutDependingOnPresentation() {
         NumericValueCache cache = new NumericValueCache();
         UnifiedReal a = UnifiedReal.TWO.sqrt(), b = new UnifiedReal(3).sqrt();
-        NumericValue first = cache.read(a), second = cache.read(b);
+        NumericValue first = cache.read(a, NumericRequest.DEFAULT);
+        NumericValue second = cache.read(b, NumericRequest.DEFAULT);
         cache.retain(List.of(a));
-        assertSame(first, cache.read(a));
-        assertNotSame(second, cache.read(b));
-        assertEquals(second.num, cache.read(b).num);
+        assertSame(first, cache.read(a, NumericRequest.DEFAULT));
+        assertNotSame(second, cache.read(b, NumericRequest.DEFAULT));
+        assertEquals(second.num, cache.read(b, NumericRequest.DEFAULT).num);
         cache.clear();
-        assertNotSame(first, cache.read(a));
+        assertNotSame(first, cache.read(a, NumericRequest.DEFAULT));
     }
 }

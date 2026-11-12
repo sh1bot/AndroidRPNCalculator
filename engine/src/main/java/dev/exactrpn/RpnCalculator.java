@@ -309,10 +309,6 @@ public final class RpnCalculator {
                     saveValue(value, SavedValue.of(value, "r", null, null));
                 }
                 break;
-            case "DUP":
-                need(1);
-                stack.add(top());
-                break;
             case "SWAP":
                 need(2);
                 Collections.swap(stack, stack.size() - 1, stack.size() - 2);

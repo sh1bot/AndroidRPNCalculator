@@ -238,10 +238,10 @@ public final class FunctionsTest {
     @Test
     public void mixedDisplayCopyAndFactorisationThroughRemoteProcess() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        RemoteCalculator remote = new RemoteCalculator(context);
+        RemoteCalculator remote = new RemoteCalculator(context, false);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         File seed = File.createTempFile("functions-test-", ".state", context.getNoBackupFilesDir());
-        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir());
+        CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         try {
             TestCalculator calculator = new TestCalculator();
             for (String key : new String[] {"7", "ENTER", "3", "÷"}) calculator.key(key);
@@ -286,45 +286,11 @@ public final class FunctionsTest {
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.DOT).stack("2 1/3", 0);
             assertEquals("2\u00a01/3", styled.toString());
-            android.text.style.SuperscriptSpan[] raised =
-                    styled.getSpans(0, styled.length(), android.text.style.SuperscriptSpan.class);
-            android.text.style.SubscriptSpan[] lowered =
-                    styled.getSpans(0, styled.length(), android.text.style.SubscriptSpan.class);
-            assertEquals(1, raised.length);
-            assertEquals(1, lowered.length);
-            assertEquals(
-                    "1",
-                    styled.subSequence(styled.getSpanStart(raised[0]), styled.getSpanEnd(raised[0]))
-                            .toString());
-            assertEquals(
-                    "3",
-                    styled.subSequence(
-                                    styled.getSpanStart(lowered[0]), styled.getSpanEnd(lowered[0]))
-                            .toString());
             android.text.Spanned longFraction =
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.UNGROUPED)
                                     .stack("123456789/12345", 0);
-            android.text.style.SuperscriptSpan[] fullNumerator =
-                    longFraction.getSpans(
-                            0, longFraction.length(), android.text.style.SuperscriptSpan.class);
-            android.text.style.SubscriptSpan[] fullDenominator =
-                    longFraction.getSpans(
-                            0, longFraction.length(), android.text.style.SubscriptSpan.class);
-            assertEquals(
-                    "123456789",
-                    longFraction
-                            .subSequence(
-                                    longFraction.getSpanStart(fullNumerator[0]),
-                                    longFraction.getSpanEnd(fullNumerator[0]))
-                            .toString());
-            assertEquals(
-                    "12345",
-                    longFraction
-                            .subSequence(
-                                    longFraction.getSpanStart(fullDenominator[0]),
-                                    longFraction.getSpanEnd(fullDenominator[0]))
-                            .toString());
+            assertEquals("123456789/12345", longFraction.toString());
             assertTrue(
                     TestCalculator.load(mixed.state)
                             .values()
@@ -529,7 +495,7 @@ public final class FunctionsTest {
     @Test
     public void remoteValidationUsesTheErrorCatalogue() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        RemoteCalculator remote = new RemoteCalculator(context);
+        RemoteCalculator remote = new RemoteCalculator(context, false);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         try {
             DisplayResult result =

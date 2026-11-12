@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 final class KeypadLayoutTest {
     private KeypadLayout choose(int width, int height, boolean expanded) {
-        return KeypadLayout.choose(width, height, expanded, 12, 48, 48, 200, 112);
+        return KeypadLayout.choose(width, height, expanded, 12, 48, 48, 200, 112, 4, 5);
     }
 
     @Test

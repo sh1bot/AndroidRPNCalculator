@@ -57,7 +57,7 @@ final class EntryRegressionTest extends RegressionSupport {
         assertTrue(top(c).definitelyOne(), "swap");
         keys(c, "DROP");
         assertTrue(top(c).definitelyEquals(UnifiedReal.TWO), "drop");
-        keys(c, "DUP");
+        keys(c, "ENTER");
         assertTrue(c.values().size() == 2, "duplicate");
         keys(c, "CLEAR");
         try {
@@ -146,7 +146,8 @@ final class EntryRegressionTest extends RegressionSupport {
         assertEquals(
                 "ESCAPE", KeyboardInput.command(111, 0, false, false, false), "escape mapping");
         assertEquals("UNDO", KeyboardInput.command(54, 0, true, false, false), "undo shortcut");
-        assertEquals("DUP", KeyboardInput.command(32, 0, true, false, false), "duplicate shortcut");
+        assertEquals(
+                "ENTER", KeyboardInput.command(32, 0, true, false, false), "duplicate shortcut");
         assertEquals("SWAP", KeyboardInput.command(47, 0, true, false, false), "swap shortcut");
         assertTrue(
                 KeyboardInput.command(54, 'z', false, true, false) == null,
