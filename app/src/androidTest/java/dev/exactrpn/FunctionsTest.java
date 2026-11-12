@@ -51,9 +51,9 @@ public final class FunctionsTest {
                     true);
         }
         int marker =
-                Math.max(
-                        Math.max(number.indexOf('e'), number.indexOf('E')),
-                        Math.max(number.indexOf('p'), number.indexOf('P')));
+                base == 10
+                        ? Math.max(number.indexOf('e'), number.indexOf('E'))
+                        : Math.max(number.indexOf('p'), number.indexOf('P'));
         return marker < 0
                 ? FormattedValue.decimal(number, approximate, base)
                 : FormattedValue.exponential(
