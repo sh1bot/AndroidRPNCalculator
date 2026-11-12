@@ -208,10 +208,6 @@ final class TestCalculator {
         return engine.values();
     }
 
-    RpnCalculator.AngleUnit angleUnit() {
-        return engine.angleUnit();
-    }
-
     void setAngleUnit(RpnCalculator.AngleUnit unit) {
         engine.setAngleUnit(unit);
     }

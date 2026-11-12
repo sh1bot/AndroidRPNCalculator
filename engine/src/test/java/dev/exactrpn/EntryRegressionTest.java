@@ -254,17 +254,6 @@ final class EntryRegressionTest extends RegressionSupport {
         hp.setAngleUnit(RpnCalculator.AngleUnit.RAD);
         keys(hp, "CLEAR", "π", "2", "÷", "sin");
         assertTrue(top(hp).definitelyOne(), "radians unchanged");
-        hp.key("7");
-        hp.key("ANGLE");
-        assertTrue(
-                hp.angleUnit() == RpnCalculator.AngleUnit.DEG
-                        && hp.isEditing()
-                        && hp.entry().equals("7"),
-                "angle toggle preserves entry and stack");
-        hp.key("ANGLE");
-        assertTrue(hp.angleUnit() == RpnCalculator.AngleUnit.GRAD, "cycle to gradians");
-        hp.key("ANGLE");
-        assertTrue(hp.angleUnit() == RpnCalculator.AngleUnit.RAD, "cycle to radians");
         assertEquals("1234.56", normalize("1234.56", ',', '.', 3, 3), "C decimal in comma locale");
         assertTrue(
                 NumberText.analyze("1.234", new NumberText.Profile(',', '.', 3, 3)).ambiguous(),

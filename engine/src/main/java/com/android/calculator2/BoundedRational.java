@@ -62,6 +62,14 @@ public class BoundedRational {
         mDen = BigInteger.valueOf(1);
     }
 
+    public BigInteger numerator() {
+        return mNum;
+    }
+
+    public BigInteger denominator() {
+        return mDen;
+    }
+
     /**
      * Produce BoundedRational equal to the given double.
      */

@@ -35,16 +35,15 @@ public enum Operation {
     SIXTEEN_POWER(CalculatorKey.SIXTEEN_POWER, 1),
     LN(CalculatorKey.LN, 1),
     EXP(CalculatorKey.EXP, 1),
-    SIN(CalculatorKey.SIN, 1, true),
-    COS(CalculatorKey.COS, 1, true),
-    TAN(CalculatorKey.TAN, 1, true),
-    ASIN(CalculatorKey.ASIN, 1, true),
-    ACOS(CalculatorKey.ACOS, 1, true),
-    ATAN(CalculatorKey.ATAN, 1, true);
+    SIN(CalculatorKey.SIN, 1),
+    COS(CalculatorKey.COS, 1),
+    TAN(CalculatorKey.TAN, 1),
+    ASIN(CalculatorKey.ASIN, 1),
+    ACOS(CalculatorKey.ACOS, 1),
+    ATAN(CalculatorKey.ATAN, 1);
 
     public final String key;
     public final int arity;
-    private final boolean angle;
     private static final UnifiedReal DEGREES = new UnifiedReal(180),
             GRADIANS = new UnifiedReal(200);
     private static final Map<String, Operation> OPERATIONS = new HashMap<>();
@@ -54,25 +53,12 @@ public enum Operation {
     }
 
     Operation(CalculatorKey key, int arity) {
-        this(key, arity, false);
-    }
-
-    Operation(CalculatorKey key, int arity, boolean angle) {
-        this(key.wire, arity, angle);
-    }
-
-    Operation(String key, int arity, boolean angle) {
-        this.key = key;
+        this.key = key.wire;
         this.arity = arity;
-        this.angle = angle;
     }
 
     public static Operation find(String key) {
         return OPERATIONS.get(key);
-    }
-
-    public String savedName(RpnCalculator.AngleUnit unit) {
-        return angle ? key + ":" + unit.name() : key;
     }
 
     private static UnifiedReal angleDivisor(RpnCalculator.AngleUnit unit) {

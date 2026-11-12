@@ -3,6 +3,7 @@ package dev.exactrpn;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -22,6 +23,7 @@ import org.junit.runner.RunWith;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class StackSelectionTest {
@@ -92,6 +94,36 @@ public final class StackSelectionTest {
     private void selectEnds(MainActivity activity) {
         instrumentation.runOnMainSync(() -> tagged(activity, "stack-label:0").performClick());
         instrumentation.runOnMainSync(() -> tagged(activity, "stack-row:2").performClick());
+    }
+
+    @Test
+    public void changingSelectionUpdatesExistingRowsWithoutRebuildingThem() throws Exception {
+        MainActivity activity = open();
+        CalculatorSession state = session(activity);
+        try {
+            seed(activity);
+            instrumentation.runOnMainSync(() -> tagged(activity, "stack-row:0").performClick());
+            await(
+                    () ->
+                            state.selectedRows.contains(0)
+                                    && tagged(activity, "stack-checkbox:0") != null);
+            AtomicReference<View> firstRow = new AtomicReference<>();
+            instrumentation.runOnMainSync(
+                    () -> firstRow.set(tagged(activity, "stack-row:0")));
+
+            instrumentation.runOnMainSync(() -> tagged(activity, "stack-row:1").performClick());
+            await(
+                    () -> {
+                        View checkbox = tagged(activity, "stack-checkbox:1");
+                        return state.selectedRows.contains(1)
+                                && checkbox instanceof android.widget.CheckBox
+                                && ((android.widget.CheckBox) checkbox).isChecked();
+                    });
+            instrumentation.runOnMainSync(
+                    () -> assertSame(firstRow.get(), tagged(activity, "stack-row:0")));
+        } finally {
+            finish(activity);
+        }
     }
 
     @Test

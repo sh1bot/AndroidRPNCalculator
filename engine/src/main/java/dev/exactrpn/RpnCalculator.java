@@ -176,7 +176,7 @@ public final class RpnCalculator {
     public static byte[] saveWithEntry(byte[] calculation, EntryEditor draft, boolean newBranch)
             throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(calculation));
-        if (in.readInt() != 0x52504e36)
+        if (in.readInt() != 0x52504e37)
             throw new IOException("Unsupported snapshot for entry replacement");
         int length = in.readInt();
         if (length < 0 || length > calculation.length - 13)
@@ -209,10 +209,6 @@ public final class RpnCalculator {
         return bytes;
     }
 
-    public AngleUnit angleUnit() {
-        return angleUnit;
-    }
-
     public void setAngleUnit(AngleUnit unit) {
         angleUnit = Objects.requireNonNull(unit);
     }
@@ -238,16 +234,12 @@ public final class RpnCalculator {
         }
         for (UnifiedReal value : values) {
             stack.add(value);
-            saveValue(value, SavedValue.of(value, "r", null, null));
+            saveValue(value, SavedValue.rational(value));
         }
         remember(before);
     }
 
     public void key(String key) {
-        if (key.equals("ANGLE")) {
-            angleUnit = AngleUnit.values()[(angleUnit.ordinal() + 1) % AngleUnit.values().length];
-            return;
-        }
         if (key.equals(Command.UNDO)) {
             if (!undo.isEmpty()) {
                 redo.push(new State(this));
@@ -306,7 +298,7 @@ public final class RpnCalculator {
                 for (BigInteger factor : factors) {
                     UnifiedReal value = new UnifiedReal(factor);
                     stack.add(value);
-                    saveValue(value, SavedValue.of(value, "r", null, null));
+                    saveValue(value, SavedValue.rational(value));
                 }
                 break;
             case "SWAP":
@@ -381,7 +373,13 @@ public final class RpnCalculator {
                 expression = savedValues.get(value);
             } else {
                 sum = operation.evaluate(sum, value, angleUnit);
-                expression = SavedValue.of(sum, operation.key, expression, savedValues.get(value));
+                expression =
+                        SavedValue.of(
+                                sum,
+                                operation,
+                                angleUnit,
+                                expression,
+                                savedValues.get(value));
             }
         }
         State before = new State(this);
@@ -406,7 +404,8 @@ public final class RpnCalculator {
             expressions.add(
                     SavedValue.of(
                             result,
-                            operation.savedName(angleUnit),
+                            operation,
+                            angleUnit,
                             savedValues.get(original),
                             null));
         }
@@ -482,7 +481,7 @@ public final class RpnCalculator {
                 body.length + currentEntry.length + 13, CalculationLimits.ARITHMETIC_BYTES);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e36);
+        out.writeInt(0x52504e37);
         out.writeInt(body.length);
         out.write(body);
         out.writeInt(currentEntry.length);
@@ -525,11 +524,16 @@ public final class RpnCalculator {
             }
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeUTF(angleUnit.name());
         out.writeInt(nodes.size());
         for (SavedValue node : nodes) {
-            out.writeUTF(node.op);
-            out.writeUTF(node.literal);
+            out.writeBoolean(node.rational != null);
+            if (node.rational != null) {
+                writeInteger(out, node.rational.numerator);
+                writeInteger(out, node.rational.denominator);
+            } else {
+                out.writeByte(node.operation.ordinal());
+                out.writeByte(node.angle.ordinal());
+            }
             out.writeInt(node.left == null ? -1 : ids.get(node.left));
             out.writeInt(node.right == null ? -1 : ids.get(node.right));
         }
@@ -552,7 +556,7 @@ public final class RpnCalculator {
     public static RpnCalculator load(byte[] bytes) throws IOException {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            if (in.readInt() != 0x52504e36) throw new IOException("Unknown saved state version");
+            if (in.readInt() != 0x52504e37) throw new IOException("Unknown saved state version");
             byte[] body = readSection(in), entry = readSection(in);
             boolean branch = in.readBoolean();
             if (in.available() != 0) throw new IOException("Trailing saved state data");
@@ -567,23 +571,28 @@ public final class RpnCalculator {
 
     private static RpnCalculator readMath(DataInputStream in) throws IOException {
         RpnCalculator c = new RpnCalculator();
-        c.angleUnit = AngleUnit.valueOf(in.readUTF());
         int count = readCount(in, 1000000);
         List<SavedValue> nodes = new ArrayList<>();
         List<UnifiedReal> values = new ArrayList<>();
         for (int i = 0; i < count; i++) {
             if (Thread.currentThread().isInterrupted())
                 throw new com.hp.creals.CR.AbortedException();
-            String op = in.readUTF(), literal = in.readUTF();
+            boolean rational = in.readBoolean();
+            RationalValue exact =
+                    rational ? new RationalValue(readInteger(in), readInteger(in)) : null;
+            Operation operation = rational ? null : readEnum(in, Operation.values());
+            AngleUnit angle = rational ? null : readEnum(in, AngleUnit.values());
             int left = in.readInt(), right = in.readInt();
             if (left < -1 || right < -1 || left >= i || right >= i)
                 throw new IOException("Invalid expression reference");
             SavedValue node =
-                    new SavedValue(
-                            op,
-                            literal,
-                            left < 0 ? null : nodes.get(left),
-                            right < 0 ? null : nodes.get(right));
+                    rational
+                            ? SavedValue.rational(exact)
+                            : SavedValue.operation(
+                                    operation,
+                                    angle,
+                                    left < 0 ? null : nodes.get(left),
+                                    right < 0 ? null : nodes.get(right));
             UnifiedReal value =
                     node.evaluate(
                             left < 0 ? null : values.get(left),
@@ -622,6 +631,26 @@ public final class RpnCalculator {
         return count;
     }
 
+    private static void writeInteger(DataOutputStream out, BigInteger value) throws IOException {
+        byte[] bytes = value.toByteArray();
+        out.writeInt(bytes.length);
+        out.write(bytes);
+    }
+
+    private static BigInteger readInteger(DataInputStream in) throws IOException {
+        int length = readCount(in, CalculationLimits.ARITHMETIC_BYTES);
+        if (length == 0 || length > in.available()) throw new IOException("Invalid integer");
+        byte[] bytes = new byte[length];
+        in.readFully(bytes);
+        return new BigInteger(bytes);
+    }
+
+    private static <T> T readEnum(DataInputStream in, T[] values) throws IOException {
+        int ordinal = in.readUnsignedByte();
+        if (ordinal >= values.length) throw new IOException("Invalid saved value type");
+        return values[ordinal];
+    }
+
     private UnifiedReal top() {
         return stack.get(stack.size() - 1);
     }
@@ -637,7 +666,7 @@ public final class RpnCalculator {
         if (!editor.entry.isEmpty()) {
             UnifiedReal value = parse(editor.entry, editor.inputProfile.radix);
             stack.add(value);
-            saveValue(value, SavedValue.of(value, "r", null, null));
+            saveValue(value, SavedValue.rational(value));
         }
         editor.entry = "";
         editor.editing = false;
@@ -657,7 +686,8 @@ public final class RpnCalculator {
                 result,
                 SavedValue.of(
                         result,
-                        operation.savedName(angleUnit),
+                        operation,
+                        angleUnit,
                         savedValues.get(a),
                         savedValues.get(b)));
         for (int i = 0; i < operation.arity; i++) stack.remove(stack.size() - 1);

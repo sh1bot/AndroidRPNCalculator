@@ -129,7 +129,8 @@ final class CalculatorSession {
         }
         if (!busy
                 && Looper.myLooper() == Looper.getMainLooper()
-                && editLocally(command, inputGeneration)) return;
+                && (editLocally(command, inputGeneration)
+                        || changeFormat(command, inputGeneration))) return;
         boolean start;
         synchronized (this) {
             pending.addLast(new PendingKey(command, inputGeneration, copy));
@@ -318,7 +319,10 @@ final class CalculatorSession {
     }
 
     private boolean changeFormat(Command key, long generation) {
-        if (!key.is("FORMAT") && !key.is("NUMBER_FORMAT") && !key.is("FRACTION")) return false;
+        if (!key.is("FORMAT")
+                && !key.is("NUMBER_FORMAT")
+                && !key.is("FRACTION")
+                && !key.is("ANGLE")) return false;
         Display current = display;
         ValueFormatter.Notation notation =
                 key.is("FORMAT")
@@ -330,6 +334,11 @@ final class CalculatorSession {
         Display next =
                 new Display(
                         current,
+                        key.is("ANGLE")
+                                ? RpnCalculator.AngleUnit.values()[
+                                        (current.angleUnit.ordinal() + 1)
+                                                % RpnCalculator.AngleUnit.values().length]
+                                : current.angleUnit,
                         notation,
                         key.is("NUMBER_FORMAT") ? current.numberMode.next() : current.numberMode,
                         key.is("FRACTION") ? current.fractionMode.next() : current.fractionMode,
@@ -372,7 +381,6 @@ final class CalculatorSession {
             CalculationRequest request = request(Command.rows(Command.Kind.READ_VALUES, rows));
             request.numbers = NumericRequest.display(radix);
             DisplayResult result = remote.evaluate(request);
-            result.angle = current.angleUnit;
             Display settings =
                     new Display(
                             current,

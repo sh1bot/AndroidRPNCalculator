@@ -20,7 +20,6 @@ final class DisplayResult {
     byte[] state, entryState;
     boolean readOnly, exactRequired;
     ArrayList<NumericValue> values = new ArrayList<>();
-    RpnCalculator.AngleUnit angle = RpnCalculator.AngleUnit.RAD;
 
     static byte[] encode(DisplayResult result, EntryEditor editor) throws IOException {
         boolean[] exact = new boolean[result.values.size()];
@@ -65,7 +64,6 @@ final class DisplayResult {
                             + textSize(result.checkpoint)
                             + 4
                             + 4
-                            + 1
                             + bytesSize(entry);
         return size;
     }
@@ -74,7 +72,7 @@ final class DisplayResult {
             throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
-            out.writeInt(0x44525039);
+            out.writeInt(0x44525040);
             out.writeBoolean(result.readOnly);
             writeText(out, result.stackId);
             out.writeInt(result.values.size());
@@ -86,7 +84,6 @@ final class DisplayResult {
                 writeText(out, result.checkpoint);
                 out.writeInt(result.operationError == null ? -1 : result.operationError.ordinal());
                 out.writeInt(result.errorArgument);
-                out.writeByte(result.angle.ordinal());
                 writeBytes(out, entry);
             }
         }
@@ -95,7 +92,7 @@ final class DisplayResult {
 
     static DisplayResult decode(byte[] bytes) throws IOException {
         try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(require(bytes)))) {
-            if (in.readInt() != 0x44525039) throw new IOException("Unknown result protocol");
+            if (in.readInt() != 0x44525040) throw new IOException("Unknown result protocol");
             DisplayResult result = new DisplayResult();
             result.readOnly = in.readBoolean();
             result.stackId = readText(in);
@@ -112,7 +109,6 @@ final class DisplayResult {
                     throw new IOException("Invalid error code");
                 result.operationError = code == -1 ? null : CalculationError.Code.values()[code];
                 result.errorArgument = in.readInt();
-                result.angle = readEnum(in, RpnCalculator.AngleUnit.values());
                 result.entryState = readBytes(in);
                 if (result.state == null || result.entryState == null)
                     throw new IOException("Missing calculation state");

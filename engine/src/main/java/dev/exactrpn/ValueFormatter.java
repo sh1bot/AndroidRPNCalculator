@@ -20,21 +20,30 @@ public final class ValueFormatter {
 
     public static String format(
             NumericValue value, boolean newest, Notation notation, FractionMode mode) {
+        return presentation(value, newest, notation, mode).canonical;
+    }
+
+    public static FormattedValue presentation(
+            NumericValue value, boolean newest, Notation notation, FractionMode mode) {
         RationalValue rational = value.rational;
         if (rational != null) {
             boolean integer = rational.denominator.equals(BigInteger.ONE);
             if (integer && newest && fits(rational.numerator, value.base))
-                return digits(rational.numerator, value.base);
+                return FormattedValue.decimal(
+                        digits(rational.numerator, value.base), false, value.base);
             if (!integer
                     && mode != FractionMode.DECIMAL
                     && fits(rational.numerator, value.base)
                     && fits(rational.denominator, value.base)) {
-                String text = fraction(rational, mode == FractionMode.MIXED, value.base);
-                if (newest || text.length() <= DIGITS + 4) return text;
+                FormattedValue text =
+                        fractionPresentation(
+                                rational, mode == FractionMode.MIXED, value.base, true);
+                if (newest || text.canonical.length() <= DIGITS + 4) return text;
             }
             if (newest && mode == FractionMode.DECIMAL) {
                 String text = terminating(rational, value.base);
-                if (text != null && text.length() <= MAX_INLINE_DIGITS + 2) return text;
+                if (text != null && text.length() <= MAX_INLINE_DIGITS + 2)
+                    return FormattedValue.decimal(text, false, value.base);
             }
         }
         return approximation(value, notation, DIGITS, true, newest);
@@ -47,34 +56,46 @@ public final class ValueFormatter {
             String text = terminating(value.rational, value.base);
             if (text != null) return text;
         }
-        return approximation(value, notation, 40, false, false).replace('\u2212', '-');
+        return approximation(value, notation, 40, false, false)
+                .canonical
+                .replace('\u2212', '-');
     }
 
     /** Exact fraction text for a caller which can measure it, or null when none is available. */
-    public static String exactFraction(NumericValue value, FractionMode mode) {
+    public static FormattedValue exactFractionPresentation(
+            NumericValue value, FractionMode mode) {
         RationalValue rational = value.rational;
         if (rational == null
                 || rational.denominator.equals(BigInteger.ONE)
                 || mode == FractionMode.DECIMAL
                 || !fits(rational.numerator, value.base)
                 || !fits(rational.denominator, value.base)) return null;
-        if (mode != FractionMode.MIXED) return fraction(rational, false, value.base);
+        if (mode != FractionMode.MIXED)
+            return fractionPresentation(rational, false, value.base, false);
         BigInteger[] parts = rational.numerator.abs().divideAndRemainder(rational.denominator);
-        if (parts[0].signum() == 0) return fraction(rational, false, value.base);
-        return (rational.numerator.signum() < 0 ? "-" : "")
-                + digits(parts[0], value.base)
-                + (rational.numerator.signum() < 0 ? "-" : "+")
-                + digits(parts[1], value.base)
-                + "/"
-                + digits(rational.denominator, value.base);
+        if (parts[0].signum() == 0)
+            return fractionPresentation(rational, false, value.base, false);
+        boolean negative = rational.numerator.signum() < 0;
+        return FormattedValue.fraction(
+                (negative ? "-" : "") + digits(parts[0], value.base),
+                negative ? '-' : '+',
+                digits(parts[1], value.base),
+                digits(rational.denominator, value.base),
+                value.base,
+                false);
     }
 
     /** Forced exponential fallback, rounded to at most the requested significant digits. */
     public static String exponential(NumericValue value, Notation notation, int significantDigits) {
+        return exponentialPresentation(value, notation, significantDigits).canonical;
+    }
+
+    public static FormattedValue exponentialPresentation(
+            NumericValue value, Notation notation, int significantDigits) {
         if (significantDigits < 1) throw new IllegalArgumentException("No significant digits");
         if (value.zeroBound != 0)
             return approximation(value, notation, significantDigits, true, false);
-        if (value.num.signum() == 0) return "0";
+        if (value.num.signum() == 0) return FormattedValue.decimal("0", false, value.base);
         BigInteger radix = BigInteger.valueOf(value.base);
         BigInteger coefficient = value.num.abs();
         int scale = value.scale;
@@ -104,12 +125,11 @@ public final class ValueFormatter {
                         ? Math.floorDiv(exponent, group) * group
                         : exponent;
         String mantissa = pointAfter(number, exponent - power + 1);
-        return (exact ? "" : "≈ ")
-                + (value.num.signum() < 0 ? "-" : "")
-                + mantissa
-                + exponentMarker(value.base)
-                + (power >= 0 ? "+" : "−")
-                + radixDigits(Math.abs(power), value.base);
+        return FormattedValue.exponential(
+                (value.num.signum() < 0 ? "-" : "") + mantissa,
+                (power >= 0 ? "+" : "−") + radixDigits(Math.abs(power), value.base),
+                !exact,
+                value.base);
     }
 
     public static String clipboard(NumericValue value, Notation notation) {
@@ -125,18 +145,28 @@ public final class ValueFormatter {
     }
 
     private static String fraction(RationalValue value, boolean mixed, int base) {
+        return fractionPresentation(value, mixed, base, true).canonical;
+    }
+
+    private static FormattedValue fractionPresentation(
+            RationalValue value, boolean mixed, int base, boolean spaced) {
         BigInteger numerator = value.numerator, denominator = value.denominator;
-        if (denominator.equals(BigInteger.ONE)) return digits(numerator, base);
-        if (!mixed) return digits(numerator, base) + "/" + digits(denominator, base);
+        if (denominator.equals(BigInteger.ONE))
+            return FormattedValue.decimal(digits(numerator, base), false, base);
+        if (!mixed)
+            return FormattedValue.fraction(
+                    "", '\0', digits(numerator, base), digits(denominator, base), base, spaced);
         BigInteger[] parts = numerator.abs().divideAndRemainder(denominator);
         if (parts[0].signum() == 0)
-            return digits(numerator, base) + "/" + digits(denominator, base);
-        return (numerator.signum() < 0 ? "-" : "")
-                + digits(parts[0], base)
-                + " "
-                + digits(parts[1], base)
-                + "/"
-                + digits(denominator, base);
+            return FormattedValue.fraction(
+                    "", '\0', digits(numerator, base), digits(denominator, base), base, spaced);
+        return FormattedValue.fraction(
+                (numerator.signum() < 0 ? "-" : "") + digits(parts[0], base),
+                ' ',
+                digits(parts[1], base),
+                digits(denominator, base),
+                base,
+                spaced);
     }
 
     private static String terminating(RationalValue value, int base) {
@@ -161,7 +191,7 @@ public final class ValueFormatter {
         return (negative ? "-" : "") + text;
     }
 
-    private static String approximation(
+    private static FormattedValue approximation(
             NumericValue value,
             Notation notation,
             int significantDigits,
@@ -169,20 +199,20 @@ public final class ValueFormatter {
             boolean preferPlain) {
         if (value.zeroBound != 0)
             return mark
-                    ? "\u2248 0 (|x| < 1"
-                            + exponentMarker(value.base)
-                            + "\u2212"
-                            + radixDigits(value.zeroBound, value.base)
-                            + ")"
-                    : "0";
-        String prefix = mark && !value.exact ? "\u2248 " : "";
-        if (value.num.signum() == 0) return prefix + "0";
+                    ? FormattedValue.zeroBound(value.zeroBound, value.base, true)
+                    : FormattedValue.decimal("0", false, value.base);
+        boolean approximate = mark && !value.exact;
+        if (value.num.signum() == 0)
+            return FormattedValue.decimal("0", approximate, value.base);
         boolean negative = value.num.signum() < 0;
         String number = digits(value.num.abs(), value.base);
         int exponent = number.length() - value.scale - 1;
         if (exponent >= -6 && exponent < significantDigits
                 || preferPlain && Math.abs((long) exponent) <= MAX_WIDE_DIGITS)
-            return prefix + (negative ? "-" : "") + plain(number, value.scale);
+            return FormattedValue.decimal(
+                    (negative ? "-" : "") + plain(number, value.scale),
+                    approximate,
+                    value.base);
         int group = RadixMode.of(value.base).grouping;
         int power =
                 notation == Notation.ENGINEERING
@@ -190,16 +220,11 @@ public final class ValueFormatter {
                         : exponent;
         int wholeDigits = exponent - power + 1;
         String mantissa = pointAfter(number, wholeDigits);
-        return prefix
-                + (negative ? "-" : "")
-                + mantissa
-                + exponentMarker(value.base)
-                + (power >= 0 ? "+" : "\u2212")
-                + radixDigits(Math.abs(power), value.base);
-    }
-
-    private static String exponentMarker(int base) {
-        return base == 10 ? "e" : "p";
+        return FormattedValue.exponential(
+                (negative ? "-" : "") + mantissa,
+                (power >= 0 ? "+" : "\u2212") + radixDigits(Math.abs(power), value.base),
+                approximate,
+                value.base);
     }
 
     private static String radixDigits(int value, int base) {

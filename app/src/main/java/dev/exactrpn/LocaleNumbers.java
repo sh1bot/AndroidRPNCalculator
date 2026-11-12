@@ -81,49 +81,37 @@ public final class LocaleNumbers {
         return text.toString();
     }
 
-    public CharSequence stack(String canonical, int groupingColor) {
+    public CharSequence stack(FormattedValue value, int groupingColor) {
         SpannableStringBuilder text = new SpannableStringBuilder();
-        String number = canonical;
-        if (number.startsWith("≈ ")) {
-            text.append("≈ ");
-            number = number.substring(2);
-        }
-        // The near-zero bound is an annotation, but its power of ten uses the same styling.
-        String bound = "0 (|x| < 1";
-        int boundMarker = exponent(number, bound.length());
-        if (number.startsWith(bound) && boundMarker == bound.length() && number.endsWith(")")) {
-            text.append(entry(bound));
-            appendExponent(text, number.substring(boundMarker + 1, number.length() - 1));
+        if (value.approximate) text.append("≈ ");
+        if (value.kind == FormattedValue.Kind.ZERO_BOUND) {
+            text.append(entry("0 (|x| < 1"));
+            appendExponent(
+                    text,
+                    "−"
+                            + Integer.toString(value.zeroBound, value.base)
+                                    .toUpperCase(java.util.Locale.ROOT),
+                    "10");
             text.append(")");
             return styleDozenal(text);
         }
-        if (number.contains("(")) {
-            text.append(entry(number));
-            return styleDozenal(text);
-        }
-        int slash = number.indexOf('/');
-        if (slash >= 0) {
-            int operator = fractionOperator(number, slash);
-            String numerator = number.substring(operator >= 0 ? operator + 1 : 0, slash);
-            if (operator >= 0) {
-                appendInteger(text, number.substring(0, operator), groupingColor);
-                char symbol = number.charAt(operator);
+        if (value.kind == FormattedValue.Kind.FRACTION) {
+            String numerator = value.numerator;
+            if (!value.whole.isEmpty()) {
+                appendInteger(text, value.whole, groupingColor);
+                char symbol = value.fractionOperator;
                 text.append(symbol == ' ' ? "\u00a0" : symbol == '-' ? " − " : " + ");
-            } else if (numerator.startsWith("-")) {
+            } else if (value.numerator.startsWith("-")) {
                 text.append(((DecimalFormat) integers).getNegativePrefix());
                 numerator = numerator.substring(1);
             }
             appendInteger(text, numerator, groupingColor);
             text.append("/");
-            appendInteger(text, number.substring(slash + 1), groupingColor);
+            appendInteger(text, value.denominator, groupingColor);
             return styleDozenal(text);
         }
-        int e = exponent(number, 0);
-        String mantissa = e < 0 ? number : number.substring(0, e);
-        int dot = mantissa.indexOf('.');
-        String whole = dot < 0 ? mantissa : mantissa.substring(0, dot);
-        appendInteger(text, whole, groupingColor);
-        if (dot >= 0) {
+        appendInteger(text, value.whole, groupingColor);
+        if (!value.fractional.isEmpty()) {
             int start = text.length();
             text.append(Character.toString(decimalSeparator()));
             text.setSpan(
@@ -131,9 +119,10 @@ public final class LocaleNumbers {
                     start,
                     start + 1,
                     Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            text.append(entry(mantissa.substring(dot + 1)));
+            text.append(entry(value.fractional));
         }
-        if (e >= 0) appendExponent(text, number.substring(e + 1));
+        if (value.kind == FormattedValue.Kind.EXPONENTIAL)
+            appendExponent(text, value.exponent, "10");
         return styleDozenal(text);
     }
 
@@ -377,31 +366,16 @@ public final class LocaleNumbers {
         }
     }
 
-    FractionParts fractionParts(String canonical, int groupingColor) {
-        int slash = canonical.indexOf('/');
-        if (slash < 0) return null;
-        int operator = fractionOperator(canonical, slash);
-        String whole = operator >= 0 && operator < slash ? canonical.substring(0, operator) : "";
-        String numerator =
-                canonical.substring(operator >= 0 && operator < slash ? operator + 1 : 0, slash);
+    FractionParts fractionParts(FormattedValue value, int groupingColor) {
+        if (value.kind != FormattedValue.Kind.FRACTION) return null;
         SpannableStringBuilder displayedWhole =
-                new SpannableStringBuilder(integer(whole, groupingColor));
-        if (!whole.isEmpty())
-            displayedWhole.append(
-                    operator < canonical.length() && canonical.charAt(operator) == '-'
-                            ? " −"
-                            : " +");
+                new SpannableStringBuilder(integer(value.whole, groupingColor));
+        if (!value.whole.isEmpty())
+            displayedWhole.append(value.fractionOperator == '-' ? " −" : " +");
         return new FractionParts(
                 breakable(displayedWhole),
-                breakable(integer(numerator, groupingColor)),
-                breakable(integer(canonical.substring(slash + 1), groupingColor)));
-    }
-
-    private static int fractionOperator(String canonical, int slash) {
-        int operator = canonical.indexOf('+');
-        if (operator < 0) operator = canonical.indexOf('-', 1);
-        if (operator < 0) operator = canonical.indexOf(' ');
-        return operator < slash ? operator : -1;
+                breakable(integer(value.numerator, groupingColor)),
+                breakable(integer(value.denominator, groupingColor)));
     }
 
     private CharSequence integer(String canonical, int groupingColor) {
@@ -456,8 +430,4 @@ public final class LocaleNumbers {
         return c == 'p' || c == 'P' || radixMode == RadixMode.DECIMAL && (c == 'e' || c == 'E');
     }
 
-    private int exponent(String text, int from) {
-        for (int i = from; i < text.length(); i++) if (isExponent(text.charAt(i))) return i;
-        return -1;
-    }
 }

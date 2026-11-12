@@ -152,7 +152,6 @@ public class CalculationService extends Service {
                 throw new IOException(
                         "Saved calculation is damaged or from an unsupported version", ex);
             }
-            if (input == null) cached.setAngleUnit(request.angle);
             cachedId = input;
             cachedSession = session;
             cachedStackId = UUID.randomUUID().toString();
@@ -184,6 +183,7 @@ public class CalculationService extends Service {
             precision = request.numbers;
             List<UnifiedReal> before = cached.values();
             candidate = cached;
+            candidate.setAngleUnit(request.angle);
             byte[] draft = request.entryDraft;
             if (request.entryBranch) candidate.discardRedo();
             if (draft != null) {
@@ -209,7 +209,6 @@ public class CalculationService extends Service {
         }
 
         boolean keepEditor(EntryEditor returned) {
-            if (command.is("ANGLE")) return true;
             return !command.is(Command.RESTORE)
                     && !command.is(Command.UNDO)
                     && !command.is(Command.REDO)
@@ -226,7 +225,6 @@ public class CalculationService extends Service {
             display.operationError = operationError;
             display.errorArgument = errorArgument;
             display.stackId = stackId;
-            display.angle = candidate.angleUnit();
             return display;
         }
     }
