@@ -410,6 +410,12 @@ final class StackRowRenderer {
             LinearLayout row = new LinearLayout(context);
             row.setGravity(Gravity.CENTER_VERTICAL);
             row.setTag("stack-row:" + i);
+            View.OnClickListener toggle = v -> actions.toggle(index, display);
+            View.OnLongClickListener copy =
+                    v -> {
+                        actions.copy(index, display);
+                        return true;
+                    };
             if (!selectedRows.isEmpty()) {
                 CheckBox selected = new CheckBox(context);
                 selected.setTag("stack-checkbox:" + i);
@@ -424,11 +430,7 @@ final class StackRowRenderer {
                                 new int[] {colors.accent, colors.muted}));
                 selected.setChecked(selectedRows.contains(i));
                 selected.setContentDescription(context.getString(R.string.select_level, depth));
-                selected.setOnLongClickListener(
-                        v -> {
-                            actions.copy(index, display);
-                            return true;
-                        });
+                selected.setOnLongClickListener(copy);
                 selected.setOnClickListener(
                         v -> {
                             if (!actions.toggle(index, display))
@@ -441,12 +443,8 @@ final class StackRowRenderer {
             label.setSingleLine(true);
             updateStackLabel(label, depth, display.presentations.get(i).approximate);
             label.setTag("stack-label:" + i);
-            if (!display.editing) label.setOnClickListener(v -> actions.toggle(index, display));
-            label.setOnLongClickListener(
-                    v -> {
-                        actions.copy(index, display);
-                        return true;
-                    });
+            if (!display.editing) label.setOnClickListener(toggle);
+            label.setOnLongClickListener(copy);
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setTextColor(colors.muted);
             boolean result = !display.editing && depth == 1;
@@ -484,31 +482,18 @@ final class StackRowRenderer {
             value.setTextIsSelectable(false);
             row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
             value.setTag("stack-value:" + i);
-            value.setOnClickListener(v -> actions.toggle(index, display));
-            row.setOnClickListener(v -> actions.toggle(index, display));
-            value.setOnLongClickListener(
-                    v -> {
-                        actions.copy(index, display);
-                        return true;
-                    });
-            row.setOnLongClickListener(
-                    v -> {
-                        actions.copy(index, display);
-                        return true;
-                    });
-            row.setContentDescription(
+            value.setOnClickListener(toggle);
+            row.setOnClickListener(toggle);
+            value.setOnLongClickListener(copy);
+            row.setOnLongClickListener(copy);
+            String description =
                     rowDescription(
                             display.editing,
                             depth,
                             display.presentations.get(i).approximate,
-                            value.getText()));
-            if (display.editing)
-                label.setContentDescription(
-                        rowDescription(
-                                true,
-                                depth,
-                                display.presentations.get(i).approximate,
-                                value.getText()));
+                            value.getText());
+            row.setContentDescription(description);
+            if (display.editing) label.setContentDescription(description);
             stackRows.addView(row);
         }
         updateSelection(stackRows, selectedRows);
