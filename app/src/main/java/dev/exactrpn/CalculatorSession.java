@@ -365,30 +365,23 @@ final class CalculatorSession {
         }
         RadixMode radix = current.radixMode.next();
         EntryEditor entry = onMain(() -> editor == null ? new EntryEditor() : editor.copy());
+        Display settings =
+                new Display(
+                        current,
+                        current.notation,
+                        current.numberMode,
+                        current.fractionMode,
+                        radix,
+                        entry);
         Display next;
         if (current.values.isEmpty()) {
-            next =
-                    new Display(
-                            current,
-                            current.notation,
-                            current.numberMode,
-                            current.fractionMode,
-                            radix,
-                            entry);
+            next = settings;
         } else {
             int[] rows = new int[current.values.size()];
             for (int i = 0; i < rows.length; i++) rows[i] = i;
             CalculationRequest request = request(Command.rows(Command.Kind.READ_VALUES, rows));
             request.numbers = NumericRequest.display(radix);
             DisplayResult result = remote.evaluate(request);
-            Display settings =
-                    new Display(
-                            current,
-                            current.notation,
-                            current.numberMode,
-                            current.fractionMode,
-                            radix,
-                            entry);
             next = new Display(result, entry, settings);
         }
         Display accepted = next;

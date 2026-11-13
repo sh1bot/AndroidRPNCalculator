@@ -224,7 +224,7 @@ public final class CalculatorKeypad extends ViewGroup {
                     case FACTOR -> R.string.factor;
                     default -> 0;
                 };
-        if (resource != 0) return getContext().getString(resource);
+        if (resource != 0) return string(resource);
         return key.label;
     }
 
@@ -269,6 +269,18 @@ public final class CalculatorKeypad extends ViewGroup {
             bindButton(item.getKey(), item.getValue());
     }
 
+    private String string(int id) {
+        return getContext().getString(id);
+    }
+
+    private String string(int id, Object... args) {
+        return getContext().getString(id, args);
+    }
+
+    private Runnable send(String wire) {
+        return () -> command.accept(Command.key(wire));
+    }
+
     // Presentation and both gestures are assigned together for the button's current role.
     private void bindButton(CalculatorKey definition, Button button) {
         String key = effectiveKey(definition.wire);
@@ -276,7 +288,7 @@ public final class CalculatorKeypad extends ViewGroup {
         String description = keyDescription(key);
         int icon = 0;
         boolean editing = mode == InteractionMode.ENTRY, selecting = mode == InteractionMode.SELECT;
-        Runnable click = () -> command.accept(Command.key(key));
+        Runnable click = send(key);
         Runnable hold = null;
         Operation operation = Operation.find(key);
         boolean enabled =
@@ -287,23 +299,19 @@ public final class CalculatorKeypad extends ViewGroup {
             label = numbers.styleDozenal(digit);
             if (key.equals(".")) {
                 description =
-                        getContext()
-                                .getString(
-                                        editing
-                                                ? R.string.decimal_exponent_description
-                                                : R.string.decimal_separator);
-                if (editing) hold = () -> command.accept(Command.key("HOLD_DECIMAL"));
+                        string(
+                                editing
+                                        ? R.string.decimal_exponent_description
+                                        : R.string.decimal_separator);
+                if (editing) hold = send("HOLD_DECIMAL");
             } else {
                 description =
                         editing
                                 ? label.toString()
-                                : getContext()
-                                        .getString(
-                                                R.string.digit_pick_description,
-                                                label,
-                                                key.equals("0")
-                                                        ? 10
-                                                        : Character.digit(key.charAt(0), 16));
+                                : string(
+                                        R.string.digit_pick_description,
+                                        label,
+                                        key.equals("0") ? 10 : Character.digit(key.charAt(0), 16));
                 hold = () -> command.accept(Command.holdDigit(key));
             }
         }
@@ -312,24 +320,22 @@ public final class CalculatorKeypad extends ViewGroup {
                 boolean complementary = definition == CalculatorKey.COMPLEMENTS;
                 boolean open = expanded && inverse == complementary;
                 description =
-                        getContext()
-                                .getString(
-                                        complementary
-                                                ? open
-                                                        ? R.string.close_complements
-                                                        : R.string.open_complements
-                                                : open
-                                                        ? R.string.close_functions
-                                                        : R.string.open_functions);
+                        string(
+                                complementary
+                                        ? open
+                                                ? R.string.close_complements
+                                                : R.string.open_complements
+                                        : open
+                                                ? R.string.close_functions
+                                                : R.string.open_functions);
                 click = () -> togglePanel(complementary);
             }
             case PI -> {
                 description =
-                        getContext()
-                                .getString(
-                                        tau
-                                                ? R.string.tau_toggle_description
-                                                : R.string.pi_toggle_description);
+                        string(
+                                tau
+                                        ? R.string.tau_toggle_description
+                                        : R.string.pi_toggle_description);
                 hold =
                         () -> {
                             tau = !tau;
@@ -345,91 +351,72 @@ public final class CalculatorKeypad extends ViewGroup {
             }
             case LOG10 ->
                     description =
-                            getContext()
-                                    .getString(
-                                            inverse
-                                                    ? R.string.base_power_description
-                                                    : R.string.logarithm_description,
-                                            radixMode.radix);
+                            string(
+                                    inverse
+                                            ? R.string.base_power_description
+                                            : R.string.logarithm_description,
+                                    radixMode.radix);
             case CLEAR -> {
-                label = selecting ? "" : editing ? "CE" : getContext().getString(R.string.clear);
+                label = selecting ? "" : editing ? "CE" : string(R.string.clear);
                 icon = selecting ? R.drawable.ic_select_all : 0;
                 description =
-                        getContext()
-                                .getString(
-                                        selecting
-                                                ? R.string.select_all_description
-                                                : editing
-                                                        ? R.string.clear_entry
-                                                        : R.string.clear_stack);
-                click = () -> command.accept(Command.key(editing ? "CE" : "CLEAR"));
+                        string(
+                                selecting
+                                        ? R.string.select_all_description
+                                        : editing ? R.string.clear_entry : R.string.clear_stack);
+                click = send(editing ? "CE" : "CLEAR");
             }
             case BACK -> {
                 label = editing ? "⌫" : "";
                 icon = editing ? 0 : R.drawable.ic_delete;
                 description =
-                        getContext()
-                                .getString(
-                                        selecting
-                                                ? R.string.drop_selected
-                                                : editing
-                                                        ? R.string.backspace
-                                                        : R.string.drop_roll_description);
-                click = () -> command.accept(Command.key(editing ? "BACK" : "DROP"));
-                if (!selecting)
-                    hold = () -> command.accept(Command.key(editing ? "BACK" : "ROLL_DOWN"));
+                        string(
+                                selecting
+                                        ? R.string.drop_selected
+                                        : editing
+                                                ? R.string.backspace
+                                                : R.string.drop_roll_description);
+                click = send(editing ? "BACK" : "DROP");
+                if (!selecting) hold = send(editing ? "BACK" : "ROLL_DOWN");
             }
             case SWAP -> {
                 label = "⇅";
                 enabled = !selecting;
-                if (!selecting) hold = () -> command.accept(Command.key("ROLL_UP"));
+                if (!selecting) hold = send("ROLL_UP");
             }
             case ADD, MULTIPLY -> {
                 enabled = true;
                 if (selecting) {
                     label = definition == CalculatorKey.ADD ? "Σ" : "Π";
                     description =
-                            getContext()
-                                    .getString(
-                                            definition == CalculatorKey.ADD
-                                                    ? R.string.sum_selected
-                                                    : R.string.product_selected);
+                            string(
+                                    definition == CalculatorKey.ADD
+                                            ? R.string.sum_selected
+                                            : R.string.product_selected);
                 }
             }
             case ENTER -> {
-                label = getContext().getString(selecting ? R.string.pick : R.string.enter);
+                label = string(selecting ? R.string.pick : R.string.enter);
                 description =
-                        getContext()
-                                .getString(
-                                        selecting
-                                                ? R.string.pick_selected
-                                                : R.string.enter_description);
-                if (!selecting) hold = () -> command.accept(Command.key(Command.PASTE));
+                        string(selecting ? R.string.pick_selected : R.string.enter_description);
+                if (!selecting) hold = send(Command.PASTE);
             }
             case UNDO -> {
                 label =
                         calculating
-                                ? getContext().getString(R.string.cancel)
-                                : selecting ? "" : getContext().getString(R.string.undo);
+                                ? string(R.string.cancel)
+                                : selecting ? "" : string(R.string.undo);
                 icon = selecting && !calculating ? R.drawable.ic_select_none : 0;
                 description =
-                        getContext()
-                                .getString(
-                                        calculating
-                                                ? R.string.cancel_calculation
-                                                : selecting
-                                                        ? R.string.select_none_description
-                                                        : R.string.undo_description);
-                click =
-                        () ->
-                                command.accept(
-                                        Command.key(calculating ? Command.CANCEL : Command.UNDO));
+                        string(
+                                calculating
+                                        ? R.string.cancel_calculation
+                                        : selecting
+                                                ? R.string.select_none_description
+                                                : R.string.undo_description);
+                click = send(calculating ? Command.CANCEL : Command.UNDO);
                 if (calculating || !selecting)
-                    hold =
-                            () ->
-                                    command.accept(
-                                            Command.key(
-                                                    calculating ? Command.CANCEL : Command.REDO));
+                    hold = send(calculating ? Command.CANCEL : Command.REDO);
             }
             default -> {}
         }
@@ -540,55 +527,15 @@ public final class CalculatorKeypad extends ViewGroup {
         for (ViewGroup row : primaryRows) removeView(row);
         primaryRows.clear();
         for (CalculatorKey key : PRIMARY_KEYS) buttons.remove(key);
-        CalculatorKey[] digits =
+        String layout =
                 switch (radixMode) {
-                    case DECIMAL ->
-                            new CalculatorKey[] {
-                                CalculatorKey.SEVEN,
-                                CalculatorKey.EIGHT,
-                                CalculatorKey.NINE,
-                                CalculatorKey.FOUR,
-                                CalculatorKey.FIVE,
-                                CalculatorKey.SIX,
-                                CalculatorKey.ONE,
-                                CalculatorKey.TWO,
-                                CalculatorKey.THREE
-                            };
-                    case DOZENAL ->
-                            new CalculatorKey[] {
-                                CalculatorKey.EIGHT,
-                                CalculatorKey.NINE,
-                                CalculatorKey.DIGIT_A,
-                                CalculatorKey.DIGIT_B,
-                                CalculatorKey.FOUR,
-                                CalculatorKey.FIVE,
-                                CalculatorKey.SIX,
-                                CalculatorKey.SEVEN,
-                                CalculatorKey.ZERO,
-                                CalculatorKey.ONE,
-                                CalculatorKey.TWO,
-                                CalculatorKey.THREE
-                            };
-                    case HEX ->
-                            new CalculatorKey[] {
-                                CalculatorKey.DIGIT_C,
-                                CalculatorKey.DIGIT_D,
-                                CalculatorKey.DIGIT_E,
-                                CalculatorKey.DIGIT_F,
-                                CalculatorKey.EIGHT,
-                                CalculatorKey.NINE,
-                                CalculatorKey.DIGIT_A,
-                                CalculatorKey.DIGIT_B,
-                                CalculatorKey.FOUR,
-                                CalculatorKey.FIVE,
-                                CalculatorKey.SIX,
-                                CalculatorKey.SEVEN,
-                                CalculatorKey.ZERO,
-                                CalculatorKey.ONE,
-                                CalculatorKey.TWO,
-                                CalculatorKey.THREE
-                            };
+                    case DECIMAL -> "789456123";
+                    case DOZENAL -> "89AB45670123";
+                    case HEX -> "CDEF89AB45670123";
                 };
+        CalculatorKey[] digits = new CalculatorKey[layout.length()];
+        for (int i = 0; i < digits.length; i++)
+            digits[i] = CalculatorKey.find(layout.substring(i, i + 1));
         LinearLayout commandRow =
                 row(
                         new CalculatorKey[] {
@@ -674,13 +621,9 @@ public final class CalculatorKeypad extends ViewGroup {
         complements.setTextColor(expanded && inverse ? colors.accent : colors.text);
         if (Build.VERSION.SDK_INT >= 30) {
             functions.setStateDescription(
-                    getContext()
-                            .getString(
-                                    expanded && !inverse ? R.string.expanded : R.string.collapsed));
+                    string(expanded && !inverse ? R.string.expanded : R.string.collapsed));
             complements.setStateDescription(
-                    getContext()
-                            .getString(
-                                    expanded && inverse ? R.string.expanded : R.string.collapsed));
+                    string(expanded && inverse ? R.string.expanded : R.string.collapsed));
         }
         requestLayout();
     }
