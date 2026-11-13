@@ -13,13 +13,19 @@ final class LargeDisplayTest {
                         java.math.BigInteger.valueOf(123456), 10, 3, true, 0, null);
         assertEquals(
                 "1.23456e+2",
-                ValueFormatter.exponential(value, ValueFormatter.Notation.SCIENTIFIC, 6));
+                ValueFormatter.exponentialPresentation(
+                                value, ValueFormatter.Notation.SCIENTIFIC, 6)
+                        .canonical);
         assertEquals(
                 "≈ 1.2346e+2",
-                ValueFormatter.exponential(value, ValueFormatter.Notation.SCIENTIFIC, 5));
+                ValueFormatter.exponentialPresentation(
+                                value, ValueFormatter.Notation.SCIENTIFIC, 5)
+                        .canonical);
         assertEquals(
                 "≈ 123.46e+0",
-                ValueFormatter.exponential(value, ValueFormatter.Notation.ENGINEERING, 5));
+                ValueFormatter.exponentialPresentation(
+                                value, ValueFormatter.Notation.ENGINEERING, 5)
+                        .canonical);
     }
 
     @Test

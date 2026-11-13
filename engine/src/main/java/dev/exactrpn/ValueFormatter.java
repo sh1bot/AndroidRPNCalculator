@@ -86,10 +86,6 @@ public final class ValueFormatter {
     }
 
     /** Forced exponential fallback, rounded to at most the requested significant digits. */
-    public static String exponential(NumericValue value, Notation notation, int significantDigits) {
-        return exponentialPresentation(value, notation, significantDigits).canonical;
-    }
-
     public static FormattedValue exponentialPresentation(
             NumericValue value, Notation notation, int significantDigits) {
         if (significantDigits < 1) throw new IllegalArgumentException("No significant digits");

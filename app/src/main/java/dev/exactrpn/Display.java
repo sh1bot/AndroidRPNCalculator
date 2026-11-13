@@ -89,15 +89,6 @@ final class Display {
             ValueFormatter.Notation notation,
             NumberMode numberMode,
             FractionMode fractionMode,
-            EntryEditor editor) {
-        this(stack, notation, numberMode, fractionMode, stack.radixMode, editor);
-    }
-
-    Display(
-            Display stack,
-            ValueFormatter.Notation notation,
-            NumberMode numberMode,
-            FractionMode fractionMode,
             RadixMode radixMode,
             EntryEditor editor) {
         this(

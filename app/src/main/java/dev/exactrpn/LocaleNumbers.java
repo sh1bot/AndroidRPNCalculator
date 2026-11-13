@@ -210,10 +210,6 @@ public final class LocaleNumbers {
             if (digit(text.charAt(i)) && ++digits % group == 0 && i + 1 < end) breaks.add(i + 1);
     }
 
-    private void appendExponent(SpannableStringBuilder text, String exponent) {
-        appendExponent(text, exponent, "10");
-    }
-
     private void appendExponent(SpannableStringBuilder text, String exponent, String base) {
         int start = text.length();
         text.append("\u2009×");
