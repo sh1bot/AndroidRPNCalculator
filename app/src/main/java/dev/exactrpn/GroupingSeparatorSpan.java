@@ -21,7 +21,7 @@ final class GroupingSeparatorSpan extends ReplacementSpan {
         return paint;
     }
 
-    private int baseline(Paint paint, int baseline) {
+    static int baseline(Paint paint, int baseline) {
         return baseline
                 + (paint instanceof android.text.TextPaint
                         ? ((android.text.TextPaint) paint).baselineShift
