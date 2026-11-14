@@ -377,10 +377,12 @@ public final class LocaleNumbers {
             if (value.fractionOperator == '-') displayedWhole.append(" −");
             else appendDimmed(displayedWhole, "+", groupingColor);
         }
+        // The parts are drawn on single lines by StackRowRenderer, so they
+        // carry no line-break opportunities.
         return new FractionParts(
-                breakable(displayedWhole),
-                breakable(integer(value.numerator, groupingColor)),
-                breakable(integer(value.denominator, groupingColor)));
+                displayedWhole,
+                integer(value.numerator, groupingColor),
+                integer(value.denominator, groupingColor));
     }
 
     private CharSequence integer(String canonical, int groupingColor) {

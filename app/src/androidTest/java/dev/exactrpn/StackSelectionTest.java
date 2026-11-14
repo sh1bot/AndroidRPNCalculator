@@ -169,7 +169,7 @@ public final class StackSelectionTest {
     }
 
     @Test
-    public void fractionWhichWouldWrapUsesAStackedBar() throws Exception {
+    public void fractionTooWideForOneLineUsesExponentialInsteadOfWrapping() throws Exception {
         MainActivity activity = open();
         CalculatorSession state = session(activity);
         try {
@@ -187,8 +187,12 @@ public final class StackSelectionTest {
             await(
                     () -> {
                         View value = tagged(activity, "stack-value:0");
-                        return value instanceof FractionTextView
-                                && ((FractionTextView) value).isStackedFraction();
+                        if (!(value instanceof FractionTextView)) return false;
+                        android.widget.TextView text = (android.widget.TextView) value;
+                        return !((FractionTextView) value).isStackedFraction()
+                                && text.getText().toString().contains("×")
+                                && text.getLayout() != null
+                                && text.getLayout().getLineCount() == 1;
                     });
         } finally {
             finish(activity);

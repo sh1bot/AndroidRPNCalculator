@@ -135,50 +135,42 @@ final class StackRowRenderer {
                 id, depth, value.toString().replace("\u200b", "").replace("\u2060", ""));
     }
 
-    private int minimumSize(int normal) {
-        return (int) Math.ceil(normal * .7);
-    }
+    // Nominal sizes: x is larger than the other rows, but every row shares
+    // one minimum -- 80% of the ordinary rows' nominal size. A row may
+    // shrink to that floor, but no further: below it the chosen format is
+    // abandoned for exponential instead of shrinking on.
+    private static final int ROW_SIZE = 22, RESULT_SIZE = 32;
+    private static final int MINIMUM_SIZE = (int) Math.ceil(ROW_SIZE * .8);
 
-    private android.text.StaticLayout layout(
-            CharSequence text, TextView view, int size, int width) {
+    private float desiredWidth(CharSequence text, TextView view, int size) {
         android.text.TextPaint paint = new android.text.TextPaint(view.getPaint());
         paint.setTextSize(sp(size));
-        return android.text.StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
-                .setIncludePad(view.getIncludeFontPadding())
-                .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
-                .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
-                .setLineSpacing(view.getLineSpacingExtra(), view.getLineSpacingMultiplier())
-                .build();
+        return android.text.Layout.getDesiredWidth(text, paint);
     }
 
-    private boolean fits(android.text.StaticLayout layout, int width, int height) {
-        if (layout.getHeight() > height) return false;
-        for (int line = 0; line < layout.getLineCount(); line++)
-            if (layout.getLineWidth(line) > width) return false;
-        return true;
+    // Single-line width of a stacked fraction at the given size: the whole
+    // part and the wider of numerator and denominator, plus the fixed gap
+    // between them. The fraction parts themselves scale with the size.
+    private float fractionWidth(LocaleNumbers.FractionParts fraction, TextView view, int size) {
+        float whole = fraction.mixed() ? desiredWidth(fraction.whole, view, size) : 0;
+        android.text.TextPaint paint = new android.text.TextPaint(view.getPaint());
+        paint.setTextSize(sp(size) * FractionTextView.FRACTION_SCALE);
+        float part =
+                Math.max(
+                        android.text.Layout.getDesiredWidth(fraction.numerator, paint),
+                        android.text.Layout.getDesiredWidth(fraction.denominator, paint));
+        return whole + (fraction.mixed() ? dp(8) : 0) + part;
     }
 
-    private int naturalSize(
-            FractionTextView value,
-            CharSequence text,
-            LocaleNumbers.FractionParts fraction,
-            int normal,
-            int width,
-            int height) {
-        for (int size = normal; size >= minimumSize(normal); size--) {
-            value.setTextSize(size);
-            if (fraction == null) {
-                if (android.text.Layout.getDesiredWidth(
-                                text, new android.text.TextPaint(value.getPaint()))
-                        <= width) return size;
-            } else {
-                FractionTextView.StackedMeasure measure =
-                        value.measureFraction(fraction, width, false);
-                if (measure.componentsFit()
-                        && (height == 0 || value.measuredHeight(measure) <= height)) return size;
-            }
-        }
-        return 0;
+    // Text widths scale linearly with font size (the font is monospaced), so
+    // the largest size that fits is a direct calculation, not a search: only
+    // the fixed gap between a mixed fraction's parts does not scale.
+    private int maximisedSize(int normal, int width, float widthAtMinimum, float fixed) {
+        int minimum = MINIMUM_SIZE;
+        float scalable = widthAtMinimum - fixed;
+        if (scalable <= 0) return normal;
+        int size = (int) (minimum * (width - fixed) / scalable);
+        return Math.max(minimum, Math.min(normal, size));
     }
 
     private static final class RowFit {
@@ -193,6 +185,10 @@ final class StackRowRenderer {
         }
     }
 
+    // The most digits the codebase ever treats as meaningful; see the
+    // 40-digit clipboard representation in ValueFormatter.
+    private static final int MAX_EXPONENTIAL_DIGITS = 40;
+
     private RowFit exponential(
             Display display,
             LocaleNumbers numbers,
@@ -200,27 +196,48 @@ final class StackRowRenderer {
             TextView view,
             int normalSize,
             int width) {
+        // One probe at full precision supplies the sign and exponent, whose
+        // lengths do not depend on how many mantissa digits are kept.
+        FormattedValue probe =
+                ValueFormatter.exponentialPresentation(
+                        display.values.get(index), display.notation, MAX_EXPONENTIAL_DIGITS);
+        CharSequence probeText = numbers.stack(probe, colors.muted);
+        if (probe.kind != FormattedValue.Kind.EXPONENTIAL)
+            return new RowFit(probeText, MINIMUM_SIZE, probe.approximate);
+        // The font is monospaced, so the digit budget is arithmetic: count
+        // the cells that fit at the nominal size, then subtract the cells
+        // the fixed parts occupy. The marker (" ×10") is drawn at 75% size
+        // and the exponent at 72%, and one spare cell absorbs a rounding
+        // carry growing the exponent (9.9…e99 rounding up to 1.0…e100).
         android.text.TextPaint paint = new android.text.TextPaint(view.getPaint());
-        FormattedValue[] formatted = new FormattedValue[12];
-        CharSequence[] text = new CharSequence[12];
-        for (int digits = 1; digits <= 12; digits++) {
-            formatted[digits - 1] =
-                    ValueFormatter.exponentialPresentation(
-                            display.values.get(index), display.notation, digits);
-            text[digits - 1] = numbers.stack(formatted[digits - 1], colors.muted);
-        }
-        for (int size = normalSize; size >= minimumSize(normalSize); size--) {
-            paint.setTextSize(sp(size));
-            for (int digits = 12; digits >= 1; digits--) {
-                if (android.text.Layout.getDesiredWidth(text[digits - 1], paint) <= width)
-                    return new RowFit(
-                            text[digits - 1], size, formatted[digits - 1].approximate);
-            }
-        }
-        return new RowFit(text[0], minimumSize(normalSize), formatted[0].approximate);
+        paint.setTextSize(sp(normalSize));
+        int cells = (int) (width / paint.measureText("0")) - 1;
+        int suffixCells = 3 + (int) Math.ceil(probe.exponent.length() * .72f);
+        int signCells = probe.whole.startsWith("-") ? 1 : 0;
+        int digits = cells - suffixCells - signCells - 1; // one cell for the point
+        digits = Math.max(1, Math.min(MAX_EXPONENTIAL_DIGITS, digits));
+        FormattedValue compact =
+                digits == MAX_EXPONENTIAL_DIGITS
+                        ? probe
+                        : ValueFormatter.exponentialPresentation(
+                                display.values.get(index), display.notation, digits);
+        CharSequence text = numbers.stack(compact, colors.muted);
+        // Truncated to fit at the nominal size; should the span estimates
+        // ever undershoot, the minimum size fits the same text by scaling.
+        int size =
+                android.text.Layout.getDesiredWidth(text, paint) <= width
+                        ? normalSize
+                        : MINIMUM_SIZE;
+        return new RowFit(text, size, compact.approximate);
     }
 
-    private void fitBottomRow(
+    // One fitting policy for every row; rows differ only in nominal size.
+    // At the shared minimum size the value is tried in its chosen
+    // format -- decimal, mixed fraction or improper fraction, as a single
+    // line. If it does not fit there it is replaced by an exponential
+    // truncated to fit at the nominal size. A value that does fit is then
+    // scaled up to the largest size that fits, up to its nominal size.
+    private void fitRow(
             FractionTextView value,
             TextView label,
             LinearLayout row,
@@ -229,92 +246,51 @@ final class StackRowRenderer {
             LocaleNumbers numbers,
             int index,
             int depth,
+            int normalSize,
             boolean followBottom) {
         View viewport = (View) stackRows.getParent();
         FormattedValue fullValue = display.fullPresentations.get(index);
         CharSequence full = numbers.stack(fullValue, colors.muted);
-        CharSequence breakable = numbers.breakable(full);
         LocaleNumbers.FractionParts fraction =
                 numbers.fractionParts(fullValue, colors.muted);
-        int[] previousSize = {-1, -1};
+        int[] previousWidth = {-1};
         Runnable fit =
                 () -> {
-                    if (!value.isAttachedToWindow()) return;
                     int width = value.getWidth() - value.getPaddingLeft() - value.getPaddingRight();
-                    int height =
-                            viewport.getHeight()
-                                    - viewport.getPaddingTop()
-                                    - viewport.getPaddingBottom();
-                    if (width <= 0
-                            || height <= 0
-                            || width == previousSize[0] && height == previousSize[1]) return;
-                    previousSize[0] = width;
-                    previousSize[1] = height;
-                    int usableHeight = height - value.getPaddingTop() - value.getPaddingBottom();
-                    int size = naturalSize(value, full, fraction, 32, width, height);
-                    boolean fullChosen = size != 0, stacked = fraction != null, split = false;
-                    CharSequence multiline = null;
-                    if (!fullChosen) {
-                        for (size = 32; size >= minimumSize(32) && !fullChosen; size--) {
-                            value.setTextSize(size);
-                            if (fraction != null) {
-                                split = fraction.mixed();
-                                FractionTextView.StackedMeasure measure =
-                                        value.measureFraction(fraction, width, split);
-                                if (value.measuredHeight(measure) <= height)
-                                    fullChosen = stacked = true;
-                            } else {
-                                android.text.SpannableStringBuilder pointFirst =
-                                        new android.text.SpannableStringBuilder(full);
-                                int point = pointFirst.toString().indexOf(numbers.decimalSeparator());
-                                if (point >= 0) {
-                                    pointFirst.insert(point + 1, "\n");
-                                    android.text.StaticLayout pointLayout =
-                                            layout(pointFirst, value, size, width);
-                                    if (fits(pointLayout, width, usableHeight)) {
-                                        multiline = pointFirst;
-                                        fullChosen = true;
-                                    }
-                                }
-                                if (!fullChosen) {
-                                    android.text.StaticLayout grouped =
-                                            layout(breakable, value, size, width);
-                                    if (grouped.getLineCount() > 1
-                                            && fits(grouped, width, usableHeight)) {
-                                        multiline = breakable;
-                                        fullChosen = true;
-                                    }
-                                }
-                            }
-                            if (fullChosen) break;
-                        }
-                    }
+                    if (width <= 0 || width == previousWidth[0]) return;
+                    previousWidth[0] = width;
+                    int minimum = MINIMUM_SIZE;
+                    float content =
+                            fraction != null
+                                    ? fractionWidth(fraction, value, minimum)
+                                    : desiredWidth(full, value, minimum);
                     CharSequence chosen;
                     boolean approximate;
-                    if (fullChosen) {
-                        chosen = multiline == null ? full : multiline;
+                    if (content <= width) {
+                        float fixed = fraction != null && fraction.mixed() ? dp(8) : 0;
+                        int size = maximisedSize(normalSize, width, content, fixed);
+                        chosen = full;
                         approximate = fullValue.approximate;
                         value.setTextSize(size);
-                        value.setMaxLines(Integer.MAX_VALUE);
-                        if (stacked) value.stackedFraction(fraction, full, split);
+                        if (fraction != null) value.stackedFraction(fraction, full);
                         else value.inlineText(chosen);
                     } else {
-                        RowFit compact = exponential(display, numbers, index, value, 32, width);
+                        RowFit compact =
+                                exponential(display, numbers, index, value, normalSize, width);
                         chosen = compact.text;
                         approximate = compact.approximate;
                         value.setTextSize(compact.size);
-                        value.setMaxLines(1);
                         value.inlineText(chosen);
                     }
+                    // Single line, never word-wrapped: a value that cannot
+                    // fit on one line has already been replaced above, so a
+                    // small measurement error cannot wrap it by surprise.
+                    value.setSingleLine(true);
+                    value.setMaxLines(1);
                     value.setEllipsize(null);
                     updateStackLabel(label, depth, approximate);
-                    value.requestLayout();
                     row.setContentDescription(
-                            rowDescription(
-                                    false,
-                                    depth,
-                                    approximate,
-                                    chosen));
+                            rowDescription(false, depth, approximate, chosen));
                 };
         // Fit before drawing, and let a requested relayout finish before showing the row.
         // This avoids painting either the unbounded value or a stale font size for a frame.
@@ -331,61 +307,6 @@ final class StackRowRenderer {
                                                 .fullScroll(View.FOCUS_DOWN));
                     }
                     return ready;
-                };
-        fitWhenSized(value, fitted);
-    }
-
-    private void fitUpperRow(
-            FractionTextView value,
-            TextView label,
-            LinearLayout row,
-            Display display,
-            LocaleNumbers numbers,
-            int index,
-            int depth) {
-        FormattedValue fullValue = display.fullPresentations.get(index);
-        CharSequence full = numbers.stack(fullValue, colors.muted);
-        LocaleNumbers.FractionParts fraction =
-                numbers.fractionParts(fullValue, colors.muted);
-        int[] previousWidth = {-1};
-        Runnable fit =
-                () -> {
-                    int width = value.getWidth() - value.getPaddingLeft() - value.getPaddingRight();
-                    if (width <= 0 || width == previousWidth[0]) return;
-                    previousWidth[0] = width;
-                    int fullSize = naturalSize(value, full, fraction, 22, width, 0);
-                    boolean fullChosen = fullSize != 0;
-                    CharSequence chosen;
-                    boolean approximate;
-                    if (fullChosen) {
-                        chosen = full;
-                        approximate = fullValue.approximate;
-                        value.setTextSize(fullSize);
-                        value.setMaxLines(fraction == null ? 1 : Integer.MAX_VALUE);
-                        if (fraction != null) value.stackedFraction(fraction, full);
-                        else value.inlineText(full);
-                    } else {
-                        RowFit compact = exponential(display, numbers, index, value, 22, width);
-                        chosen = compact.text;
-                        approximate = compact.approximate;
-                        value.setTextSize(compact.size);
-                        value.setMaxLines(1);
-                        value.inlineText(chosen);
-                    }
-                    value.setAutoSizeTextTypeWithDefaults(TextView.AUTO_SIZE_TEXT_TYPE_NONE);
-                    value.setEllipsize(null);
-                    updateStackLabel(label, depth, approximate);
-                    row.setContentDescription(
-                            rowDescription(
-                                    false,
-                                    depth,
-                                    approximate,
-                                    chosen));
-                };
-        java.util.function.BooleanSupplier fitted =
-                () -> {
-                    fit.run();
-                    return !value.isLayoutRequested();
                 };
         fitWhenSized(value, fitted);
     }
@@ -448,7 +369,7 @@ final class StackRowRenderer {
             label.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
             label.setTextColor(colors.muted);
             boolean result = !display.editing && depth == 1;
-            FractionTextView value = text(new FractionTextView(context), result ? 32 : 22);
+            FractionTextView value = text(new FractionTextView(context), result ? RESULT_SIZE : ROW_SIZE);
             digits(value);
             label.setPadding(label.getPaddingLeft(), label.getPaddingTop(), 0, label.getPaddingBottom());
             int labelWidth =
@@ -462,23 +383,28 @@ final class StackRowRenderer {
                     value.getPaddingRight(),
                     value.getPaddingBottom());
             value.setGravity(Gravity.END);
-            value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED);
+            value.setBreakStrategy(android.text.Layout.BREAK_STRATEGY_SIMPLE);
             // Fit from a bounded first layout. A huge exact fraction must never briefly
-            // expand the stack before the viewport-aware fitter chooses its fallback.
+            // expand the stack before the fitter chooses its fallback.
             FormattedValue initial =
                     result ? display.compactPresentations.get(i) : display.presentations.get(i);
             CharSequence initialText = numbers.stack(initial, colors.muted);
             value.inlineText(initialText);
             value.setMaxLines(1);
             value.setEllipsize(android.text.TextUtils.TruncateAt.END);
-            if (!result) {
-                value.setPadding(labelGap, dp(5), dp(4), dp(5));
-                value.setHorizontallyScrolling(false);
-                fitUpperRow(value, label, row, display, numbers, i, depth);
-            }
-            if (result)
-                fitBottomRow(
-                        value, label, row, stackRows, display, numbers, i, depth, followBottom);
+            if (!result) value.setPadding(labelGap, dp(5), dp(4), dp(5));
+            value.setHorizontallyScrolling(false);
+            fitRow(
+                    value,
+                    label,
+                    row,
+                    stackRows,
+                    display,
+                    numbers,
+                    i,
+                    depth,
+                    result ? RESULT_SIZE : ROW_SIZE,
+                    result && followBottom);
             value.setTextIsSelectable(false);
             row.addView(value, new LinearLayout.LayoutParams(0, -2, 1));
             value.setTag("stack-value:" + i);
