@@ -161,31 +161,7 @@ public final class CalculatorKeypad extends ViewGroup {
         controls.addView(functions, new LinearLayout.LayoutParams(0, dp(44), 2));
         controls.addView(complements, new LinearLayout.LayoutParams(0, dp(44), 2));
         addView(controls);
-        addRows(
-                new CalculatorKey[][] {
-                    {
-                        CalculatorKey.SIN,
-                        CalculatorKey.COS,
-                        CalculatorKey.TAN,
-                        CalculatorKey.RECIPROCAL,
-                        CalculatorKey.FACTORIAL
-                    },
-                    {
-                        CalculatorKey.LN,
-                        CalculatorKey.LOG10,
-                        CalculatorKey.SQRT,
-                        CalculatorKey.FLOOR,
-                        CalculatorKey.FACTOR
-                    },
-                    {
-                        CalculatorKey.PI,
-                        CalculatorKey.E,
-                        CalculatorKey.PHI,
-                        CalculatorKey.POWER,
-                        CalculatorKey.REMAINDER
-                    }
-                },
-                scientificRows);
+        addRows(FUNCTION_KEYS, scientificRows);
         rebuildPrimaryRows();
         bindButtons();
         updateExpansion();
@@ -606,9 +582,50 @@ public final class CalculatorKeypad extends ViewGroup {
         return expanded;
     }
 
+    private static final CalculatorKey[][] FUNCTION_KEYS = {
+        {
+            CalculatorKey.SIN,
+            CalculatorKey.COS,
+            CalculatorKey.TAN,
+            CalculatorKey.RECIPROCAL,
+            CalculatorKey.FACTORIAL
+        },
+        {
+            CalculatorKey.LN,
+            CalculatorKey.LOG10,
+            CalculatorKey.SQRT,
+            CalculatorKey.FLOOR,
+            CalculatorKey.FACTOR
+        },
+        {
+            CalculatorKey.PI,
+            CalculatorKey.E,
+            CalculatorKey.PHI,
+            CalculatorKey.POWER,
+            CalculatorKey.REMAINDER
+        }
+    };
+
+    /** Rows become columns, so every function group keeps its own column in landscape. */
+    private static CalculatorKey[][] transpose(CalculatorKey[][] keys) {
+        CalculatorKey[][] result = new CalculatorKey[keys[0].length][keys.length];
+        for (int r = 0; r < keys.length; r++)
+            for (int c = 0; c < keys[r].length; c++) result[c][r] = keys[r][c];
+        return result;
+    }
+
+    private void rebuildFunctionRows() {
+        for (LinearLayout row : scientificRows) removeView(row);
+        scientificRows.clear();
+        addRows(functionsBeside ? transpose(FUNCTION_KEYS) : FUNCTION_KEYS, scientificRows);
+        updateExpansion();
+    }
+
     void setGeometry(boolean beside, int primaryWidth) {
-        functionsBeside = beside;
         this.primaryWidth = primaryWidth;
+        if (functionsBeside == beside) return;
+        functionsBeside = beside;
+        rebuildFunctionRows();
     }
 
     private void updateExpansion() {
@@ -725,12 +742,10 @@ public final class CalculatorKeypad extends ViewGroup {
             unit += span;
         }
         if (expanded)
-            for (int i = 0; i < scientificRows.size(); i++) {
+            for (int i = 0, n = scientificRows.size(); i < n; i++) {
                 int functionWidth = functionsBeside ? width - digitsWidth - dp(12) : width;
-                int rowHeight =
-                        functionsBeside
-                                ? body / 5
-                                : functionBody * (i + 1) / 3 - functionBody * i / 3;
+                int functionHeight = functionsBeside ? body : functionBody;
+                int rowHeight = functionHeight * (i + 1) / n - functionHeight * i / n;
                 measureRow(
                         scientificRows.get(i),
                         Math.max(1, functionWidth),

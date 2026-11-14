@@ -30,16 +30,21 @@ final class KeypadLayoutTest {
         assertEquals(closed.primaryWidth, open.primaryWidth);
         assertEquals(closed.stackWidth - open.stackWidth, open.keypadWidth - closed.keypadWidth);
         assertTrue(open.stackWidth >= 200);
-        assertTrue(open.keypadWidth - open.primaryWidth - 12 >= 5 * 48);
+        assertEquals(3 * 48, open.keypadWidth - open.primaryWidth - 12);
     }
 
     @Test
     void narrowerLandscapeCompressesRowsInsteadOfStarvingTheStack() {
-        KeypadLayout plan = choose(600, 300, true);
+        KeypadLayout plan = choose(560, 300, true);
         assertTrue(plan.besideStack);
         assertFalse(plan.functionsBesideDigits);
         assertTrue(plan.stackWidth >= 200);
         assertEquals(plan.primaryWidth, plan.keypadWidth);
+    }
+
+    @Test
+    void threeFunctionColumnsFitWhereFiveDidNot() {
+        assertTrue(choose(600, 300, true).functionsBesideDigits);
     }
 
     @Test

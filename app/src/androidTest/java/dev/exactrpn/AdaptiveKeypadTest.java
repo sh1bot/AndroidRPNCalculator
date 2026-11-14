@@ -328,6 +328,24 @@ public final class AdaptiveKeypadTest {
                             Rect sin = bounds(find(keypad, "sin"), workspace),
                                     clear = bounds(find(keypad, "AC"), workspace);
                             assertTrue("Functions must open to the left", sin.right <= clear.left);
+                            Rect cos = bounds(find(keypad, "cos"), workspace),
+                                    ln = bounds(find(keypad, "ln"), workspace),
+                                    pi = bounds(find(keypad, "π"), workspace),
+                                    rem = bounds(find(keypad, "rem"), workspace),
+                                    zero = bounds(find(keypad, "0"), workspace);
+                            assertTrue(
+                                    "Each function group is a column",
+                                    cos.top >= sin.bottom && Math.abs(cos.left - sin.left) <= 2);
+                            assertTrue(
+                                    "Landscape functions are three columns",
+                                    ln.left >= sin.right
+                                            && rem.left >= ln.right
+                                            && Math.abs(ln.top - sin.top) <= 2
+                                            && Math.abs(rem.left - pi.left) <= 2);
+                            assertTrue(
+                                    "Function rows line up with the five keypad rows",
+                                    Math.abs(sin.top - clear.top) <= 2
+                                            && Math.abs(rem.bottom - zero.bottom) <= 2);
                             Rect undo = bounds(find(keypad, "⎌"), workspace),
                                     functions = bounds(find(keypad, "f()"), workspace);
                             assertTrue(functions.width() > undo.width() * 1.6);
@@ -345,7 +363,7 @@ public final class AdaptiveKeypadTest {
                             assertTrue(
                                     bounds(find(keypad, "asin"), workspace).bottom
                                             <= bounds(find(keypad, "AC"), workspace).top);
-                            size(context, workspace, 600, 300);
+                            size(context, workspace, 560, 300);
                             assertTrue(
                                     "Narrow landscape stacks the function rows",
                                     bounds(find(keypad, "asin"), workspace).bottom

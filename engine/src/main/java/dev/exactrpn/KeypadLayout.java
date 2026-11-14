@@ -66,7 +66,7 @@ public final class KeypadLayout {
                                 (columns + 2) * keyMinimum,
                                 (height - controlHeight) * columns / primaryRows));
         primary = Math.min(primary, width - stackMinimum - gap);
-        int functionWidth = 5 * keyMinimum;
+        int functionWidth = 3 * keyMinimum;
         boolean functionsBeside =
                 expanded && width >= stackMinimum + primary + functionWidth + 2 * gap;
         int keypadWidth = primary + (functionsBeside ? functionWidth + gap : 0);
