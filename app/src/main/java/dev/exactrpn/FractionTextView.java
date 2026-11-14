@@ -9,17 +9,15 @@ import android.text.StaticLayout;
 import android.text.TextPaint;
 import android.util.AttributeSet;
 
-/** A TextView which can draw a wrapped fraction with a real horizontal fraction bar. */
+/** A TextView which can draw a stacked fraction with a real horizontal fraction bar. */
 final class FractionTextView extends android.widget.TextView {
-    private static final float FRACTION_SCALE = .72f;
+    static final float FRACTION_SCALE = .72f;
     private LocaleNumbers.FractionParts fraction;
     private StackedMeasure stacked;
-    private boolean splitWhole;
 
     static final class StackedMeasure {
         final StaticLayout whole, numerator, denominator;
         final int contentWidth, leftWidth, rightWidth, gap;
-        final boolean splitWhole;
 
         StackedMeasure(
                 StaticLayout whole,
@@ -28,8 +26,7 @@ final class FractionTextView extends android.widget.TextView {
                 int contentWidth,
                 int leftWidth,
                 int rightWidth,
-                int gap,
-                boolean splitWhole) {
+                int gap) {
             this.whole = whole;
             this.numerator = numerator;
             this.denominator = denominator;
@@ -37,13 +34,6 @@ final class FractionTextView extends android.widget.TextView {
             this.leftWidth = leftWidth;
             this.rightWidth = rightWidth;
             this.gap = gap;
-            this.splitWhole = splitWhole;
-        }
-
-        boolean componentsFit() {
-            return (whole == null || oneLineFits(whole, leftWidth))
-                    && oneLineFits(numerator, rightWidth)
-                    && oneLineFits(denominator, rightWidth);
         }
     }
 
@@ -56,13 +46,7 @@ final class FractionTextView extends android.widget.TextView {
     }
 
     void stackedFraction(LocaleNumbers.FractionParts parts, CharSequence accessibleText) {
-        stackedFraction(parts, accessibleText, false);
-    }
-
-    void stackedFraction(
-            LocaleNumbers.FractionParts parts, CharSequence accessibleText, boolean splitWhole) {
         fraction = parts;
-        this.splitWhole = splitWhole;
         stacked = null;
         setText(accessibleText);
         requestLayout();
@@ -71,7 +55,6 @@ final class FractionTextView extends android.widget.TextView {
 
     void inlineText(CharSequence text) {
         fraction = null;
-        splitWhole = false;
         stacked = null;
         setText(text);
         requestLayout();
@@ -82,8 +65,7 @@ final class FractionTextView extends android.widget.TextView {
         return fraction != null;
     }
 
-    StackedMeasure measureFraction(
-            LocaleNumbers.FractionParts parts, int width, boolean splitWhole) {
+    StackedMeasure measureFraction(LocaleNumbers.FractionParts parts, int width) {
         int contentWidth = Math.max(1, width);
         int gap = dp(8);
         TextPaint paint = new TextPaint(getPaint());
@@ -101,14 +83,10 @@ final class FractionTextView extends android.widget.TextView {
                                     Math.max(
                                             Layout.getDesiredWidth(parts.numerator, fractionPaint),
                                             Layout.getDesiredWidth(parts.denominator, fractionPaint)));
-            if (splitWhole) {
-                leftWidth = rightWidth = contentWidth;
-            } else {
-                int shared = Math.max(2, contentWidth - gap);
-                leftWidth = Math.max(1, Math.min(shared - 1, wholeWanted));
-                rightWidth = Math.max(1, shared - leftWidth);
-                if (fractionWanted < rightWidth) rightWidth = fractionWanted;
-            }
+            int shared = Math.max(2, contentWidth - gap);
+            leftWidth = Math.max(1, Math.min(shared - 1, wholeWanted));
+            rightWidth = Math.max(1, shared - leftWidth);
+            if (fractionWanted < rightWidth) rightWidth = fractionWanted;
             whole = layout(parts.whole, leftWidth, paint);
         } else {
             leftWidth = 0;
@@ -118,11 +96,7 @@ final class FractionTextView extends android.widget.TextView {
                 whole,
                 layout(parts.numerator, rightWidth, fractionPaint),
                 layout(parts.denominator, rightWidth, fractionPaint),
-                contentWidth,
-                leftWidth,
-                rightWidth,
-                gap,
-                splitWhole);
+                contentWidth, leftWidth, rightWidth, gap);
     }
 
     private int dp(float value) {
@@ -145,14 +119,8 @@ final class FractionTextView extends android.widget.TextView {
 
     int measuredHeight(StackedMeasure measure) {
         int height = fractionHeight(measure);
-        if (measure.splitWhole && measure.whole != null)
-            height += measure.whole.getHeight() + dp(4);
-        else if (measure.whole != null) height = Math.max(height, measure.whole.getHeight());
+        if (measure.whole != null) height = Math.max(height, measure.whole.getHeight());
         return height + getPaddingTop() + getPaddingBottom();
-    }
-
-    private static boolean oneLineFits(StaticLayout layout, int width) {
-        return layout.getLineCount() == 1 && widest(layout) <= width;
     }
 
     @Override
@@ -163,7 +131,7 @@ final class FractionTextView extends android.widget.TextView {
         }
         int width = MeasureSpec.getSize(widthMeasureSpec);
         int available = Math.max(1, width - getPaddingLeft() - getPaddingRight());
-        stacked = measureFraction(fraction, available, splitWhole);
+        stacked = measureFraction(fraction, available);
         int desired = measuredHeight(stacked);
         setMeasuredDimension(
                 resolveSize(width, widthMeasureSpec), resolveSize(desired, heightMeasureSpec));
@@ -184,19 +152,14 @@ final class FractionTextView extends android.widget.TextView {
         }
         int available = Math.max(1, getWidth() - getPaddingLeft() - getPaddingRight());
         if (stacked == null || available != stacked.contentWidth)
-            stacked = measureFraction(fraction, available, splitWhole);
+            stacked = measureFraction(fraction, available);
         canvas.save();
         canvas.translate(getPaddingLeft(), getPaddingTop());
         int totalHeight = measuredHeight(stacked) - getPaddingTop() - getPaddingBottom();
         float wholeWidth = stacked.whole == null ? 0 : widest(stacked.whole);
         float fractionWidth = Math.max(widest(stacked.numerator), widest(stacked.denominator));
-        if (stacked.splitWhole && stacked.whole != null) {
-            stacked.whole.draw(canvas);
-            canvas.translate(0, stacked.whole.getHeight() + dp(4));
-            totalHeight -= stacked.whole.getHeight() + dp(4);
-        }
         float blockLeft =
-                stacked.whole == null || stacked.splitWhole
+                stacked.whole == null
                         ? 0
                         : Math.max(
                                 0,
@@ -204,7 +167,7 @@ final class FractionTextView extends android.widget.TextView {
                                         - wholeWidth
                                         - stacked.gap
                                         - fractionWidth);
-        if (stacked.whole != null && !stacked.splitWhole) {
+        if (stacked.whole != null) {
             canvas.save();
             canvas.translate(
                     blockLeft + wholeWidth - stacked.leftWidth,
@@ -213,7 +176,7 @@ final class FractionTextView extends android.widget.TextView {
             canvas.restore();
         }
         float fractionLeft =
-                stacked.whole == null || stacked.splitWhole
+                stacked.whole == null
                         ? 0
                         : blockLeft
                                 + wholeWidth
