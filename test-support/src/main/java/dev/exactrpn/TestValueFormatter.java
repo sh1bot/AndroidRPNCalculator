@@ -19,6 +19,24 @@ final class TestValueFormatter {
                 NumericEvaluator.read(value, NumericRequest.DEFAULT), newest, notation, mode);
     }
 
+    static boolean approximate(
+            UnifiedReal value, boolean newest, ValueFormatter.Notation notation) {
+        return approximate(value, newest, notation, FractionMode.DECIMAL);
+    }
+
+    static boolean approximate(
+            UnifiedReal value,
+            boolean newest,
+            ValueFormatter.Notation notation,
+            FractionMode mode) {
+        return ValueFormatter.presentation(
+                        NumericEvaluator.read(value, NumericRequest.DEFAULT),
+                        newest,
+                        notation,
+                        mode)
+                .approximate;
+    }
+
     static String clipboard(UnifiedReal value, ValueFormatter.Notation notation) {
         return clipboard(value, notation, FractionMode.DECIMAL);
     }

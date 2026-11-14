@@ -85,8 +85,8 @@ public final class MemoryTransportTest {
                                 RadixMode.DECIMAL));
         Display editing = new Display(full, restored);
         assertEquals("123456789012345678901234567890", full.rows.get(3799));
-        assertEquals("≈ 123.456789012e+27", editing.rows.get(3798));
-        assertEquals("≈ 123.456789012e+27", editing.rows.get(3799));
+        assertEquals("123.456789012e+27", editing.rows.get(3798));
+        assertEquals("123.456789012e+27", editing.rows.get(3799));
         assertThrows(UnsupportedOperationException.class, () -> editing.rows.set(0, "changed"));
         assertThrows(
                 java.io.IOException.class,

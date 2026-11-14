@@ -17,12 +17,11 @@ final class LargeDisplayTest {
                                 value, ValueFormatter.Notation.SCIENTIFIC, 6)
                         .canonical);
         assertEquals(
-                "≈ 1.2346e+2",
-                ValueFormatter.exponentialPresentation(
-                                value, ValueFormatter.Notation.SCIENTIFIC, 5)
+                "1.2346e+2",
+                ValueFormatter.exponentialPresentation(value, ValueFormatter.Notation.SCIENTIFIC, 5)
                         .canonical);
         assertEquals(
-                "≈ 123.46e+0",
+                "123.46e+0",
                 ValueFormatter.exponentialPresentation(
                                 value, ValueFormatter.Notation.ENGINEERING, 5)
                         .canonical);
@@ -38,7 +37,9 @@ final class LargeDisplayTest {
             assertTrue(
                     display.length() < 100,
                     "Older fractions must not be clipped to a prefix: " + mode);
-            assertTrue(display.startsWith("≈ "));
+            assertTrue(
+                    TestValueFormatter.approximate(
+                            value, false, ValueFormatter.Notation.SCIENTIFIC, mode));
             String copied =
                     TestValueFormatter.clipboard(value, ValueFormatter.Notation.SCIENTIFIC, mode);
             assertTrue(copied.length() >= 1000);

@@ -16,9 +16,11 @@ final class FormattingRegressionTest extends RegressionSupport {
                 TestValueFormatter.format(RpnCalculator.parse("0.3"), true, sci),
                 "exact decimal display");
         assertEquals(
-                "≈ 56123456789.5",
+                "56123456789.5",
                 TestValueFormatter.format(RpnCalculator.parse("56123456789.456"), false, sci),
                 "large decimal rounds with guard digits");
+        assertTrue(
+                TestValueFormatter.approximate(RpnCalculator.parse("56123456789.456"), false, sci));
         for (int tail = 100; tail < 1000; tail += 7) {
             String input = "56789012345." + tail;
             String expected =
@@ -27,13 +29,14 @@ final class FormattingRegressionTest extends RegressionSupport {
                             .stripTrailingZeros()
                             .toPlainString();
             assertEquals(
-                    (new java.math.BigDecimal(input).compareTo(new java.math.BigDecimal(expected))
-                                            == 0
-                                    ? ""
-                                    : "≈ ")
-                            + expected,
+                    expected,
                     TestValueFormatter.format(RpnCalculator.parse(input), false, sci),
                     "large decimal rounding " + input);
+            assertEquals(
+                    new java.math.BigDecimal(input).compareTo(new java.math.BigDecimal(expected))
+                            != 0,
+                    TestValueFormatter.approximate(RpnCalculator.parse(input), false, sci),
+                    "large decimal approximation flag " + input);
         }
         assertEquals(
                 "56565642624.456",
@@ -73,11 +76,11 @@ final class FormattingRegressionTest extends RegressionSupport {
                 TestValueFormatter.format(huge, true, sci),
                 "newest integer expanded");
         assertEquals(
-                "≈ 1.23456789012e+29",
+                "1.23456789012e+29",
                 TestValueFormatter.format(huge, false, sci),
                 "older integer compact scientific");
         assertEquals(
-                "≈ 123.456789012e+27",
+                "123.456789012e+27",
                 TestValueFormatter.format(huge, false, eng),
                 "engineering multiple of three");
         assertEquals(
@@ -97,9 +100,12 @@ final class FormattingRegressionTest extends RegressionSupport {
                 "tiny rational remains visible");
 
         assertEquals(
-                "≈ 0.333333333333",
+                "0.333333333333",
                 TestValueFormatter.format(third, true, sci),
                 "recurring fraction limited precision");
+        assertTrue(
+                TestValueFormatter.approximate(third, true, sci),
+                "recurring fraction is approximate");
         keys(c, "CLEAR", "1", "eˣ");
         assertTrue(top(c).definitelyEquals(UnifiedReal.E), "e to x key");
         assertTrue(
@@ -162,7 +168,7 @@ final class FormattingRegressionTest extends RegressionSupport {
                 CalculatorTestSupport.formattedValues(fractions, sci, FractionMode.IMPROPER).get(0),
                 "stack fraction display");
         assertEquals(
-                "≈ 0.333333333333",
+                "0.333333333333",
                 CalculatorTestSupport.formattedValues(fractions, sci, FractionMode.DECIMAL).get(0),
                 "stack decimal display");
         assertTrue(
