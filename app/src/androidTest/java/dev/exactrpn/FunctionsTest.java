@@ -127,6 +127,16 @@ public final class FunctionsTest {
                                         styled.getSpanStart(markerFaces[0]),
                                         styled.getSpanEnd(markerFaces[0]))
                                 .toString());
+                android.text.style.ForegroundColorSpan[] dimmed =
+                        styled.getSpans(
+                                0, styled.length(), android.text.style.ForegroundColorSpan.class);
+                assertEquals(1, dimmed.length);
+                assertEquals(
+                        "\u2009×" + numbers.entry("10"),
+                        styled.subSequence(
+                                        styled.getSpanStart(dimmed[0]),
+                                        styled.getSpanEnd(dimmed[0]))
+                                .toString());
                 assertEquals(
                         numbers.entry(input.substring(marker + 1).replace('-', '−')),
                         styled.subSequence(
@@ -202,9 +212,7 @@ public final class FunctionsTest {
         assertEquals(
                 "A\u2060B\u2060C\u2060D\u200bE\u2060F\u20600\u20601\u2060.\u20602\u20603\u20604\u20605\u200b6\u20607\u20608\u20609",
                 hexadecimal
-                        .breakable(
-                                hexadecimal.stack(
-                                        formatted("ABCDEF01.23456789", 16), 0))
+                        .breakable(hexadecimal.stack(formatted("ABCDEF01.23456789", 16), 0))
                         .toString());
     }
 
@@ -333,6 +341,20 @@ public final class FunctionsTest {
                             new LocaleNumbers(Locale.US, NumberMode.DOT)
                                     .stack(formatted("2 1/3"), 0);
             assertEquals("2\u00a01/3", styled.toString());
+            android.text.Spanned plus =
+                    (android.text.Spanned)
+                            new LocaleNumbers(Locale.US, NumberMode.DOT)
+                                    .stack(formatted("2+1/3"), 0);
+            assertEquals("2+ 1/3", plus.toString());
+            android.text.style.ForegroundColorSpan[] dimmedPlus =
+                    plus.getSpans(0, plus.length(), android.text.style.ForegroundColorSpan.class);
+            assertEquals(1, dimmedPlus.length);
+            assertEquals(
+                    "+",
+                    plus.subSequence(
+                                    plus.getSpanStart(dimmedPlus[0]),
+                                    plus.getSpanEnd(dimmedPlus[0]))
+                            .toString());
             android.text.Spanned longFraction =
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.UNGROUPED)

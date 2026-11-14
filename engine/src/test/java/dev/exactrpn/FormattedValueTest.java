@@ -3,9 +3,9 @@ package dev.exactrpn;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-import java.math.BigInteger;
-
 import org.junit.jupiter.api.Test;
+
+import java.math.BigInteger;
 
 final class FormattedValueTest {
     @Test
@@ -40,6 +40,6 @@ final class FormattedValueTest {
         assertEquals("1", formatted.whole);
         assertEquals("234", formatted.fractional);
         assertEquals("+14", formatted.exponent);
-        assertEquals("≈ 1.234e+14", formatted.canonical);
+        assertEquals("1.234e+14", formatted.canonical);
     }
 }

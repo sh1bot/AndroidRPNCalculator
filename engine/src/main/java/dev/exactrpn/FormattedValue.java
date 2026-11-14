@@ -48,7 +48,7 @@ public final class FormattedValue {
                 approximate,
                 base,
                 0,
-                prefix(approximate) + number,
+                number,
                 point < 0 ? number : number.substring(0, point),
                 point < 0 ? "" : number.substring(point + 1),
                 "",
@@ -66,7 +66,7 @@ public final class FormattedValue {
                 approximate,
                 base,
                 0,
-                prefix(approximate) + mantissa + marker + exponent,
+                mantissa + marker + exponent,
                 point < 0 ? mantissa : mantissa.substring(0, point),
                 point < 0 ? "" : mantissa.substring(point + 1),
                 exponent,
@@ -105,11 +105,10 @@ public final class FormattedValue {
                 base,
                 bound,
                 mark
-                        ? "≈ 0 (|x| < 1"
+                        ? "0 (|x| < 1"
                                 + marker
                                 + "−"
-                                + Integer.toString(bound, base)
-                                        .toUpperCase(java.util.Locale.ROOT)
+                                + Integer.toString(bound, base).toUpperCase(java.util.Locale.ROOT)
                                 + ")"
                         : "0",
                 "0",
@@ -118,10 +117,6 @@ public final class FormattedValue {
                 "",
                 "",
                 '\0');
-    }
-
-    private static String prefix(boolean approximate) {
-        return approximate ? "≈ " : "";
     }
 
     @Override

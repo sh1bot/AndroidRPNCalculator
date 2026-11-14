@@ -530,7 +530,7 @@ public final class CalculatorKeypad extends ViewGroup {
         String layout =
                 switch (radixMode) {
                     case DECIMAL -> "789456123";
-                    case DOZENAL -> "89AB45670123";
+                    case DOZENAL -> "9AB678345012";
                     case HEX -> "CDEF89AB45670123";
                 };
         CalculatorKey[] digits = new CalculatorKey[layout.length()];
@@ -544,7 +544,7 @@ public final class CalculatorKeypad extends ViewGroup {
                             CalculatorKey.SWAP,
                             CalculatorKey.DIVIDE
                         });
-        DigitBand digitBand = new DigitBand(digits, radixMode == RadixMode.DECIMAL ? 3 : 4);
+        DigitBand digitBand = new DigitBand(digits, radixMode == RadixMode.HEX ? 4 : 3);
         LinearLayout bottomRow =
                 row(
                         radixMode == RadixMode.DECIMAL

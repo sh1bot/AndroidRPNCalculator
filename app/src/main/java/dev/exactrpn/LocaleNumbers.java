@@ -7,6 +7,7 @@ import android.icu.text.NumberFormat;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
+import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.text.style.SuperscriptSpan;
 import android.text.style.TypefaceSpan;
@@ -83,7 +84,6 @@ public final class LocaleNumbers {
 
     public CharSequence stack(FormattedValue value, int groupingColor) {
         SpannableStringBuilder text = new SpannableStringBuilder();
-        if (value.approximate) text.append("≈ ");
         if (value.kind == FormattedValue.Kind.ZERO_BOUND) {
             text.append(entry("0 (|x| < 1"));
             appendExponent(
@@ -91,7 +91,8 @@ public final class LocaleNumbers {
                     "−"
                             + Integer.toString(value.zeroBound, value.base)
                                     .toUpperCase(java.util.Locale.ROOT),
-                    "10");
+                    "10",
+                    groupingColor);
             text.append(")");
             return styleDozenal(text);
         }
@@ -100,7 +101,10 @@ public final class LocaleNumbers {
             if (!value.whole.isEmpty()) {
                 appendInteger(text, value.whole, groupingColor);
                 char symbol = value.fractionOperator;
-                text.append(symbol == ' ' ? "\u00a0" : symbol == '-' ? " − " : " + ");
+                if (symbol == '+') {
+                    appendDimmed(text, "+", groupingColor);
+                    text.append(" ");
+                } else text.append(symbol == ' ' ? "\u00a0" : " − ");
             } else if (value.numerator.startsWith("-")) {
                 text.append(((DecimalFormat) integers).getNegativePrefix());
                 numerator = numerator.substring(1);
@@ -122,7 +126,7 @@ public final class LocaleNumbers {
             text.append(entry(value.fractional));
         }
         if (value.kind == FormattedValue.Kind.EXPONENTIAL)
-            appendExponent(text, value.exponent, "10");
+            appendExponent(text, value.exponent, "10", groupingColor);
         return styleDozenal(text);
     }
 
@@ -210,25 +214,17 @@ public final class LocaleNumbers {
             if (digit(text.charAt(i)) && ++digits % group == 0 && i + 1 < end) breaks.add(i + 1);
     }
 
-    private void appendExponent(SpannableStringBuilder text, String exponent, String base) {
+    private void appendExponent(
+            SpannableStringBuilder text, String exponent, String base, int groupingColor) {
         int start = text.length();
-        text.append("\u2009×");
+        appendDimmed(text, "\u2009×" + entry(base), groupingColor);
         text.setSpan(
                 new RelativeSizeSpan(ExponentMarkerSpan.MARKER_SCALE),
                 start,
                 text.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         text.setSpan(
-                new TypefaceSpan("sans-serif"),
-                start,
-                text.length(),
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        text.append(entry(base));
-        text.setSpan(
-                new RelativeSizeSpan(ExponentMarkerSpan.MARKER_SCALE),
-                start + 2,
-                text.length(),
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                new TypefaceSpan("sans-serif"), start, start + 2, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         start = text.length();
         text.append(entry(exponent.replace('-', '−')));
         text.setSpan(
@@ -318,6 +314,17 @@ public final class LocaleNumbers {
         }
     }
 
+    /** Marks decoration such as the mixed-fraction plus with the same muted color as grouping. */
+    private static void appendDimmed(SpannableStringBuilder text, String part, int color) {
+        int start = text.length();
+        text.append(part);
+        text.setSpan(
+                new ForegroundColorSpan(color),
+                start,
+                text.length(),
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    }
+
     private void appendInteger(SpannableStringBuilder text, String whole, int groupingColor) {
         boolean negative = whole.startsWith("-");
         if (negative || whole.startsWith("+")) whole = whole.substring(1);
@@ -366,8 +373,10 @@ public final class LocaleNumbers {
         if (value.kind != FormattedValue.Kind.FRACTION) return null;
         SpannableStringBuilder displayedWhole =
                 new SpannableStringBuilder(integer(value.whole, groupingColor));
-        if (!value.whole.isEmpty())
-            displayedWhole.append(value.fractionOperator == '-' ? " −" : " +");
+        if (!value.whole.isEmpty()) {
+            if (value.fractionOperator == '-') displayedWhole.append(" −");
+            else appendDimmed(displayedWhole, "+", groupingColor);
+        }
         return new FractionParts(
                 breakable(displayedWhole),
                 breakable(integer(value.numerator, groupingColor)),
