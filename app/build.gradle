@@ -61,7 +61,7 @@ dependencies {
 // Html.fromHtml, so nothing is added to the APK but the document itself.
 def licenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
 def generateLicenseAssets = tasks.register('generateLicenseAssets') {
-    inputs.files(rootProject.file('README.md'), rootProject.file('HELP.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
+    inputs.files(rootProject.file('README.md'), rootProject.file('HELP.md'), rootProject.file('PRIVACY.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
     outputs.dir(licenseAssets)
     doLast {
         def parser = org.commonmark.parser.Parser.builder().build()
@@ -119,6 +119,31 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
         // this step keeps the indentation of a line that is a single URL.
         def document = (about + help + sources).replaceAll(/(?<=>)\s+(?=<)/, '')
         document += legal.replaceAll(/(https?:\/\/[^\s<]+?)(?=[.,;]?(?:<|\s|$))/, '<a href="$1">$1</a>')
+
+        // The privacy policy closes the document. Its contact token is
+        // replaced from the PRIVACY_CONTACT_EMAIL environment variable (a
+        // repository secret in CI's trusted build) and entity-encoded, so
+        // the raw address never appears in the file; without the variable
+        // the line links to the published policy instead. The file's HTML
+        // comment is build instructions, not policy text, and is dropped.
+        def inComment = false
+        def privacyMarkdown = rootProject.file('PRIVACY.md').readLines().findAll { line ->
+            if (line.trim().startsWith('<!--')) inComment = true
+            boolean keep = !inComment
+            if (line.contains('-->')) inComment = false
+            keep
+        }.join('\n')
+        def contactEmail = System.getenv('PRIVACY_CONTACT_EMAIL')
+        privacyMarkdown = privacyMarkdown.replace('CONTACT_EMAIL', contactEmail ? contactEmail
+                : '[sh1bot.github.io/AndroidRPNCalculator/PRIVACY](https://sh1bot.github.io/AndroidRPNCalculator/PRIVACY.html)')
+        def privacy = convert(privacyMarkdown)
+                .replace('<h1>Privacy Policy \u2014 Exact RPN</h1>', '<h1 id="privacy">Privacy Policy</h1>')
+                .replaceAll(/(?<=>)\s+(?=<)/, '')
+        if (contactEmail) {
+            def encoded = contactEmail.toCharArray().collect { ch -> '&#' + (int) ch + ';' }.join('')
+            privacy = privacy.replace(contactEmail, encoded)
+        }
+        document += privacy
         delete licenseAssets
         def directory = licenseAssets.get().asFile
         directory.mkdirs()

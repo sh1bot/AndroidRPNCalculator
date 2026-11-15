@@ -20,7 +20,8 @@ public final class AboutDialog extends DialogFragment {
     enum Section {
         ABOUT(R.string.about, null),
         HELP(R.string.help, "Using Exact RPN"),
-        LICENSES(R.string.licenses, "Licenses and source credits");
+        LICENSES(R.string.licenses, "Licenses and source credits"),
+        PRIVACY(R.string.privacy, "Privacy Policy");
 
         final int title;
         final String heading;

@@ -49,6 +49,11 @@ public final class AboutTest {
             assertTrue(AboutDialog.read(activity, "docs.html").contains("Hans-J. Boehm"));
             assertTrue(AboutDialog.read(activity, "docs.html").contains("Silicon Graphics"));
             pressBack();
+            onView(withTagValue(is("overflow-menu"))).perform(click());
+            onView(withText("Privacy")).inRoot(isPlatformPopup()).perform(click());
+            onView(withTagValue(is("document-text")))
+                    .check(matches(withSubstring("does not collect")));
+            pressBack();
         } catch (Throwable failure) {
             android.util.Log.e("MenuTest", LockScreenTest.shell("dumpsys window windows"));
             throw failure;

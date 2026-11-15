@@ -784,6 +784,7 @@ public class MainActivity extends Activity {
                 menu,
                 R.string.licenses,
                 () -> AboutDialog.show(this, AboutDialog.Section.LICENSES));
+        menuItem(menu, R.string.privacy, () -> AboutDialog.show(this, AboutDialog.Section.PRIVACY));
         menuItem(menu, R.string.source_code, () -> AboutDialog.source(this));
         menu.setOnDismissListener(dismissed -> button.setActivated(false));
         menu.show();
