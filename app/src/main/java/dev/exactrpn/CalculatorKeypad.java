@@ -105,8 +105,10 @@ public final class CalculatorKeypad extends ViewGroup {
 
         private void measureBandButton(Button button, int cellWidth, int cellHeight) {
             int gap = Math.min(dp(8), cellHeight / 6);
+            // Buttons fill their cells. Squareness is not decided here:
+            // KeypadLayout budgets the keypad's space, and buttons come out
+            // square where that budget leaves square cells.
             int width = Math.max(1, cellWidth - gap), height = Math.max(1, cellHeight - gap);
-            if (!expanded) width = height = Math.min(width, height);
             fitLabel(button, width, height);
             button.measure(
                     MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
@@ -734,7 +736,7 @@ public final class CalculatorKeypad extends ViewGroup {
             int span = primary instanceof DigitBand ? 3 : 1;
             int rowHeight = primaryBody * (unit + span) / 5 - primaryBody * unit / 5;
             if (primary instanceof LinearLayout)
-                measureRow((LinearLayout) primary, digitsWidth, rowHeight, !expanded);
+                measureRow((LinearLayout) primary, digitsWidth, rowHeight);
             else
                 primary.measure(
                         MeasureSpec.makeMeasureSpec(digitsWidth, MeasureSpec.EXACTLY),
@@ -747,15 +749,12 @@ public final class CalculatorKeypad extends ViewGroup {
                 int functionHeight = functionsBeside ? body : functionBody;
                 int rowHeight = functionHeight * (i + 1) / n - functionHeight * i / n;
                 measureRow(
-                        scientificRows.get(i),
-                        Math.max(1, functionWidth),
-                        Math.max(1, rowHeight),
-                        false);
+                        scientificRows.get(i), Math.max(1, functionWidth), Math.max(1, rowHeight));
             }
         setMeasuredDimension(width, height);
     }
 
-    private void measureRow(LinearLayout row, int width, int height, boolean round) {
+    private void measureRow(LinearLayout row, int width, int height) {
         int gap = Math.min(dp(8), height / 6);
         float totalWeight = 0;
         for (int c = 0; c < row.getChildCount(); c++)
@@ -768,7 +767,6 @@ public final class CalculatorKeypad extends ViewGroup {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) button.getLayoutParams();
             lp.width = Math.max(1, cellWidth - gap);
             lp.height = Math.max(1, height - gap);
-            if (round && weight == 1) lp.width = lp.height = Math.min(lp.width, lp.height);
             fitLabel(button, lp.width, lp.height);
         }
         row.measure(
