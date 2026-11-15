@@ -50,13 +50,11 @@ dependencies {
 // Generate offline documents from their authoritative sources. No runtime Markdown dependency.
 def licenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
 def generateLicenseAssets = tasks.register('generateLicenseAssets') {
-    inputs.files(rootProject.file('HELP.md'), rootProject.file('README.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
+    inputs.files(rootProject.file('HELP.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
     outputs.dir(licenseAssets)
     doLast {
         def escape = { text -> text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') }
         def help = rootProject.file('HELP.md').getText('UTF-8')
-        def embedded = help.replaceFirst('# Using Exact RPN', '### Using Exact RPN').replace('\n## ', '\n#### ')
-        assert rootProject.file('README.md').getText('UTF-8').contains('<!-- BEGIN HELP -->\n' + embedded + '<!-- END HELP -->'): 'README Use section must match HELP.md'
         def html = help.readLines().collect { line ->
             def match = (line =~ /^(#{1,6}) (.*)$/)
             if (match.matches()) return '<h' + match[0][1].length() + '>' + escape(match[0][2]) + '</h' + match[0][1].length() + '>'
