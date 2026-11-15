@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
-      permanent_signing: ${{ steps.trusted_signing.outputs.permanent_signing }}
+      permanent_signing: ${{ steps.trusted_build.outputs.permanent_signing }}
     steps:
       - name: Check out source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -63,15 +63,8 @@ jobs:
       - name: Check upstream source integrity
         run: sha256sum -c licenses/SHA256SUMS
 
-      - name: Build unsigned release artifacts
-        run: |
-          gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
-          mkdir -p dist
-          scripts/optimize-apk.sh app/build/outputs/apk/release/app-release-unsigned.apk dist/ExactRPN.apk
-          cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
-
-      - name: Sign trusted main branch
-        id: trusted_signing
+      - name: Build trusted main branch (permanent signing when configured)
+        id: trusted_build
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -86,36 +79,37 @@ jobs:
             : "${ANDROID_KEYSTORE_PASSWORD:?Missing keystore password}"
             : "${ANDROID_KEY_ALIAS:?Missing key alias}"
             : "${ANDROID_KEY_PASSWORD:?Missing key password}"
-            keystore_path="$RUNNER_TEMP/androidrpn-signing.p12"
-            trap 'rm -f "$keystore_path"' EXIT
+            export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/androidrpn-signing.p12"
+            trap 'rm -f "$ANDROID_KEYSTORE_PATH"' EXIT
             umask 077
-            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore_path"
+            printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
             echo "Signing with the permanent key configured in repository secrets."
             echo "permanent_signing=true" >> "$GITHUB_OUTPUT"
-            "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign \
-              --ks "$keystore_path" \
-              --ks-type PKCS12 \
-              --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
-              --ks-key-alias "$ANDROID_KEY_ALIAS" \
-              --key-pass env:ANDROID_KEY_PASSWORD \
-              dist/ExactRPN.apk
-            jarsigner \
-              -keystore "$keystore_path" \
-              -storetype PKCS12 \
-              -storepass:env ANDROID_KEYSTORE_PASSWORD \
-              -keypass:env ANDROID_KEY_PASSWORD \
-              dist/ExactRPN.aab "$ANDROID_KEY_ALIAS"
+            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
+            cp app/build/outputs/apk/release/app-release.apk dist/ExactRPN.apk
+            cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
           else
             if [[ -n "$ANDROID_KEYSTORE_PASSWORD$ANDROID_KEY_ALIAS$ANDROID_KEY_PASSWORD" ]]; then
               echo "::error::Signing secrets are incomplete: ANDROID_KEYSTORE_BASE64 is missing."
               exit 1
             fi
+            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
+            cp app/build/outputs/apk/release/app-release-unsigned.apk dist/ExactRPN.apk
+            cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
             echo "::warning::No permanent signing key configured. Artifacts are intentionally unsigned and will not be published."
           fi
 
+      - name: Build unsigned pull requests and other branches
+        if: github.ref != 'refs/heads/main' || github.event_name == 'pull_request'
+        run: |
+          gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
+          mkdir -p dist
+          cp app/build/outputs/apk/release/app-release-unsigned.apk dist/ExactRPN.apk
+          cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
+
       - name: Verify APK signing policy and record checksum
         env:
-          PERMANENT_SIGNING: ${{ steps.trusted_signing.outputs.permanent_signing }}
+          PERMANENT_SIGNING: ${{ steps.trusted_build.outputs.permanent_signing }}
         run: |
           sha256sum dist/ExactRPN.apk
           if [[ "$PERMANENT_SIGNING" == "true" ]]; then
@@ -160,7 +154,7 @@ jobs:
 
       - name: Verify app bundle signing policy
         env:
-          PERMANENT_SIGNING: ${{ steps.trusted_signing.outputs.permanent_signing }}
+          PERMANENT_SIGNING: ${{ steps.trusted_build.outputs.permanent_signing }}
         run: |
           python3 - <<'PYTHON'
           import os
