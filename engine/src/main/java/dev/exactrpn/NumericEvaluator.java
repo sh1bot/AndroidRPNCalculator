@@ -15,8 +15,7 @@ public final class NumericEvaluator {
     public static NumericValue read(UnifiedReal value, NumericRequest request) {
         RationalValue rational = null;
         if (value.boundedRationalValue() != null) {
-            BigInteger[] parts = ExactFunctions.parts(value);
-            rational = new RationalValue(parts[0], parts[1]);
+            rational = ExactFunctions.rational(value);
             NumericValue approximation = round(rational, request);
             if (rational.byteSize() > request.exactBytes) {
                 if (request.requireRational)

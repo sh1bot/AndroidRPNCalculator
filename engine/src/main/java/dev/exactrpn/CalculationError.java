@@ -28,6 +28,17 @@ public interface CalculationError {
 
     int argument();
 
+    static Code code(Throwable error) {
+        if (error instanceof CalculationError) return ((CalculationError) error).code();
+        if (error instanceof NumberFormatException) return Code.INVALID_NUMBER;
+        if (error instanceof ArithmeticException) return Code.UNDEFINED_RESULT;
+        return Code.INTERNAL;
+    }
+
+    static int argument(Throwable error) {
+        return error instanceof CalculationError ? ((CalculationError) error).argument() : 0;
+    }
+
     static IllegalArgumentException invalid(Code code) {
         return invalid(code, 0);
     }

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import static dev.exactrpn.UiTestSupport.awaitHere;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 import android.app.Instrumentation;
 import android.content.ClipboardManager;
@@ -22,27 +22,11 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class StackSelectionTest {
     private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-
-    private interface Condition {
-        boolean ready();
-    }
-
-    private void await(Condition condition) {
-        long until = SystemClock.elapsedRealtime() + 15000;
-        do {
-            AtomicBoolean ready = new AtomicBoolean();
-            instrumentation.runOnMainSync(() -> ready.set(condition.ready()));
-            if (ready.get()) return;
-            SystemClock.sleep(25);
-        } while (SystemClock.elapsedRealtime() < until);
-        fail("Timed out waiting for stack UI at " + new Throwable().getStackTrace()[1]);
-    }
 
     static CalculatorSession session(MainActivity activity) {
         try {
@@ -76,19 +60,20 @@ public final class StackSelectionTest {
                                                 instrumentation.getTargetContext(),
                                                 LockedCalculatorActivity.class)
                                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
-        await(() -> !session(activity).busy);
+        awaitHere("Timed out waiting for stack UI", () -> !session(activity).busy);
         return activity;
     }
 
     private void key(MainActivity activity, String key) {
         instrumentation.runOnMainSync(() -> tagged(activity, key).performClick());
-        await(() -> !session(activity).busy);
+        awaitHere("Timed out waiting for stack UI", () -> !session(activity).busy);
     }
 
     private void seed(MainActivity activity) {
         for (String key : new String[] {"1", "ENTER", "2", "ENTER", "3", "ENTER"})
             key(activity, key);
-        await(() -> tagged(activity, "stack-label:2") != null);
+        awaitHere(
+                "Timed out waiting for stack UI", () -> tagged(activity, "stack-label:2") != null);
     }
 
     private void selectEnds(MainActivity activity) {
@@ -103,7 +88,7 @@ public final class StackSelectionTest {
         try {
             seed(activity);
             instrumentation.runOnMainSync(() -> tagged(activity, "stack-row:0").performClick());
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () ->
                             state.selectedRows.contains(0)
                                     && tagged(activity, "stack-checkbox:0") != null);
@@ -112,7 +97,7 @@ public final class StackSelectionTest {
                     () -> firstRow.set(tagged(activity, "stack-row:0")));
 
             instrumentation.runOnMainSync(() -> tagged(activity, "stack-row:1").performClick());
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () -> {
                         View checkbox = tagged(activity, "stack-checkbox:1");
                         return state.selectedRows.contains(1)
@@ -140,13 +125,13 @@ public final class StackSelectionTest {
                         Command.key("ENTER")
                     }) {
                 instrumentation.runOnMainSync(() -> state.enqueue(command));
-                await(() -> !state.busy);
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
             for (int mode = 0; mode < 2; mode++) {
                 String expectedMode = mode == 0 ? "FRAC" : "IMPR";
                 instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
-                await(() -> !state.busy);
-                await(
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
+                awaitHere("Timed out waiting for stack UI",
                         () -> {
                             android.widget.TextView modeButton =
                                     (android.widget.TextView) tagged(a, "FRACTION");
@@ -182,9 +167,9 @@ public final class StackSelectionTest {
                         Command.key("FRACTION")
                     }) {
                 instrumentation.runOnMainSync(() -> state.enqueue(command));
-                await(() -> !state.busy);
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () -> {
                         View value = tagged(activity, "stack-value:0");
                         if (!(value instanceof FractionTextView)) return false;
@@ -215,9 +200,9 @@ public final class StackSelectionTest {
                         Command.key("FRACTION")
                     }) {
                 instrumentation.runOnMainSync(() -> state.enqueue(command));
-                await(() -> !state.busy);
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () -> {
                         View upper = tagged(activity, "stack-value:0");
                         return upper instanceof FractionTextView
@@ -242,9 +227,9 @@ public final class StackSelectionTest {
                         Command.key("ENTER")
                     }) {
                 instrumentation.runOnMainSync(() -> state.enqueue(command));
-                await(() -> !state.busy);
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () -> {
                         android.widget.TextView upper =
                                 (android.widget.TextView) tagged(activity, "stack-value:0");
@@ -270,13 +255,15 @@ public final class StackSelectionTest {
                         Command.key("÷")
                     }) {
                 instrumentation.runOnMainSync(() -> state.enqueue(command));
-                await(() -> !state.busy);
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
             while (state.display.fractionMode != FractionMode.DECIMAL) {
                 instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
-                await(() -> !state.busy);
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
-            await(() -> tagged(activity, "stack-value:0") != null);
+            awaitHere(
+                    "Timed out waiting for stack UI",
+                    () -> tagged(activity, "stack-value:0") != null);
             String[] firstText = new String[3];
             float[] firstSize = new float[3];
             int[] firstHeight = new int[3], firstLines = new int[3];
@@ -288,7 +275,7 @@ public final class StackSelectionTest {
             for (int mode = 0; mode < 7; mode++) {
                 int slot = mode % 3;
                 String expectedMode = new String[] {"DEC", "FRAC", "IMPR"}[slot];
-                await(
+                awaitHere("Timed out waiting for stack UI",
                         () -> {
                             android.widget.TextView modeButton =
                                     (android.widget.TextView) tagged(activity, "FRACTION");
@@ -325,7 +312,7 @@ public final class StackSelectionTest {
                                     android.content.ClipData.newPlainText("test", "pending"));
                             value.performLongClick();
                         });
-                await(
+                awaitHere("Timed out waiting for stack UI",
                         () ->
                                 !state.busy
                                         && clipboard.hasPrimaryClip()
@@ -336,7 +323,7 @@ public final class StackSelectionTest {
                                                                 .getItemAt(0)
                                                                 .getText()));
                 instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
-                await(() -> !state.busy);
+                awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
         } finally {
             finish(activity);
@@ -352,10 +339,10 @@ public final class StackSelectionTest {
             char[] digits = new char[600];
             java.util.Arrays.fill(digits, '7');
             instrumentation.runOnMainSync(() -> state.enqueue(Command.paste(new String(digits))));
-            await(() -> !state.busy && state.display.editing);
+            awaitHere("Timed out waiting for stack UI", () -> !state.busy && state.display.editing);
             key(a, "ENTER");
             try {
-                await(
+                awaitHere("Timed out waiting for stack UI",
                         () -> {
                             android.widget.TextView value =
                                     (android.widget.TextView) tagged(a, "stack-value:0");
@@ -394,7 +381,7 @@ public final class StackSelectionTest {
                 throw new AssertionError(detail.get(), failed);
             }
             key(a, "FUNCTIONS");
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () -> {
                         View row = tagged(a, "stack-row:0");
                         android.widget.ScrollView viewport =
@@ -415,7 +402,9 @@ public final class StackSelectionTest {
         CalculatorSession state = session(a);
         try {
             for (String key : new String[] {"π", "e", "+", "e", "π", "+", "−"}) key(a, key);
-            await(() -> tagged(a, "stack-row:0") != null && tagged(a, "stack-row:1") == null);
+            awaitHere(
+                    "Timed out waiting for stack UI",
+                    () -> tagged(a, "stack-row:0") != null && tagged(a, "stack-row:1") == null);
             instrumentation.runOnMainSync(() -> tagged(a, "stack-row:0").performClick());
             assertEquals(1, state.selectedRows.size());
             instrumentation.runOnMainSync(() -> tagged(a, "1/x").performClick());
@@ -430,7 +419,7 @@ public final class StackSelectionTest {
                         tagged(a, "UNDO").performClick();
                     });
             long started = SystemClock.elapsedRealtime();
-            await(() -> !state.busy);
+            awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             assertTrue(SystemClock.elapsedRealtime() - started < 2000);
             assertEquals(1, state.selectedRows.size());
             assertEquals(1, state.display.rows.size());
@@ -446,7 +435,8 @@ public final class StackSelectionTest {
         try {
             for (String key : new String[] {"6", "5", "5", "3", "6"}) key(a, key);
             instrumentation.runOnMainSync(() -> state.enqueue(Command.key("10ˣ")));
-            await(() -> !state.busy && !state.display.editing);
+            awaitHere(
+                    "Timed out waiting for stack UI", () -> !state.busy && !state.display.editing);
             assertEquals(java.util.Arrays.asList("1e+65536"), state.display.rows);
             assertTrue(state.error.isEmpty());
             key(a, "ENTER");
@@ -532,7 +522,7 @@ public final class StackSelectionTest {
                                     .getTargetContext()
                                     .getSystemService(Context.CLIPBOARD_SERVICE);
             instrumentation.runOnMainSync(() -> tagged(a, "stack-value:1").performLongClick());
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () ->
                             clipboard.getPrimaryClip() != null
                                     && "2"
@@ -544,7 +534,7 @@ public final class StackSelectionTest {
             assertEquals(2, session.selectedRows.size());
             key(a, "8");
             instrumentation.runOnMainSync(() -> tagged(a, "stack-row:0").performLongClick());
-            await(
+            awaitHere("Timed out waiting for stack UI",
                     () ->
                             clipboard.getPrimaryClip() != null
                                     && "1"

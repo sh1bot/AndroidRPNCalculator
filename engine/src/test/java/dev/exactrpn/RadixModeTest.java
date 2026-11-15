@@ -63,8 +63,10 @@ final class RadixModeTest {
     }
 
     private static void exact(String decimal, String text, int radix) {
+        RationalValue expected = ExactFunctions.rational(RpnCalculator.parse(decimal));
+        RationalValue actual = ExactFunctions.rational(RpnCalculator.parse(text, radix));
         assertEquals(
-                java.util.Arrays.toString(ExactFunctions.parts(RpnCalculator.parse(decimal))),
-                java.util.Arrays.toString(ExactFunctions.parts(RpnCalculator.parse(text, radix))));
+                expected.numerator + "/" + expected.denominator,
+                actual.numerator + "/" + actual.denominator);
     }
 }

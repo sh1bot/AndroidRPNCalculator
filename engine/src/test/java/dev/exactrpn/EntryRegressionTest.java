@@ -126,35 +126,35 @@ final class EntryRegressionTest extends RegressionSupport {
         assertTrue(
                 top(original).definitelyEquals(new UnifiedReal(3)),
                 "calculation works after cancelled candidate");
-        assertEquals("7", KeyboardInput.command(14, '7', false, false, false), "digit key mapping");
+        assertEquals("7", CalculatorKey.command(14, '7', false, false, false), "digit key mapping");
         assertEquals(
-                "7", KeyboardInput.command(151, 0, false, false, false), "numpad digit mapping");
-        assertEquals("+", KeyboardInput.command(157, 0, false, false, false), "numpad arithmetic");
+                "7", CalculatorKey.command(151, 0, false, false, false), "numpad digit mapping");
+        assertEquals("+", CalculatorKey.command(157, 0, false, false, false), "numpad arithmetic");
         assertEquals(
-                "+", KeyboardInput.command(81, '+', false, false, false), "shifted plus mapping");
+                "+", CalculatorKey.command(81, '+', false, false, false), "shifted plus mapping");
         assertEquals(
-                "ENTER", KeyboardInput.command(66, 0, false, false, false), "enter key mapping");
+                "ENTER", CalculatorKey.command(66, 0, false, false, false), "enter key mapping");
         assertEquals(
                 "ENTER",
-                KeyboardInput.command(160, 0, false, false, false),
+                CalculatorKey.command(160, 0, false, false, false),
                 "numpad enter mapping");
-        assertEquals("ENTER", KeyboardInput.command(62, ' ', false, false, false), "space mapping");
+        assertEquals("ENTER", CalculatorKey.command(62, ' ', false, false, false), "space mapping");
         assertEquals(
-                "BACK", KeyboardInput.command(67, 0, false, false, false), "backspace mapping");
+                "BACK", CalculatorKey.command(67, 0, false, false, false), "backspace mapping");
         assertEquals(
-                "DELETE", KeyboardInput.command(112, 0, false, false, false), "delete mapping");
+                "DELETE", CalculatorKey.command(112, 0, false, false, false), "delete mapping");
         assertEquals(
-                "ESCAPE", KeyboardInput.command(111, 0, false, false, false), "escape mapping");
-        assertEquals("UNDO", KeyboardInput.command(54, 0, true, false, false), "undo shortcut");
+                "ESCAPE", CalculatorKey.command(111, 0, false, false, false), "escape mapping");
+        assertEquals("UNDO", CalculatorKey.command(54, 0, true, false, false), "undo shortcut");
         assertEquals(
-                "ENTER", KeyboardInput.command(32, 0, true, false, false), "duplicate shortcut");
-        assertEquals("SWAP", KeyboardInput.command(47, 0, true, false, false), "swap shortcut");
+                "ENTER", CalculatorKey.command(32, 0, true, false, false), "duplicate shortcut");
+        assertEquals("SWAP", CalculatorKey.command(47, 0, true, false, false), "swap shortcut");
         assertTrue(
-                KeyboardInput.command(54, 'z', false, true, false) == null,
+                CalculatorKey.command(54, 'z', false, true, false) == null,
                 "leave alt shortcuts to system");
         assertEquals(
                 "eˣ",
-                KeyboardInput.command(33, 'E', false, false, false),
+                CalculatorKey.command(33, 'E', false, false, false),
                 "uppercase exponential shortcut");
         keys(original, "4", "5", "CE");
         assertTrue(
@@ -360,10 +360,10 @@ final class EntryRegressionTest extends RegressionSupport {
                 TestValueFormatter.clipboard(third, sci),
                 "clipboard omits approximation annotation");
         assertEquals(
-                "PASTE", KeyboardInput.command(50, 0, true, false, false), "Ctrl V paste shortcut");
+                "PASTE", CalculatorKey.command(50, 0, true, false, false), "Ctrl V paste shortcut");
         assertEquals(
                 "5",
-                KeyboardInput.command(0, '٥', false, false, false),
+                CalculatorKey.command(0, '٥', false, false, false),
                 "localized hardware digits");
         CalculatorTestSupport.paste(pasted, "1e-3");
         pasted.key(".");

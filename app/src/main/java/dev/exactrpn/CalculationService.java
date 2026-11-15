@@ -103,8 +103,8 @@ public class CalculationService extends Service {
             }
             if (ex instanceof DeviceAccess.Locked) response.putBoolean("deviceLocked", true);
             else {
-                response.putString("errorCode", ErrorCodes.code(ex).name());
-                response.putInt("errorArgument", ErrorCodes.argument(ex));
+                response.putString("errorCode", CalculationError.code(ex).name());
+                response.putInt("errorArgument", CalculationError.argument(ex));
             }
         }
         Message result = Message.obtain(null, EVALUATE);
@@ -200,8 +200,8 @@ public class CalculationService extends Service {
                 } catch (IllegalArgumentException | ArithmeticException ex) {
                     // The engine may have committed valid entry before the operator failed.
                     // Publish that state together with the error, rather than losing the entry.
-                    operationError = ErrorCodes.code(ex);
-                    errorArgument = ErrorCodes.argument(ex);
+                    operationError = CalculationError.code(ex);
+                    errorArgument = CalculationError.argument(ex);
                 }
             }
             sameStack = candidate.sameStack(before);

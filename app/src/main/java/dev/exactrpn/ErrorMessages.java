@@ -22,65 +22,28 @@ final class ErrorMessages {
     }
 
     static String fromCode(Context context, CalculationError.Code code, int argument) {
-        int id;
-        switch (code) {
-            case NEED_VALUES:
-                id = R.string.error_need_values;
-                break;
-            case ENTRY_TOO_LONG:
-                id = R.string.error_entry_too_long;
-                break;
-            case ROW_MISSING:
-                id = R.string.error_row_missing;
-                break;
-            case NUMBER_TOO_LARGE:
-                id = R.string.error_number_too_large;
-                break;
-            case FACTORIAL_INTEGER:
-                id = R.string.error_factorial_integer;
-                break;
-            case FACTORIAL_NONNEGATIVE:
-                id = R.string.error_factorial_nonnegative;
-                break;
-            case FACTOR_INTEGER:
-                id = R.string.error_factor_integer;
-                break;
-            case FACTOR_GREATER_THAN_ONE:
-                id = R.string.error_factor_greater_than_one;
-                break;
-            case RATIONAL_REQUIRED:
-                id = R.string.error_rational_required;
-                break;
-            case DIVIDE_BY_ZERO:
-                id = R.string.error_divide_by_zero;
-                break;
-            case ZERO_ROOT_DEGREE:
-                id = R.string.error_zero_root_degree;
-                break;
-            case EVEN_NEGATIVE_ROOT:
-                id = R.string.error_even_negative_root;
-                break;
-            case AMBIGUOUS_NUMBER:
-                id = R.string.error_ambiguous_number;
-                break;
-            case INVALID_PASTE_LINE:
-                id = R.string.error_invalid_paste_line;
-                break;
-            case INVALID_NUMBER:
-                id = R.string.error_invalid_number;
-                break;
-            case UNDEFINED_RESULT:
-                id = R.string.error_undefined_result;
-                break;
-            case TRANSFER_TOO_LARGE:
-                id = R.string.error_transfer_too_large;
-                break;
-            case INTERNAL:
-                id = R.string.error_internal;
-                break;
-            default:
-                id = R.string.error_internal;
-        }
+        int id =
+                switch (code) {
+                    case NEED_VALUES -> R.string.error_need_values;
+                    case ENTRY_TOO_LONG -> R.string.error_entry_too_long;
+                    case ROW_MISSING -> R.string.error_row_missing;
+                    case NUMBER_TOO_LARGE -> R.string.error_number_too_large;
+                    case FACTORIAL_INTEGER -> R.string.error_factorial_integer;
+                    case FACTORIAL_NONNEGATIVE -> R.string.error_factorial_nonnegative;
+                    case FACTOR_INTEGER -> R.string.error_factor_integer;
+                    case FACTOR_GREATER_THAN_ONE -> R.string.error_factor_greater_than_one;
+                    case RATIONAL_REQUIRED -> R.string.error_rational_required;
+                    case DIVIDE_BY_ZERO -> R.string.error_divide_by_zero;
+                    case ZERO_ROOT_DEGREE -> R.string.error_zero_root_degree;
+                    case EVEN_NEGATIVE_ROOT -> R.string.error_even_negative_root;
+                    case AMBIGUOUS_NUMBER -> R.string.error_ambiguous_number;
+                    case INVALID_PASTE_LINE -> R.string.error_invalid_paste_line;
+                    case INVALID_NUMBER -> R.string.error_invalid_number;
+                    case UNDEFINED_RESULT -> R.string.error_undefined_result;
+                    case TRANSFER_TOO_LARGE -> R.string.error_transfer_too_large;
+                    case INTERNAL -> R.string.error_internal;
+                    default -> R.string.error_internal;
+                };
         return context.getString(id, argument);
     }
 }

@@ -7,7 +7,6 @@ import android.graphics.Paint;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
-import android.util.AttributeSet;
 
 /** A TextView which can draw a stacked fraction with a real horizontal fraction bar. */
 final class FractionTextView extends android.widget.TextView {
@@ -41,20 +40,16 @@ final class FractionTextView extends android.widget.TextView {
         super(context);
     }
 
-    FractionTextView(Context context, AttributeSet attributes) {
-        super(context, attributes);
-    }
-
     void stackedFraction(LocaleNumbers.FractionParts parts, CharSequence accessibleText) {
-        fraction = parts;
-        stacked = null;
-        setText(accessibleText);
-        requestLayout();
-        invalidate();
+        show(parts, accessibleText);
     }
 
     void inlineText(CharSequence text) {
-        fraction = null;
+        show(null, text);
+    }
+
+    private void show(LocaleNumbers.FractionParts parts, CharSequence text) {
+        fraction = parts;
         stacked = null;
         setText(text);
         requestLayout();

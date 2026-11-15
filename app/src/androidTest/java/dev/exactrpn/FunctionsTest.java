@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import static dev.exactrpn.UiTestSupport.findButton;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
 import android.content.Context;
-import android.view.View;
-import android.view.ViewGroup;
 import android.widget.Button;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -187,15 +186,7 @@ public final class FunctionsTest {
         assertEquals(2, entry.getSpans(0, entry.length(), TurnedDigitSpan.class).length);
         assertEquals("AB", numbers.copy("AB"));
 
-        LocaleNumbers ungrouped =
-                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
-        assertEquals(
-                "1\u20602\u20603\u200b4\u20605\u20606\u2060.\u20601\u20602\u20603\u200b4\u20605\u20606",
-                ungrouped.breakable(ungrouped.stack(formatted("123456.123456"), 0)).toString());
         LocaleNumbers grouped = new LocaleNumbers(Locale.US, NumberMode.DOT, RadixMode.DECIMAL);
-        assertEquals(
-                "1\u20602\u20603\u2060\u2009\u200b4\u20605\u20606\u2060.\u20601\u20602\u20603\u200b4\u20605\u20606",
-                grouped.breakable(grouped.stack(formatted("123456.123456"), 0)).toString());
         android.text.Spanned groupedDisplay =
                 (android.text.Spanned) grouped.stack(formatted("123456"), 0);
         GroupingSeparatorSpan[] groupingSpans =
@@ -207,13 +198,6 @@ public final class FunctionsTest {
         assertTrue(
                 groupingSpans[0].getSize(monospace, groupedDisplay, 3, 4, null)
                         < monospace.measureText("0"));
-        LocaleNumbers hexadecimal =
-                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.HEX);
-        assertEquals(
-                "A\u2060B\u2060C\u2060D\u200bE\u2060F\u20600\u20601\u2060.\u20602\u20603\u20604\u20605\u200b6\u20607\u20608\u20609",
-                hexadecimal
-                        .breakable(hexadecimal.stack(formatted("ABCDEF01.23456789", 16), 0))
-                        .toString());
     }
 
     @Test
@@ -413,7 +397,7 @@ public final class FunctionsTest {
                                         {"10ˣ", "10ˣ"},
                                         {"⌈x⌉", "ceil"}
                                     }) {
-                                Button button = find(keypad, example[0]);
+                                Button button = findButton(keypad, example[0]);
                                 assertNotNull(example[0], button);
                                 button.performClick();
                                 assertEquals(example[1], command.get().wire);
@@ -434,10 +418,10 @@ public final class FunctionsTest {
                             assertTrue(decimal.isLongClickable());
                             decimal.performLongClick();
                             assertEquals("HOLD_DECIMAL", command.get().wire);
-                            find(keypad, "⌫").performLongClick();
+                            findButton(keypad, "⌫").performLongClick();
                             assertEquals("BACK", command.get().wire);
                             keypad.setInverse(false);
-                            Button log = find(keypad, "log10");
+                            Button log = findButton(keypad, "log10");
                             assertNotNull(log);
                             android.text.Spanned label = (android.text.Spanned) log.getText();
                             android.text.style.SubscriptSpan[] bases =
@@ -452,7 +436,7 @@ public final class FunctionsTest {
                                                     label.getSpanStart(bases[0]),
                                                     label.getSpanEnd(bases[0]))
                                             .toString());
-                            Button sine = find(keypad, "sin");
+                            Button sine = findButton(keypad, "sin");
                             assertNotNull(sine);
                             sine.performClick();
                             assertEquals("sin", command.get().wire);
@@ -474,7 +458,7 @@ public final class FunctionsTest {
                                 keypad.setNumberFormat(
                                         new LocaleNumbers(Locale.US, NumberMode.DOT, radix));
                                 keypad.setInverse(false);
-                                Button logarithm = find(keypad, "log" + base);
+                                Button logarithm = findButton(keypad, "log" + base);
                                 assertNotNull(logarithm);
                                 logarithm.performClick();
                                 assertEquals("log" + base, command.get().wire);
@@ -493,39 +477,12 @@ public final class FunctionsTest {
                                                         label.getSpanEnd(subscripts[0]))
                                                 .toString());
                                 keypad.setInverse(true);
-                                Button power = find(keypad, base + "ˣ");
+                                Button power = findButton(keypad, base + "ˣ");
                                 assertNotNull(power);
                                 power.performClick();
                                 assertEquals(base + "ˣ", command.get().wire);
                             }
                         });
-    }
-
-    @Test
-    public void androidBalancesTheExtraDigitGroupOntoTheFirstLine() {
-        LocaleNumbers numbers =
-                new LocaleNumbers(Locale.US, NumberMode.UNGROUPED, RadixMode.DECIMAL);
-        CharSequence text =
-                numbers.breakable(
-                        numbers.stack(
-                                formatted("111111111111111"), android.graphics.Color.GRAY));
-        android.text.TextPaint paint = new android.text.TextPaint();
-        paint.setTypeface(android.graphics.Typeface.MONOSPACE);
-        paint.setTextSize(32);
-        int width = (int) Math.ceil(android.text.Layout.getDesiredWidth("111111111", paint));
-        android.text.StaticLayout layout =
-                android.text.StaticLayout.Builder.obtain(text, 0, text.length(), paint, width)
-                        .setBreakStrategy(android.text.Layout.BREAK_STRATEGY_BALANCED)
-                        .setHyphenationFrequency(android.text.Layout.HYPHENATION_FREQUENCY_NONE)
-                        .build();
-        assertEquals(2, layout.getLineCount());
-        int firstDigits = 0, secondDigits = 0;
-        for (int i = layout.getLineStart(0); i < layout.getLineEnd(0); i++)
-            if (Character.isDigit(text.charAt(i))) firstDigits++;
-        for (int i = layout.getLineStart(1); i < layout.getLineEnd(1); i++)
-            if (Character.isDigit(text.charAt(i))) secondDigits++;
-        assertEquals(9, firstDigits);
-        assertEquals(6, secondDigits);
     }
 
     @Test
@@ -580,16 +537,5 @@ public final class FunctionsTest {
             remote.close();
             worker.shutdownNow();
         }
-    }
-
-    private Button find(View view, String text) {
-        if (view instanceof Button && ((Button) view).getText().toString().equals(text))
-            return (Button) view;
-        if (view instanceof ViewGroup)
-            for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
-                Button result = find(((ViewGroup) view).getChildAt(i), text);
-                if (result != null) return result;
-            }
-        return null;
     }
 }

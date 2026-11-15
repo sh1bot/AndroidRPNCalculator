@@ -196,6 +196,11 @@ public enum CalculatorKey {
         return WIRES.get(wire);
     }
 
+    /** Modifier policy; actual bindings live in the key catalog below. */
+    public static String command(int code, int unicode, boolean ctrl, boolean alt, boolean meta) {
+        return alt || meta ? null : keyboard(code, unicode, ctrl);
+    }
+
     public static String keyboard(int code, int unicode, boolean ctrl) {
         for (CalculatorKey key : KEYS) {
             if (ctrl) {

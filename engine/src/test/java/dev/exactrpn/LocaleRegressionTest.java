@@ -235,15 +235,15 @@ final class LocaleRegressionTest extends RegressionSupport {
                 accept.isEditing() && accept.entry().isEmpty(), "empty paste remains in edit mode");
         accept.key("ENTER");
         assertTrue(!accept.isEditing(), "Enter leaves empty pasted edit without pushing zero");
-        assertEquals("LEFT", KeyboardInput.command(21, 0, false, false, false), "left key mapping");
+        assertEquals("LEFT", CalculatorKey.command(21, 0, false, false, false), "left key mapping");
         assertEquals(
-                "RIGHT", KeyboardInput.command(22, 0, false, false, false), "right key mapping");
+                "RIGHT", CalculatorKey.command(22, 0, false, false, false), "right key mapping");
         assertEquals(
-                "HOME", KeyboardInput.command(122, 0, false, false, false), "home key mapping");
-        assertEquals("END", KeyboardInput.command(123, 0, false, false, false), "end key mapping");
+                "HOME", CalculatorKey.command(122, 0, false, false, false), "home key mapping");
+        assertEquals("END", CalculatorKey.command(123, 0, false, false, false), "end key mapping");
         assertEquals(
-                "HOME", KeyboardInput.command(122, 0, true, false, false), "Ctrl Home mapping");
-        assertEquals("END", KeyboardInput.command(123, 0, true, false, false), "Ctrl End mapping");
+                "HOME", CalculatorKey.command(122, 0, true, false, false), "Ctrl Home mapping");
+        assertEquals("END", CalculatorKey.command(123, 0, true, false, false), "Ctrl End mapping");
         TestCalculator nav = new TestCalculator();
         CalculatorTestSupport.paste(nav, "123.45");
         nav.key("LEFT");

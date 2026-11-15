@@ -166,15 +166,15 @@ final class FunctionsRegressionTest extends RegressionSupport {
         assertTrue(top(root).definitelyEquals(new UnifiedReal(3)), "Xth root of Y operand order");
         assertEquals(
                 "rem",
-                KeyboardInput.command(0, '%', false, false, false),
+                CalculatorKey.command(0, '%', false, false, false),
                 "remainder keyboard shortcut");
         assertEquals(
                 "!",
-                KeyboardInput.command(0, '!', false, false, false),
+                CalculatorKey.command(0, '!', false, false, false),
                 "factorial keyboard shortcut");
         assertEquals(
                 "Factor",
-                KeyboardInput.command(0, 'f', false, false, false),
+                CalculatorKey.command(0, 'f', false, false, false),
                 "factorise keyboard shortcut");
     }
 
@@ -225,7 +225,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                 "large prime has a proof, not only probable-prime acceptance");
         assertEquals(
                 "SMART_CLEAR",
-                KeyboardInput.command(40, 0, true, false, false),
+                CalculatorKey.command(40, 0, true, false, false),
                 "Ctrl L uses safe contextual clear");
     }
 }

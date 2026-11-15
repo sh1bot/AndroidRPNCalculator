@@ -224,14 +224,14 @@ final class RemoteCalculator {
         if (pending != null) pending.completeExceptionally(error);
         pending = null;
         pendingRequest = null;
-        disconnect();
+        disconnect(true);
     }
 
     synchronized void cancel() {
         if (pending != null) pending.cancel(false);
         pending = null;
         pendingRequest = null;
-        disconnect();
+        disconnect(true);
     }
 
     synchronized void close() {
@@ -239,10 +239,6 @@ final class RemoteCalculator {
         closed = true;
         if (pending != null) cancel();
         else disconnect(false);
-    }
-
-    private void disconnect() {
-        disconnect(true);
     }
 
     private void disconnect(boolean terminate) {
