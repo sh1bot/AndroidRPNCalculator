@@ -683,22 +683,19 @@ public final class CalculatorKeypad extends ViewGroup {
                                         getResources().getDisplayMetrics())));
         String key = effectiveKey((String) button.getTag());
         int preferred = preferredLabelSize(key);
-        // A small folded-only increase; expanded function labels keep their existing sizes.
-        if (!expanded) preferred += preferred >= 24 ? 2 : 1;
         int preferredPixels =
                 Math.round(
                         TypedValue.applyDimension(
                                 TypedValue.COMPLEX_UNIT_SP,
                                 preferred,
                                 getResources().getDisplayMetrics()));
-        // Restore one third of the former 55%-to-80% headroom, with modest sp caps.
-        float sizeFraction = expanded ? .55f : .55f + (.8f - .55f) / 3;
+        // One label policy for every layout: the cap follows the button's own
+        // size, so labels change only where the layout changes the buttons.
         int maximum =
                 Math.max(
                         minimum,
                         Math.min(
-                                preferredPixels,
-                                Math.round(Math.min(width, height) * sizeFraction)));
+                                preferredPixels, Math.round(Math.min(width, height) * .55f)));
         // Drop is a vector rather than text; give it the same sp-aware size budget.
         if (key.equals("BACK") && button.getForeground() != null)
             fitDeleteIcon(button, width, height, maximum);
