@@ -113,8 +113,10 @@
     <string name="unlock_to_resume">Unlock the phone to resume the saved calculation</string>
     <string name="temporary_status">TEMP</string>
     <string name="temporary_description">Temporary calculation, never saved. %1$s</string>
+    <string name="about">About</string>
     <string name="help">Help</string>
     <string name="licenses">Licenses</string>
+    <string name="privacy">Privacy</string>
     <string name="source_code">Source code</string>
     <string name="error_invalid_paste_line">Cannot paste: line %1$d is invalid, ambiguous, or too large. Nothing was added.</string>
     <string name="selection_operation_unavailable">This operation is unavailable while rows are selected</string>
