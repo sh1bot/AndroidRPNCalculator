@@ -76,3 +76,27 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
 }
 android.sourceSets.main.assets.srcDir(licenseAssets)
 tasks.named('preBuild').configure { dependsOn generateLicenseAssets }
+
+// AGP already runs aapt2 optimize before packaging release resources. Its
+// public DSL does not expose resource-name collapsing, so add that final
+// optimization to the same pre-signing stage instead of rewriting a signed APK.
+tasks.matching { it.name == 'optimizeReleaseResources' }.configureEach {
+    outputs.upToDateWhen { false }
+    doLast {
+        def aapt2 = androidComponents.sdkComponents.sdkDirectory.get().file(
+                "build-tools/${android.buildToolsVersion}/aapt2").asFile
+        outputs.files.asFileTree.matching { include '**/*.ap_' }.files.each { resources ->
+            def optimized = new File(resources.parentFile, resources.name + '.collapsed')
+            providers.exec {
+                commandLine aapt2, 'optimize', '--collapse-resource-names',
+                        '--deduplicate-entry-values', '-o', optimized, resources
+            }.result.get().assertNormalExitValue()
+            if (optimized.length() < resources.length()) {
+                java.nio.file.Files.move(optimized.toPath(), resources.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            } else {
+                optimized.delete()
+            }
+        }
+    }
+}
