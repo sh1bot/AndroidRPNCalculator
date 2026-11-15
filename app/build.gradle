@@ -1,3 +1,10 @@
+buildscript {
+    repositories { mavenCentral() }
+    // Build-time only: converts the project's Markdown documents to HTML.
+    // Nothing of it is packaged into the app.
+    dependencies { classpath 'org.commonmark:commonmark:0.29.0' }
+}
+
 plugins { id 'com.android.application' }
 def signingFile = System.getenv('ANDROID_KEYSTORE_PATH')
 android {
@@ -47,31 +54,100 @@ dependencies {
 
 
 
-// Generate offline documents from their authoritative sources. No runtime Markdown dependency.
+// Generate the app's single offline document from its authoritative sources:
+// the README's preamble and Sources section, HELP.md, and the licence texts.
+// Markdown is converted at build time (commonmark is a build-only dependency);
+// the app ships just the minified HTML and renders it with Android's built-in
+// Html.fromHtml, so nothing is added to the APK but the document itself.
 def licenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
 def generateLicenseAssets = tasks.register('generateLicenseAssets') {
-    inputs.files(rootProject.file('HELP.md'), rootProject.file('README.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
+    inputs.files(rootProject.file('README.md'), rootProject.file('HELP.md'), rootProject.file('PRIVACY.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
     outputs.dir(licenseAssets)
     doLast {
+        def parser = org.commonmark.parser.Parser.builder().build()
+        def renderer = org.commonmark.renderer.html.HtmlRenderer.builder().build()
+        // Html.fromHtml has always understood <tt>; <code> arrived much later.
+        def convert = { markdown ->
+            renderer.render(parser.parse(markdown)).replace('<code>', '<tt>').replace('</code>', '</tt>')
+        }
         def escape = { text -> text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;') }
-        def help = rootProject.file('HELP.md').getText('UTF-8')
-        def embedded = help.replaceFirst('# Using Exact RPN', '### Using Exact RPN').replace('\n## ', '\n#### ')
-        assert rootProject.file('README.md').getText('UTF-8').contains('<!-- BEGIN HELP -->\n' + embedded + '<!-- END HELP -->'): 'README Use section must match HELP.md'
-        def html = help.readLines().collect { line ->
-            def match = (line =~ /^(#{1,6}) (.*)$/)
-            if (match.matches()) return '<h' + match[0][1].length() + '>' + escape(match[0][2]) + '</h' + match[0][1].length() + '>'
-            '<p>' + escape(line).replaceAll(/\*\*(.+?)\*\*/, '<b>$1</b>').replaceAll(/`(.+?)`/, '<tt>$1</tt>') + '</p>'
-        }.join('\n')
-        def legal = '<h1>Licenses and source credits</h1>'
+
+        // Split the README at its '## ' headings. The preamble is the About
+        // text; the Build section is for source readers only, and Use just
+        // links to HELP.md, whose own text is the usage section below.
+        def sections = ['': []]
+        def current = ''
+        rootProject.file('README.md').readLines().each { line ->
+            if (line.startsWith('## ')) {
+                current = line.substring(3).trim()
+                sections[current] = []
+            } else {
+                sections[current] << line
+            }
+        }
+        assert sections.containsKey('Sources and license'): 'README.md has no Sources and license section'
+        // The APK download link is meaningless inside the app; the source
+        // link takes its place.
+        def aboutMarkdown = sections[''].findAll { !it.contains('releases/latest/download') }.join('\n')
+        def about = convert(aboutMarkdown)
+                .replace('<h1>Exact RPN for Android</h1>', '<h1 id="about">Exact RPN for Android</h1>')
+        about += '<p>Source code: <a href="https://github.com/sh1bot/AndroidRPNCalculator">github.com/sh1bot/AndroidRPNCalculator</a></p>'
+
+        def help = convert(rootProject.file('HELP.md').getText('UTF-8'))
+                .replace('<h1>Using Exact RPN</h1>', '<h1 id="help">Using Exact RPN</h1>')
+
+        // Links to licence files in the repo become links to the bundled
+        // licence section below.
+        def sources = convert('## Sources and license\n' + sections['Sources and license'].join('\n'))
+                .replace('<h2>Sources and license</h2>', '<h1 id="sources">Sources and license</h1>')
+                .replace('href="licenses/APACHE-2.0.txt"', 'href="#licenses"')
+                .replace('href="licenses/CR-COPYRIGHT.txt"', 'href="#licenses"')
+                .replace('href="licenses"', 'href="#licenses"')
+                .replace('href="LICENSE"', 'href="#licenses"')
+                .replace('href="NOTICE"', 'href="#licenses"')
+
+        // The licence texts are bundled verbatim; the only change is that
+        // bare URLs become links.
+        def legal = '<h1 id="licenses">Licenses and source credits</h1>'
         ['Source credits':'NOTICE', 'Apache License 2.0':'licenses/APACHE-2.0.txt', 'Constructive-real library notices':'licenses/CR-COPYRIGHT.txt'].each { title, path ->
             legal += '<h2>' + title + '</h2><p>' + escape(rootProject.file(path).getText('UTF-8')).replace('\n', '<br>') + '</p>'
         }
+
+        // Minify the converted sections: whitespace that sits purely between
+        // tags is renderer formatting. The licence texts are exempt: their
+        // construction emits no formatting whitespace, and linkifying after
+        // this step keeps the indentation of a line that is a single URL.
+        def document = (about + help + sources).replaceAll(/(?<=>)\s+(?=<)/, '')
+        document += legal.replaceAll(/(https?:\/\/[^\s<]+?)(?=[.,;]?(?:<|\s|$))/, '<a href="$1">$1</a>')
+
+        // The privacy policy closes the document. Its contact token is
+        // replaced from the PRIVACY_CONTACT_EMAIL environment variable (a
+        // repository secret in CI's trusted build) and entity-encoded, so
+        // the raw address never appears in the file; without the variable
+        // the line links to the published policy instead. The file's HTML
+        // comment is build instructions, not policy text, and is dropped.
+        def inComment = false
+        def privacyMarkdown = rootProject.file('PRIVACY.md').readLines().findAll { line ->
+            if (line.trim().startsWith('<!--')) inComment = true
+            boolean keep = !inComment
+            if (line.contains('-->')) inComment = false
+            keep
+        }.join('\n')
+        def contactEmail = System.getenv('PRIVACY_CONTACT_EMAIL')
+        privacyMarkdown = privacyMarkdown.replace('CONTACT_EMAIL', contactEmail ? contactEmail
+                : '[sh1bot.github.io/AndroidRPNCalculator/PRIVACY](https://sh1bot.github.io/AndroidRPNCalculator/PRIVACY.html)')
+        def privacy = convert(privacyMarkdown)
+                .replace('<h1>Privacy Policy \u2014 Exact RPN</h1>', '<h1 id="privacy">Privacy Policy</h1>')
+                .replaceAll(/(?<=>)\s+(?=<)/, '')
+        if (contactEmail) {
+            def encoded = contactEmail.toCharArray().collect { ch -> '&#' + (int) ch + ';' }.join('')
+            privacy = privacy.replace(contactEmail, encoded)
+        }
+        document += privacy
         delete licenseAssets
         def directory = licenseAssets.get().asFile
         directory.mkdirs()
-        ['help.html':html, 'licenses.html':legal].each { name, content ->
-            new File(directory, name).setText(content, 'UTF-8')
-        }
+        new File(directory, 'docs.html').setText(document, 'UTF-8')
     }
 }
 android.sourceSets.main.assets.srcDir(licenseAssets)
