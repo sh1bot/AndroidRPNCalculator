@@ -54,10 +54,13 @@ public final class AboutDialog extends DialogFragment {
         text.setPadding(pad, pad, pad, pad);
         text.setMovementMethod(android.text.method.LinkMovementMethod.getInstance());
         try {
+            String document = read(getActivity(), help ? "help.html" : "licenses.html");
+            // The help document is HTML; the licences document is plain text.
             text.setText(
-                    android.text.Html.fromHtml(
-                            read(getActivity(), help ? "help.html" : "licenses.html"),
-                            android.text.Html.FROM_HTML_MODE_LEGACY));
+                    help
+                            ? android.text.Html.fromHtml(
+                                    document, android.text.Html.FROM_HTML_MODE_LEGACY)
+                            : document);
         } catch (IOException ex) {
             throw new IllegalStateException("Missing offline document", ex);
         }

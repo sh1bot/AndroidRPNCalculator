@@ -179,7 +179,7 @@ public final class ValueFormatter {
         boolean negative = scaled.signum() < 0;
         String text = scaled.abs().toString(base).toUpperCase(java.util.Locale.ROOT);
         if (places == 0) return (negative ? "-" : "") + text;
-        text = "0".repeat(Math.max(0, places + 1 - text.length())) + text;
+        text = zeros(Math.max(0, places + 1 - text.length())) + text;
         int point = text.length() - places;
         text = text.substring(0, point) + "." + text.substring(point);
         while (text.endsWith("0")) text = text.substring(0, text.length() - 1);
@@ -227,14 +227,21 @@ public final class ValueFormatter {
         return Integer.toString(value, base).toUpperCase(java.util.Locale.ROOT);
     }
 
+    // String.repeat is API 33+; filling by hand avoids the D8 backport class.
+    private static String zeros(int count) {
+        char[] chars = new char[count];
+        java.util.Arrays.fill(chars, '0');
+        return new String(chars);
+    }
+
     private static String plain(String number, int scale) {
         return pointAfter(number, number.length() - scale);
     }
 
     private static String pointAfter(String number, int wholeDigits) {
-        if (wholeDigits <= 0) return "0." + "0".repeat(-wholeDigits) + number;
+        if (wholeDigits <= 0) return "0." + zeros(-wholeDigits) + number;
         if (wholeDigits >= number.length())
-            return number + "0".repeat(wholeDigits - number.length());
+            return number + zeros(wholeDigits - number.length());
         return number.substring(0, wholeDigits) + "." + number.substring(wholeDigits);
     }
 }

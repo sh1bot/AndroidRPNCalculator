@@ -48,6 +48,8 @@ android {
         }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    // Nothing reads the version-control-info.textproto entry AGP embeds.
+    vcsInfo { include = false }
     testOptions {
         unitTests {
             includeAndroidResources = true
@@ -127,9 +129,11 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
             if (match.matches()) return '<h' + match[0][1].length() + '>' + escape(match[0][2]) + '</h' + match[0][1].length() + '>'
             '<p>' + escape(line).replaceAll(/\*\*(.+?)\*\*/, '<b>$1</b>').replaceAll(/`(.+?)`/, '<tt>$1</tt>') + '</p>'
         }.join('\n')
-        def legal = '<h1>Licenses and source credits</h1>'
+        // Plain text, shown as-is by AboutDialog: keeping the newlines instead
+        // of a <br> per line saves about 1.5 KB in the generated asset.
+        def legal = 'Licenses and source credits\n'
         ['Source credits':'NOTICE', 'Apache License 2.0':'licenses/APACHE-2.0.txt', 'Constructive-real library notices':'licenses/CR-COPYRIGHT.txt'].each { title, path ->
-            legal += '<h2>' + title + '</h2><p>' + escape(rootProject.file(path).getText('UTF-8')).replace('\n', '<br>') + '</p>'
+            legal += '\n' + title + '\n\n' + rootProject.file(path).getText('UTF-8').strip() + '\n'
         }
         delete licenseAssets
         def directory = licenseAssets.get().asFile
