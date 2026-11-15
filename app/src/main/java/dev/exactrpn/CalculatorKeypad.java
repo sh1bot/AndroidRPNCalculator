@@ -105,8 +105,10 @@ public final class CalculatorKeypad extends ViewGroup {
 
         private void measureBandButton(Button button, int cellWidth, int cellHeight) {
             int gap = Math.min(dp(8), cellHeight / 6);
+            // Band buttons always fill their cells: their cells are usually
+            // wider than tall, so squaring them (as rows may do) would leave
+            // gaps at the sides, and the panel state must not reshape them.
             int width = Math.max(1, cellWidth - gap), height = Math.max(1, cellHeight - gap);
-            if (!expanded) width = height = Math.min(width, height);
             fitLabel(button, width, height);
             button.measure(
                     MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
@@ -734,7 +736,11 @@ public final class CalculatorKeypad extends ViewGroup {
             int span = primary instanceof DigitBand ? 3 : 1;
             int rowHeight = primaryBody * (unit + span) / 5 - primaryBody * unit / 5;
             if (primary instanceof LinearLayout)
-                measureRow((LinearLayout) primary, digitsWidth, rowHeight, !expanded);
+                // Squaring is part of the stacked, collapsed layout only. With
+                // the functions beside the digits, showing or hiding them costs
+                // the keypad nothing, so its buttons must not change shape.
+                measureRow(
+                        (LinearLayout) primary, digitsWidth, rowHeight, !expanded && !functionsBeside);
             else
                 primary.measure(
                         MeasureSpec.makeMeasureSpec(digitsWidth, MeasureSpec.EXACTLY),
