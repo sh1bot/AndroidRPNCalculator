@@ -35,7 +35,11 @@ android {
         }
     }
     buildTypes {
+        // Nothing reads the version-control-info.textproto entry AGP embeds;
+        // in AGP 8.9 vcsInfo is a per-build-type setting.
+        debug { vcsInfo.include = false }
         release {
+            vcsInfo.include = false
             minifyEnabled true
             shrinkResources true
             // This app has no runtime reflection that needs generic, annotation, or
@@ -48,8 +52,6 @@ android {
         }
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
-    // Nothing reads the version-control-info.textproto entry AGP embeds.
-    vcsInfo { include = false }
     testOptions {
         unitTests {
             includeAndroidResources = true
