@@ -33,9 +33,11 @@ public final class EntryOperatorTest {
 
     private void key(CalculatorSession session, Command key) {
         instrumentation.runOnMainSync(() -> session.enqueue(key));
-        long until = SystemClock.elapsedRealtime() + 15000;
-        while (session.busy && SystemClock.elapsedRealtime() < until) SystemClock.sleep(25);
-        assertFalse("Calculation timed out", session.busy);
+        // Poll through UiTestSupport like every other wait in the suite: reading
+        // busy on the main thread also lets the queued completion run there,
+        // which a bare sleep loop never does (and under Robolectric the wait
+        // starved entirely).
+        UiTestSupport.await("Calculation timed out", 15_000, () -> !session.busy);
     }
 
     @Test

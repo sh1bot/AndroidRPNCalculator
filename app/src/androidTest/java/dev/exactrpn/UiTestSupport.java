@@ -5,7 +5,6 @@ import static org.junit.Assert.fail;
 
 import android.app.Instrumentation;
 import android.os.FileObserver;
-import android.os.SystemClock;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -42,13 +41,21 @@ final class UiTestSupport {
 
     private static void poll(String failure, long timeoutMillis, BooleanSupplier condition) {
         Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-        long until = SystemClock.elapsedRealtime() + timeoutMillis;
+        // Real clock, not SystemClock: under Robolectric the shadow clock advances
+        // virtual time without really waiting, which races the app's worker threads.
+        // On a device nanoTime is the same monotonic clock SystemClock exposes.
+        long until = System.nanoTime() + timeoutMillis * 1_000_000L;
         do {
             AtomicBoolean ready = new AtomicBoolean();
             instrumentation.runOnMainSync(() -> ready.set(condition.getAsBoolean()));
             if (ready.get()) return;
-            SystemClock.sleep(25);
-        } while (SystemClock.elapsedRealtime() < until);
+            try {
+                Thread.sleep(25);
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        } while (System.nanoTime() < until);
         fail(failure);
     }
 

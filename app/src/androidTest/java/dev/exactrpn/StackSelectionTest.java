@@ -43,6 +43,10 @@ public final class StackSelectionTest {
         CalculatorSession session = session(activity);
         instrumentation.runOnMainSync(activity::finish);
         instrumentation.waitForIdleSync();
+        // Under Robolectric a finishing activity is never destroyed, so run the
+        // teardown MainActivity.onDestroy would have run on a device. Closing
+        // twice is harmless: on a device onDestroy may repeat this call.
+        session.close();
         assertTrue(
                 "Activity worker must finish before the next test",
                 session.awaitClosed(10, TimeUnit.SECONDS));

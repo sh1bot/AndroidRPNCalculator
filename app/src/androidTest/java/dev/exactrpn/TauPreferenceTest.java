@@ -3,13 +3,11 @@ package dev.exactrpn;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.fail;
 
 import android.app.Instrumentation;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.SystemClock;
 import android.widget.Button;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -17,8 +15,6 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
-
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @RunWith(AndroidJUnit4.class)
 public final class TauPreferenceTest {
@@ -31,14 +27,7 @@ public final class TauPreferenceTest {
                                 new Intent(context, MainActivity.class)
                                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
         CalculatorSession session = StackSelectionTest.session(activity);
-        long until = SystemClock.elapsedRealtime() + 15000;
-        do {
-            AtomicBoolean ready = new AtomicBoolean();
-            instrumentation.runOnMainSync(() -> ready.set(!session.busy));
-            if (ready.get()) return activity;
-            SystemClock.sleep(25);
-        } while (SystemClock.elapsedRealtime() < until);
-        fail("Calculator did not finish restoring");
+        UiTestSupport.await("Calculator did not finish restoring", () -> !session.busy);
         return activity;
     }
 
