@@ -72,8 +72,8 @@ public final class NumberText {
         for (Profile profile : profiles) {
             try {
                 String canonical = parse(text, profile);
-                BigInteger[] parts = ExactFunctions.parts(RpnCalculator.parse(canonical, radix));
-                values.putIfAbsent(parts[0] + "/" + parts[1], canonical);
+                RationalValue parts = ExactFunctions.rational(RpnCalculator.parse(canonical, radix));
+                values.putIfAbsent(parts.numerator + "/" + parts.denominator, canonical);
             } catch (IllegalArgumentException | ArithmeticException ignored) {
             }
         }

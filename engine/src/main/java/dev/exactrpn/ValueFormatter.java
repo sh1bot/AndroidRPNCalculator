@@ -228,10 +228,7 @@ public final class ValueFormatter {
     }
 
     private static String plain(String number, int scale) {
-        int point = number.length() - scale;
-        if (point <= 0) return "0." + "0".repeat(-point) + number;
-        if (point >= number.length()) return number + "0".repeat(point - number.length());
-        return number.substring(0, point) + "." + number.substring(point);
+        return pointAfter(number, number.length() - scale);
     }
 
     private static String pointAfter(String number, int wholeDigits) {

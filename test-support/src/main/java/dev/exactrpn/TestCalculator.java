@@ -148,10 +148,6 @@ final class TestCalculator {
         editor.select(start, end);
     }
 
-    void moveCursor(String direction, boolean extend) {
-        editor.moveCursor(direction, extend);
-    }
-
     void setInputProfile(NumberText.Profile profile) {
         editor.setInputProfile(profile);
     }
@@ -197,11 +193,6 @@ final class TestCalculator {
     void clearUndo() {
         engine.clearUndo();
         editor.clearUndo();
-    }
-
-    void discardRedo() {
-        engine.discardRedo();
-        editor.redo.clear();
     }
 
     List<UnifiedReal> values() {
@@ -255,11 +246,4 @@ final class TestCalculator {
         rowAction(() -> engine.transformRows(operation, rows));
     }
 
-    List<UnifiedReal> selectedValues(int... rows) {
-        return engine.selectedValues(rows);
-    }
-
-    boolean sameStack(List<UnifiedReal> values) {
-        return engine.sameStack(values);
-    }
 }

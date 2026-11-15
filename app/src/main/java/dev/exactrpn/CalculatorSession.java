@@ -178,8 +178,7 @@ final class CalculatorSession {
                                         || key.is("DELETE")
                                         || key.is("HOLD_DROP")
                                         || key.is("SMART_CLEAR")
-                                        || key.is("±")
-                                        || Command.cursorDirection(wire) != null)
+                                        || key.is("±"))
                         || key.is(Command.UNDO) && editor.undoCount() > 0
                         || key.is(Command.REDO) && editor.redoCount() > 0;
         if (editing && key.kind == Command.Kind.HOLD_DIGIT) local = true;
@@ -248,6 +247,14 @@ final class CalculatorSession {
             if (ex.getCause() instanceof RuntimeException) throw (RuntimeException) ex.getCause();
             throw new IllegalStateException(ex.getCause());
         }
+    }
+
+    private void runOnMain(Runnable action) {
+        onMain(
+                () -> {
+                    action.run();
+                    return null;
+                });
     }
 
     private byte[] completedDraft(Command key) throws java.io.IOException {
@@ -343,12 +350,11 @@ final class CalculatorSession {
                         key.is("NUMBER_FORMAT") ? current.numberMode.next() : current.numberMode,
                         key.is("FRACTION") ? current.fractionMode.next() : current.fractionMode,
                         entry);
-        onMain(
+        runOnMain(
                 () -> {
                     arithmeticDisplay = next;
                     display = new Display(next, editor == null ? entry : editor);
                     setError(generation, "");
-                    return null;
                 });
         return true;
     }
@@ -385,13 +391,12 @@ final class CalculatorSession {
             next = new Display(result, entry, settings);
         }
         Display accepted = next;
-        onMain(
+        runOnMain(
                 () -> {
                     inputProfiles.clear();
                     arithmeticDisplay = accepted;
                     display = new Display(accepted, editor == null ? entry : editor);
                     setError(generation, "");
-                    return null;
                 });
         return true;
     }
@@ -534,19 +539,11 @@ final class CalculatorSession {
                         loaded = true;
                     }
                 };
-        onMain(
-                () -> {
-                    accept.run();
-                    return null;
-                });
+        runOnMain(() -> accept.run());
     }
 
     void saveForLifecycle() {
-        onMain(
-                () -> {
-                    persistSession(inputGeneration);
-                    return null;
-                });
+        runOnMain(() -> persistSession(inputGeneration));
     }
 
     private void persistSession(long generation) {

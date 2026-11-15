@@ -4,7 +4,6 @@ package dev.exactrpn;
 import static org.junit.Assert.*;
 
 import android.content.Context;
-import android.os.FileObserver;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -16,26 +15,9 @@ import java.io.File;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 @RunWith(AndroidJUnit4.class)
 public final class MemoryTransportTest {
-    private FileObserver watch(File directory, AtomicInteger accesses) {
-        FileObserver observer =
-                new FileObserver(directory.getAbsolutePath(), FileObserver.ALL_EVENTS) {
-                    @Override
-                    public void onEvent(int event, String path) {
-                        if (path != null
-                                && (path.startsWith("calculation-")
-                                        || path.startsWith("calculator-state")
-                                        || path.equals("locked-calculations")))
-                            accesses.incrementAndGet();
-                    }
-                };
-        observer.startWatching();
-        return observer;
-    }
-
     private CalculationRequest request(String key, DisplayResult accepted) {
         return request(Command.key(key), accepted);
     }

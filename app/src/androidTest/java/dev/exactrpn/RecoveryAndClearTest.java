@@ -1,21 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import static dev.exactrpn.UiTestSupport.await;
+import static dev.exactrpn.UiTestSupport.findButton;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.fail;
 
 import android.app.Instrumentation;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.os.SystemClock;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.Button;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -25,37 +23,10 @@ import org.junit.runner.RunWith;
 
 import java.io.File;
 import java.nio.file.Files;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 @RunWith(AndroidJUnit4.class)
 public final class RecoveryAndClearTest {
     private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-
-    private interface Condition {
-        boolean ready();
-    }
-
-    private void await(Condition condition) {
-        long until = SystemClock.elapsedRealtime() + 15000;
-        do {
-            AtomicBoolean ready = new AtomicBoolean();
-            instrumentation.runOnMainSync(() -> ready.set(condition.ready()));
-            if (ready.get()) return;
-            SystemClock.sleep(25);
-        } while (SystemClock.elapsedRealtime() < until);
-        fail("Timed out waiting for recovery/entry UI");
-    }
-
-    private Button button(View view, String text) {
-        if (view instanceof Button && ((Button) view).getText().toString().equals(text))
-            return (Button) view;
-        if (view instanceof ViewGroup)
-            for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
-                Button found = button(((ViewGroup) view).getChildAt(i), text);
-                if (found != null) return found;
-            }
-        return null;
-    }
 
     @Test
     public void invalidSnapshotsRecoverAndRepeatedCeCannotClearStack() throws Exception {
@@ -75,37 +46,40 @@ public final class RecoveryAndClearTest {
                 CalculatorSession session = StackSelectionTest.session(activity);
                 View root = activity.getWindow().getDecorView();
                 try {
-                    await(
+                    await("Timed out waiting for recovery/entry UI",
                             () ->
                                     !session.busy
                                             && session.checkpoint == null
                                             && session.error.contains("restore"));
                     assertNull(StoreTestSupport.checkpoint(store));
                     assertArrayEquals(bad, Files.readAllBytes(corrupt.toPath()));
-                    instrumentation.runOnMainSync(() -> button(root, "9").performClick());
-                    await(
+                    instrumentation.runOnMainSync(
+                            () -> findButton(root, "9").performClick());
+                    await("Timed out waiting for recovery/entry UI",
                             () ->
                                     !session.busy
                                             && session.display.entry.equals("9")
-                                            && button(root, "CE") != null);
-                    instrumentation.runOnMainSync(() -> button(root, "Enter").performClick());
-                    await(
+                                            && findButton(root, "CE") != null);
+                    instrumentation.runOnMainSync(
+                            () -> findButton(root, "Enter").performClick());
+                    await("Timed out waiting for recovery/entry UI",
                             () ->
                                     !session.busy
                                             && !session.display.editing
                                             && session.display.rows.size() == 1);
-                    instrumentation.runOnMainSync(() -> button(root, "7").performClick());
-                    await(
+                    instrumentation.runOnMainSync(
+                            () -> findButton(root, "7").performClick());
+                    await("Timed out waiting for recovery/entry UI",
                             () ->
                                     !session.busy
                                             && session.display.entry.equals("7")
-                                            && button(root, "CE") != null);
+                                            && findButton(root, "CE") != null);
                     instrumentation.runOnMainSync(
                             () -> {
-                                button(root, "CE").performClick();
-                                button(root, "CE").performClick();
+                                findButton(root, "CE").performClick();
+                                findButton(root, "CE").performClick();
                             });
-                    await(
+                    await("Timed out waiting for recovery/entry UI",
                             () ->
                                     !session.busy
                                             && session.display.editing
@@ -121,18 +95,22 @@ public final class RecoveryAndClearTest {
                                 java.util.Arrays.fill(large, '1');
                                 clipboard.setPrimaryClip(
                                         ClipData.newPlainText("too long", new String(large)));
-                                button(root, "Enter").performLongClick();
+                                findButton(root, "Enter").performLongClick();
                                 assertFalse(session.busy);
                                 assertEquals(beforePaste, session.checkpoint);
                             });
-                    instrumentation.runOnMainSync(() -> button(root, "Enter").performClick());
-                    await(
+                    instrumentation.runOnMainSync(
+                            () -> findButton(root, "Enter").performClick());
+                    await("Timed out waiting for recovery/entry UI",
                             () ->
                                     !session.busy
                                             && !session.display.editing
-                                            && button(root, "AC") != null);
-                    instrumentation.runOnMainSync(() -> button(root, "AC").performClick());
-                    await(() -> !session.busy && session.display.rows.isEmpty());
+                                            && findButton(root, "AC") != null);
+                    instrumentation.runOnMainSync(
+                            () -> findButton(root, "AC").performClick());
+                    await(
+                            "Timed out waiting for recovery/entry UI",
+                            () -> !session.busy && session.display.rows.isEmpty());
                 } finally {
                     StackSelectionTest.finish(activity);
                     store.clear();

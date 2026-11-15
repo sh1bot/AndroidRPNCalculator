@@ -24,12 +24,11 @@ public final class ClipboardNumbers {
             try {
                 EntryEditor.checkLength(line);
                 if (!line.contains("/")) {
-                    BigInteger[] parts =
-                            ExactFunctions.parts(
+                    values.add(
+                            ExactFunctions.rational(
                                     RpnCalculator.parse(
                                             NumberText.analyze(line, locale).canonical(),
-                                            locale.radix));
-                    values.add(new RationalValue(parts[0], parts[1]));
+                                            locale.radix)));
                 } else {
                     var match = FRACTION.matcher(line);
                     if (!match.matches())

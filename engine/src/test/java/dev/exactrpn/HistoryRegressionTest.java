@@ -221,7 +221,7 @@ final class HistoryRegressionTest extends RegressionSupport {
                 redoRestored.undoCount() == 0 && redoRestored.redoCount() == 0,
                 "clear history removes undo and redo");
         assertEquals(
-                "REDO", KeyboardInput.command(53, 0, true, false, false), "Ctrl Y redo shortcut");
+                "REDO", CalculatorKey.command(53, 0, true, false, false), "Ctrl Y redo shortcut");
     }
 
     @Test

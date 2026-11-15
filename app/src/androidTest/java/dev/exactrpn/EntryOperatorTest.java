@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import static dev.exactrpn.UiTestSupport.await;
 import static org.junit.Assert.*;
 
 import android.app.Instrumentation;
@@ -21,8 +22,6 @@ import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.BooleanSupplier;
 
 @RunWith(AndroidJUnit4.class)
 public final class EntryOperatorTest {
@@ -37,17 +36,6 @@ public final class EntryOperatorTest {
         long until = SystemClock.elapsedRealtime() + 15000;
         while (session.busy && SystemClock.elapsedRealtime() < until) SystemClock.sleep(25);
         assertFalse("Calculation timed out", session.busy);
-    }
-
-    private void awaitUi(BooleanSupplier condition) {
-        long until = SystemClock.elapsedRealtime() + 10000;
-        do {
-            AtomicBoolean ready = new AtomicBoolean();
-            instrumentation.runOnMainSync(() -> ready.set(condition.getAsBoolean()));
-            if (ready.get()) return;
-            SystemClock.sleep(25);
-        } while (SystemClock.elapsedRealtime() < until);
-        fail("Timed out waiting for error notice");
     }
 
     @Test
@@ -415,7 +403,7 @@ public final class EntryOperatorTest {
             assertSame(accepted, session.checkpoint);
             assertArrayEquals(accepted.bytes, store.load());
             session.cancel();
-            awaitUi(() -> !session.busy);
+            await("Timed out waiting for error notice", 10_000, () -> !session.busy);
             session.background = false;
             key(session, "CLEAR");
             key(session, "UNDO");
@@ -500,9 +488,13 @@ public final class EntryOperatorTest {
         android.widget.EditText entry = root.findViewWithTag("number-entry");
         try {
             key(session, Command.paste("1.23"));
-            awaitUi(() -> entry.getText().toString().equals("1.23"));
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> entry.getText().toString().equals("1.23"));
             instrumentation.runOnMainSync(() -> root.findViewWithTag(".").performLongClick());
-            awaitUi(() -> !session.busy && entry.getText().toString().equals("1.23e"));
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && entry.getText().toString().equals("1.23e"));
             instrumentation.runOnMainSync(
                     () -> {
                         assertEquals(
@@ -512,7 +504,9 @@ public final class EntryOperatorTest {
                                         .length);
                         root.findViewWithTag("4").performClick();
                     });
-            awaitUi(() -> !session.busy && entry.getText().toString().equals("1.23e4"));
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && entry.getText().toString().equals("1.23e4"));
             instrumentation.runOnMainSync(
                     () -> {
                         assertEquals(
@@ -526,9 +520,13 @@ public final class EntryOperatorTest {
                         entry.setSelection(
                                 5); // Immediately after the single underlying e character.
                     });
-            awaitUi(() -> !session.busy && session.display.start == 5);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && session.display.start == 5);
             instrumentation.runOnMainSync(() -> root.findViewWithTag("BACK").performClick());
-            awaitUi(() -> !session.busy && entry.getText().toString().equals("1.234"));
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && entry.getText().toString().equals("1.234"));
             instrumentation.runOnMainSync(
                     () -> {
                         assertEquals(
@@ -546,7 +544,9 @@ public final class EntryOperatorTest {
                                         .length);
                         root.findViewWithTag("ENTER").performClick();
                     });
-            awaitUi(() -> !session.busy && !session.display.editing);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && !session.display.editing);
             assertEquals(Arrays.asList("1.234"), session.display.rows);
         } finally {
             StackSelectionTest.finish(activity);
@@ -565,7 +565,7 @@ public final class EntryOperatorTest {
         CalculatorSession session = StackSelectionTest.session(activity);
         CountDownLatch release = new CountDownLatch(1);
         try {
-            awaitUi(() -> !session.busy);
+            await("Timed out waiting for error notice", 10_000, () -> !session.busy);
             java.lang.reflect.Field workerField =
                     CalculatorSession.class.getDeclaredField("worker");
             workerField.setAccessible(true);
@@ -589,7 +589,9 @@ public final class EntryOperatorTest {
                     });
             // Complete the earlier failing operator only after the next key has dismissed it.
             release.countDown();
-            awaitUi(() -> !session.busy && session.display.entry.equals("1"));
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && session.display.entry.equals("1"));
             assertEquals("", session.error);
             instrumentation.runOnMainSync(
                     () ->
@@ -616,7 +618,9 @@ public final class EntryOperatorTest {
         TextView notice = root.findViewWithTag("calculation-notice");
         try {
             key(session, "+");
-            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> notice.getVisibility() == View.VISIBLE);
             instrumentation.runOnMainSync(
                     () -> {
                         root.findViewWithTag("FUNCTIONS").performClick();
@@ -624,16 +628,22 @@ public final class EntryOperatorTest {
                         assertEquals("", session.error);
                     });
             key(session, "+");
-            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> notice.getVisibility() == View.VISIBLE);
             instrumentation.runOnMainSync(
                     () -> {
                         root.findViewWithTag("1").performClick();
                         assertEquals(View.GONE, notice.getVisibility());
                     });
-            awaitUi(() -> !session.busy && session.display.entry.equals("1"));
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && session.display.entry.equals("1"));
             assertEquals("", session.error);
             instrumentation.runOnMainSync(() -> root.findViewWithTag("+").performClick());
-            awaitUi(() -> !session.busy && notice.getVisibility() == View.VISIBLE);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> !session.busy && notice.getVisibility() == View.VISIBLE);
             assertFalse(session.error.isEmpty());
             assertFalse(session.display.editing);
         } finally {
@@ -653,7 +663,7 @@ public final class EntryOperatorTest {
         CalculatorSession session = StackSelectionTest.session(activity);
         View root = activity.getWindow().getDecorView();
         try {
-            awaitUi(() -> !session.busy);
+            await("Timed out waiting for error notice", 10_000, () -> !session.busy);
             instrumentation.runOnMainSync(
                     () -> {
                         root.findViewWithTag("1").performClick();
@@ -664,7 +674,7 @@ public final class EntryOperatorTest {
                             button.performClick();
                         }
                     });
-            awaitUi(() -> !session.busy);
+            await("Timed out waiting for error notice", 10_000, () -> !session.busy);
             assertEquals("1", session.display.entry);
             assertEquals(RpnCalculator.AngleUnit.DEG, session.display.angleUnit);
             assertEquals(ValueFormatter.Notation.ENGINEERING, session.display.notation);
@@ -690,15 +700,21 @@ public final class EntryOperatorTest {
                     activity.getWindow().getDecorView().findViewWithTag("calculation-notice");
             key(session, "1");
             key(session, "+");
-            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> notice.getVisibility() == View.VISIBLE);
             String message = session.error;
             long firstError = session.errorRevision;
-            awaitUi(() -> notice.getVisibility() == View.GONE);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> notice.getVisibility() == View.GONE);
             // No intervening edit: this failure starts with the same value already on the stack.
             key(session, "+");
             assertEquals(message, session.error);
             assertTrue(session.errorRevision > firstError);
-            awaitUi(() -> notice.getVisibility() == View.VISIBLE);
+            await(
+                    "Timed out waiting for error notice", 10_000,
+                    () -> notice.getVisibility() == View.VISIBLE);
             instrumentation.runOnMainSync(() -> assertEquals(message, notice.getText().toString()));
             assertEquals(Arrays.asList("1"), session.display.rows);
             assertFalse(session.display.editing);

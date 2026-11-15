@@ -43,7 +43,7 @@ public final class Command {
     // Only KEY actions have a key identifier; entry text is never interpreted as a command.
     public final String wire;
     public final Operation operation;
-    private RationalValue[] values = new RationalValue[0];
+    private final RationalValue[] values;
     public final String text;
     public final int start, end;
     public final boolean raw, explicitDecimal;
@@ -58,7 +58,8 @@ public final class Command {
             boolean raw,
             boolean explicitDecimal,
             int[] rows,
-            Operation operation) {
+            Operation operation,
+            RationalValue[] values) {
         this.kind = kind;
         this.wire = wire;
         this.text = text;
@@ -68,19 +69,15 @@ public final class Command {
         this.explicitDecimal = explicitDecimal;
         this.rows = rows.clone();
         this.operation = operation;
+        this.values = values.clone();
+    }
+
+    private Command(Kind kind, String wire, String text) {
+        this(kind, wire, text, 0, 0, false, false, new int[0], null, new RationalValue[0]);
     }
 
     public static Command key(String key) {
-        return new Command(
-                Kind.KEY,
-                java.util.Objects.requireNonNull(key),
-                "",
-                0,
-                0,
-                false,
-                false,
-                new int[0],
-                null);
+        return new Command(Kind.KEY, java.util.Objects.requireNonNull(key), "");
     }
 
     public static Command edit(String text, int start, int end, boolean raw, boolean decimal) {
@@ -93,43 +90,34 @@ public final class Command {
                 raw,
                 decimal,
                 new int[0],
-                null);
+                null,
+                new RationalValue[0]);
     }
 
     public static Command select(int start, int end) {
-        return new Command(Kind.SELECT, "", "", start, end, false, false, new int[0], null);
+        return new Command(
+                Kind.SELECT, "", "", start, end, false, false, new int[0], null, new RationalValue[0]);
     }
 
     public static Command paste(String text) {
-        return new Command(
-                Kind.PASTE_RAW,
-                "",
-                java.util.Objects.requireNonNull(text),
-                0,
-                0,
-                false,
-                false,
-                new int[0],
-                null);
+        return new Command(Kind.PASTE_RAW, "", java.util.Objects.requireNonNull(text));
     }
 
     public static Command holdDigit(String digit) {
         if (digit.length() != 1 || Character.digit(digit.charAt(0), 16) < 0)
             throw new IllegalArgumentException("Invalid digit shortcut");
-        return new Command(Kind.HOLD_DIGIT, "", digit, 0, 0, false, false, new int[0], null);
+        return new Command(Kind.HOLD_DIGIT, "", digit);
     }
 
     public static Command rows(Kind kind, int... rows) {
         if (!kind.takesRows || kind == Kind.UNARY_ROWS)
             throw new IllegalArgumentException("Not a row action");
-        return new Command(kind, "", "", 0, 0, false, false, rows, null);
+        return new Command(kind, "", "", 0, 0, false, false, rows, null, new RationalValue[0]);
     }
 
     public static Command pushValues(RationalValue[] values) {
-        Command command =
-                new Command(Kind.PUSH_VALUES, "", "", 0, 0, false, false, new int[0], null);
-        command.values = values.clone();
-        return command;
+        return new Command(
+                Kind.PUSH_VALUES, "", "", 0, 0, false, false, new int[0], null, values);
     }
 
     public RationalValue[] values() {
@@ -139,7 +127,8 @@ public final class Command {
     public static Command unaryRows(Operation operation, int... rows) {
         if (operation == null || operation.arity != 1)
             throw new IllegalArgumentException("Not a unary operation");
-        return new Command(Kind.UNARY_ROWS, "", "", 0, 0, false, false, rows, operation);
+        return new Command(
+                Kind.UNARY_ROWS, "", "", 0, 0, false, false, rows, operation, new RationalValue[0]);
     }
 
     public Command forEntry(boolean editing) {

@@ -131,8 +131,7 @@ final class StackRowRenderer {
                         : (approximate
                                 ? R.string.select_level_approximate
                                 : R.string.select_level_value);
-        return context.getString(
-                id, depth, value.toString().replace("\u200b", "").replace("\u2060", ""));
+        return context.getString(id, depth, value.toString());
     }
 
     // Nominal sizes: x is larger than the other rows, but every row shares

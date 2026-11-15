@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import static dev.exactrpn.UiTestSupport.awaitHere;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -21,7 +22,6 @@ import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.FileObserver;
 import android.os.ParcelFileDescriptor;
-import android.os.SystemClock;
 import android.widget.TextView;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -42,28 +42,12 @@ import java.util.Arrays;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class LockScreenTest {
     private final Instrumentation instrumentation = InstrumentationRegistry.getInstrumentation();
-
-    private interface Condition {
-        boolean ready();
-    }
-
-    private void await(Condition condition) {
-        long until = SystemClock.elapsedRealtime() + 15000;
-        do {
-            AtomicBoolean ready = new AtomicBoolean();
-            instrumentation.runOnMainSync(() -> ready.set(condition.ready()));
-            if (ready.get()) return;
-            SystemClock.sleep(25);
-        } while (SystemClock.elapsedRealtime() < until);
-        fail("Timed out waiting for lock-screen test at " + new Throwable().getStackTrace()[1]);
-    }
 
     static String shell(String command) throws Exception {
         try (InputStream input =
@@ -88,7 +72,7 @@ public final class LockScreenTest {
                         context.startActivity(
                                 new Intent(context, LockedCalculatorActivity.class)
                                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
-        await(
+        awaitHere("Timed out waiting for lock-screen test",
                 () -> {
                     for (Activity activity :
                             ActivityLifecycleMonitorRegistry.getInstance()
@@ -106,7 +90,7 @@ public final class LockScreenTest {
         instrumentation.runOnMainSync(
                 () -> activity.getWindow().getDecorView().findViewWithTag(key).performClick());
         CalculatorSession session = StackSelectionTest.session(activity);
-        await(() -> !session.busy);
+        awaitHere("Timed out waiting for lock-screen test", () -> !session.busy);
     }
 
     private File seed(Context context, CalculatorStore store) throws Exception {
@@ -119,20 +103,6 @@ public final class LockScreenTest {
         return seed;
     }
 
-    private FileObserver watch(Context context, AtomicInteger accesses) {
-        FileObserver observer =
-                new FileObserver(
-                        context.getNoBackupFilesDir().getAbsolutePath(), FileObserver.ALL_EVENTS) {
-                    @Override
-                    public void onEvent(int event, String path) {
-                        if (path != null && path.startsWith("calculator-state"))
-                            accesses.incrementAndGet();
-                    }
-                };
-        observer.startWatching();
-        return observer;
-    }
-
     @Test
     public void temporaryActivityNeverRestoresOrChangesTheSavedCalculation() throws Exception {
         Context context = instrumentation.getTargetContext();
@@ -140,12 +110,15 @@ public final class LockScreenTest {
         File seed = seed(context, store), saved = new File(StoreTestSupport.checkpoint(store));
         byte[] before = Files.readAllBytes(saved.toPath());
         AtomicInteger accesses = new AtomicInteger();
-        FileObserver observer = watch(context, accesses);
+        FileObserver observer = UiTestSupport.watch(
+                context.getNoBackupFilesDir(),
+                accesses,
+                new String[] {"calculator-state"});
         LockedCalculatorActivity activity = null;
         try {
             activity = open(context);
             CalculatorSession session = StackSelectionTest.session(activity);
-            await(() -> !session.busy);
+            awaitHere("Timed out waiting for lock-screen test", () -> !session.busy);
             assertTrue(session.temporary);
             assertFalse(session.canUseSavedState());
             assertTrue(session.display.rows.isEmpty());
@@ -161,7 +134,7 @@ public final class LockScreenTest {
             activity = null;
             activity = open(context);
             CalculatorSession reopened = StackSelectionTest.session(activity);
-            await(() -> !reopened.busy);
+            awaitHere("Timed out waiting for lock-screen test", () -> !reopened.busy);
             assertTrue(reopened.display.rows.isEmpty());
             StackSelectionTest.finish(activity);
             activity = null;
@@ -182,7 +155,10 @@ public final class LockScreenTest {
         File seed = seed(context, store);
         String saved = StoreTestSupport.checkpoint(store);
         AtomicInteger accesses = new AtomicInteger();
-        FileObserver observer = watch(context, accesses);
+        FileObserver observer = UiTestSupport.watch(
+                context.getNoBackupFilesDir(),
+                accesses,
+                new String[] {"calculator-state"});
         ExecutorService worker = Executors.newSingleThreadExecutor();
         RemoteCalculator remote = new RemoteCalculator(context, true);
         try {
@@ -217,7 +193,10 @@ public final class LockScreenTest {
         File seed = seed(context, store), saved = new File(StoreTestSupport.checkpoint(store));
         byte[] before = Files.readAllBytes(saved.toPath());
         AtomicInteger accesses = new AtomicInteger();
-        FileObserver observer = watch(context, accesses);
+        FileObserver observer = UiTestSupport.watch(
+                context.getNoBackupFilesDir(),
+                accesses,
+                new String[] {"calculator-state"});
         LockedCalculatorActivity activity = null;
         boolean credential = false;
         String lockDelay = shell("settings get secure lock_screen_lock_after_timeout").trim();
@@ -225,11 +204,11 @@ public final class LockScreenTest {
             shell("locksettings set-disabled false");
             shell("locksettings set-pin 1234");
             credential = true;
-            await(manager::isDeviceSecure);
+            awaitHere("Timed out waiting for lock-screen test", manager::isDeviceSecure);
             shell("settings put secure lock_screen_lock_after_timeout 0");
             shell("input keyevent KEYCODE_SLEEP");
             try {
-                await(manager::isDeviceLocked);
+                awaitHere("Timed out waiting for lock-screen test", manager::isDeviceLocked);
             } catch (AssertionError failure) {
                 android.util.Log.e("LockTest", shell("dumpsys window policy"));
                 android.util.Log.e("LockTest", shell("dumpsys trust"));
@@ -239,7 +218,7 @@ public final class LockScreenTest {
             shell("input keyevent KEYCODE_WAKEUP");
             activity = open(context);
             CalculatorSession session = StackSelectionTest.session(activity);
-            await(() -> !session.busy);
+            awaitHere("Timed out waiting for lock-screen test", () -> !session.busy);
             assertTrue(DeviceAccess.locked(context));
             assertTrue(session.display.rows.isEmpty());
             CalculatorStore guarded =
@@ -274,7 +253,7 @@ public final class LockScreenTest {
             assertFalse(session.canUseSavedState());
             unlockWithPin(manager, activity);
             shell("locksettings clear --old 1234");
-            await(() -> !manager.isDeviceSecure());
+            awaitHere("Timed out waiting for lock-screen test", () -> !manager.isDeviceSecure());
             credential = false;
             assertFalse(
                     "Unlock must not promote the temporary session", session.canUseSavedState());
@@ -323,7 +302,7 @@ public final class LockScreenTest {
         info.flags |= android.accessibilityservice.AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS;
         instrumentation.getUiAutomation().setServiceInfo(info);
         instrumentation.runOnMainSync(() -> manager.requestDismissKeyguard(activity, null));
-        await(
+        awaitHere("Timed out waiting for lock-screen test",
                 () -> {
                     android.view.accessibility.AccessibilityNodeInfo root =
                             instrumentation.getUiAutomation().getRootInActiveWindow();
@@ -334,7 +313,7 @@ public final class LockScreenTest {
                 });
         shell("input text 1234");
         shell("input keyevent KEYCODE_ENTER");
-        await(() -> !DeviceAccess.locked(activity));
+        awaitHere("Timed out waiting for lock-screen test", () -> !DeviceAccess.locked(activity));
     }
 
     @Test

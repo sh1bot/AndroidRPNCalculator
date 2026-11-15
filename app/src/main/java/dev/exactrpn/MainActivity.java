@@ -496,7 +496,7 @@ public class MainActivity extends Activity {
         }
         if (key == null)
             key =
-                    KeyboardInput.command(
+                    CalculatorKey.command(
                             keyCode,
                             unicode,
                             event.isCtrlPressed(),
@@ -797,7 +797,6 @@ public class MainActivity extends Activity {
         entryView.setInputType(
                 android.text.InputType.TYPE_CLASS_TEXT
                         | android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS);
-        digits(entryView);
         entryView.setSingleLine(true);
         entryView.setHint("▸");
         entryView.setHintTextColor(colors.muted);

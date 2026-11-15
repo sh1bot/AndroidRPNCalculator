@@ -34,8 +34,8 @@ final class ExactFunctions {
         BigInteger integer = value.bigIntegerValue();
         if (integer != null) return new UnifiedReal(integer);
         if (value.boundedRationalValue() != null) {
-            BigInteger[] fraction = parts(value);
-            BigInteger[] qr = fraction[0].divideAndRemainder(fraction[1]);
+            RationalValue fraction = rational(value);
+            BigInteger[] qr = fraction.numerator.divideAndRemainder(fraction.denominator);
             return new UnifiedReal(qr[1].signum() < 0 ? qr[0].subtract(BigInteger.ONE) : qr[0]);
         }
         // get_appr(-bits) has error strictly less than one unit. Never round through a double.
@@ -51,24 +51,27 @@ final class ExactFunctions {
     }
 
     static UnifiedReal remainder(UnifiedReal y, UnifiedReal x, boolean modulo) {
-        BigInteger[] a = parts(y), b = parts(x);
-        if (b[0].signum() == 0)
+        RationalValue a = rational(y), b = rational(x);
+        if (b.numerator.signum() == 0)
             throw CalculationError.arithmetic(CalculationError.Code.DIVIDE_BY_ZERO);
-        BigInteger quotient = a[0].multiply(b[1]).divide(a[1].multiply(b[0]));
-        BigInteger denominator = a[1].multiply(b[1]);
-        BigInteger numerator = a[0].multiply(b[1]).subtract(b[0].multiply(a[1]).multiply(quotient));
-        if (modulo && numerator.signum() != 0 && numerator.signum() != b[0].signum())
-            numerator = numerator.add(b[0].multiply(a[1]));
+        BigInteger quotient =
+                a.numerator.multiply(b.denominator).divide(a.denominator.multiply(b.numerator));
+        BigInteger denominator = a.denominator.multiply(b.denominator);
+        BigInteger numerator =
+                a.numerator
+                        .multiply(b.denominator)
+                        .subtract(b.numerator.multiply(a.denominator).multiply(quotient));
+        if (modulo && numerator.signum() != 0 && numerator.signum() != b.numerator.signum())
+            numerator = numerator.add(b.numerator.multiply(a.denominator));
         BigInteger gcd = numerator.gcd(denominator);
         return new UnifiedReal(new BoundedRational(numerator.divide(gcd), denominator.divide(gcd)));
     }
 
-    static BigInteger[] parts(UnifiedReal value) {
+    static RationalValue rational(UnifiedReal value) {
         com.android.calculator2.BoundedRational bounded = value.boundedRationalValue();
         if (bounded == null)
             throw CalculationError.invalid(CalculationError.Code.RATIONAL_REQUIRED);
-        RationalValue rational = new RationalValue(bounded.numerator(), bounded.denominator());
-        return new BigInteger[] {rational.numerator, rational.denominator};
+        return new RationalValue(bounded.numerator(), bounded.denominator());
     }
 
     static UnifiedReal root(UnifiedReal base, UnifiedReal index) {
@@ -80,12 +83,12 @@ final class ExactFunctions {
         degree = degree.abs();
         if (degree.equals(BigInteger.ONE)) return inverse ? base.inverse() : base;
         if (base.boundedRationalValue() != null) {
-            BigInteger[] ratio = parts(base);
-            boolean negative = ratio[0].signum() < 0;
+            RationalValue ratio = rational(base);
+            boolean negative = ratio.numerator.signum() < 0;
             if (negative && !degree.testBit(0))
                 throw CalculationError.arithmetic(CalculationError.Code.EVEN_NEGATIVE_ROOT);
-            BigInteger numerator = exactRoot(ratio[0].abs(), degree),
-                    denominator = exactRoot(ratio[1], degree);
+            BigInteger numerator = exactRoot(ratio.numerator.abs(), degree),
+                    denominator = exactRoot(ratio.denominator, degree);
             if (numerator != null && denominator != null) {
                 if (negative) numerator = numerator.negate();
                 UnifiedReal result = new UnifiedReal(new BoundedRational(numerator, denominator));

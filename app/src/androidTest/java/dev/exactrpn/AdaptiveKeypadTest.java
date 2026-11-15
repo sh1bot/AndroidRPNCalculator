@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import static dev.exactrpn.UiTestSupport.findButton;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -26,17 +27,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 @RunWith(AndroidJUnit4.class)
 public final class AdaptiveKeypadTest {
-    private Button find(View view, String label) {
-        if (view instanceof Button && ((Button) view).getText().toString().equals(label))
-            return (Button) view;
-        if (view instanceof ViewGroup)
-            for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
-                Button result = find(((ViewGroup) view).getChildAt(i), label);
-                if (result != null) return result;
-            }
-        return null;
-    }
-
     private int dp(Context context, int value) {
         return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
@@ -84,7 +74,7 @@ public final class AdaptiveKeypadTest {
                         size(context, workspace, 760, 280);
                         assertEquals(0, keypad.getTop());
                         assertEquals(workspace.getHeight(), keypad.getHeight());
-                        find(keypad, "f()").performClick();
+                        findButton(keypad, "f()").performClick();
                         size(context, workspace, 660, 280);
                         assertEquals(0, keypad.getTop());
                         assertEquals(workspace.getHeight(), keypad.getHeight());
@@ -114,18 +104,18 @@ public final class AdaptiveKeypadTest {
                                     new CalculatorKeypad(
                                             context, command::set, true, (open, inverse) -> {});
                             keypad.setTauPreference(false, preference::set);
-                            find(keypad, "π").performLongClick();
+                            findButton(keypad, "π").performLongClick();
                             assertTrue(preference.get());
                             assertNull(command.get());
-                            find(keypad, "τ").performClick();
+                            findButton(keypad, "τ").performClick();
                             assertEquals("τ", command.get().wire);
                             command.set(null);
                             keypad.setInverse(true);
-                            assertNotNull(find(keypad, "τ"));
-                            find(keypad, "τ").performLongClick();
+                            assertNotNull(findButton(keypad, "τ"));
+                            findButton(keypad, "τ").performLongClick();
                             assertFalse(preference.get());
                             assertNull(command.get());
-                            find(keypad, "π").performClick();
+                            findButton(keypad, "π").performClick();
                             assertEquals("π", command.get().wire);
                         });
     }
@@ -145,31 +135,31 @@ public final class AdaptiveKeypadTest {
                                             false,
                                             (open, inverse) -> state.set(open + ":" + inverse));
                             assertFalse(keypad.isExpanded());
-                            assertNull(find(keypad, "INV"));
-                            find(keypad, "f()").performClick();
+                            assertNull(findButton(keypad, "INV"));
+                            findButton(keypad, "f()").performClick();
                             assertTrue(keypad.isExpanded());
                             assertEquals("true:false", state.get());
                             assertNull(command.get());
-                            find(keypad, "rem").performClick();
+                            findButton(keypad, "rem").performClick();
                             assertEquals("rem", command.get().wire);
                             command.set(null);
-                            find(keypad, "f⁻¹()").performClick();
+                            findButton(keypad, "f⁻¹()").performClick();
                             assertTrue(keypad.isExpanded());
                             assertEquals("true:true", state.get());
                             assertNull(command.get());
-                            find(keypad, "mod").performClick();
+                            findButton(keypad, "mod").performClick();
                             assertEquals("mod", command.get().wire);
-                            find(keypad, "⌈x⌉").performClick();
+                            findButton(keypad, "⌈x⌉").performClick();
                             assertEquals("ceil", command.get().wire);
                             command.set(null);
-                            find(keypad, "f⁻¹()").performClick();
+                            findButton(keypad, "f⁻¹()").performClick();
                             assertFalse(keypad.isExpanded());
                             assertEquals("false:true", state.get());
                             assertNull(command.get());
-                            find(keypad, "f()").performClick();
-                            assertNotNull(find(keypad, "sin"));
-                            assertNotNull(find(keypad, "rem"));
-                            find(keypad, "f()").performClick();
+                            findButton(keypad, "f()").performClick();
+                            assertNotNull(findButton(keypad, "sin"));
+                            assertNotNull(findButton(keypad, "rem"));
+                            findButton(keypad, "f()").performClick();
                             assertFalse(keypad.isExpanded());
                         });
     }
@@ -187,7 +177,7 @@ public final class AdaptiveKeypadTest {
                             CalculatorWorkspace workspace =
                                     new CalculatorWorkspace(context, new View(context), keypad);
                             size(context, workspace, 392, 700);
-                            android.text.TextPaint buttonFont = find(keypad, "⎌").getPaint();
+                            android.text.TextPaint buttonFont = findButton(keypad, "⎌").getPaint();
                             android.util.Log.i(
                                     "GlyphProbe",
                                     "API="
@@ -202,9 +192,9 @@ public final class AdaptiveKeypadTest {
                                             + buttonFont.hasGlyph("⇅"));
                             assertTrue(
                                     "Undo glyph must be available in the button font",
-                                    find(keypad, "⎌").getPaint().hasGlyph("⎌"));
-                            Rect undo = bounds(find(keypad, "⎌"), workspace),
-                                    clear = bounds(find(keypad, "AC"), workspace),
+                                    findButton(keypad, "⎌").getPaint().hasGlyph("⎌"));
+                            Rect undo = bounds(findButton(keypad, "⎌"), workspace),
+                                    clear = bounds(findButton(keypad, "AC"), workspace),
                                     drop =
                                             bounds(
                                                     ((Button) keypad.findViewWithTag("BACK")),
@@ -221,7 +211,7 @@ public final class AdaptiveKeypadTest {
                             TestCalculator calculator = new TestCalculator();
                             for (String key : new String[] {"1", "ENTER", "2", "ENTER"})
                                 calculator.key(key);
-                            find(keypad, "2").performLongClick();
+                            findButton(keypad, "2").performLongClick();
                             assertEquals(Command.Kind.HOLD_DIGIT, command.get().kind);
                             assertEquals("2", command.get().text);
                             calculator.apply(
@@ -232,20 +222,20 @@ public final class AdaptiveKeypadTest {
                                             calculator,
                                             ValueFormatter.Notation.SCIENTIFIC,
                                             FractionMode.DECIMAL));
-                            find(keypad, "0").performLongClick();
+                            findButton(keypad, "0").performLongClick();
                             assertEquals(Command.Kind.HOLD_DIGIT, command.get().kind);
                             assertEquals("0", command.get().text);
                             CalculatorTestSupport.paste(calculator, "4");
                             keypad.setMode(InteractionMode.ENTRY);
-                            find(keypad, "1").performLongClick();
+                            findButton(keypad, "1").performLongClick();
                             calculator.apply(
                                     command.get(), NumberText.COMPUTER, NumberText.COMPUTER);
                             assertEquals("41", calculator.entry());
                             assertEquals(3, calculator.values().size());
-                            assertNotNull(find(keypad, "CE"));
-                            assertNotNull(find(keypad, "⌫"));
+                            assertNotNull(findButton(keypad, "CE"));
+                            assertNotNull(findButton(keypad, "⌫"));
                             keypad.setCalculating(true);
-                            find(keypad, "Cancel").performLongClick();
+                            findButton(keypad, "Cancel").performLongClick();
                             assertEquals("CANCEL", command.get().wire);
                         });
     }
@@ -264,9 +254,9 @@ public final class AdaptiveKeypadTest {
                                     new CalculatorWorkspace(context, stack, keypad);
                             size(context, workspace, 392, 700);
                             int stackHeight = stack.getHeight(), keypadHeight = keypad.getHeight();
-                            Rect digitArea = bounds(find(keypad, "7"), workspace);
-                            digitArea.union(bounds(find(keypad, "3"), workspace));
-                            Rect multiply = bounds(find(keypad, "×"), workspace);
+                            Rect digitArea = bounds(findButton(keypad, "7"), workspace);
+                            digitArea.union(bounds(findButton(keypad, "3"), workspace));
+                            Rect multiply = bounds(findButton(keypad, "×"), workspace);
 
                             keypad.setNumberFormat(
                                     new LocaleNumbers(
@@ -274,9 +264,10 @@ public final class AdaptiveKeypadTest {
                             size(context, workspace, 392, 700);
                             assertEquals(stackHeight, stack.getHeight());
                             assertEquals(keypadHeight, keypad.getHeight());
-                            assertTrue(digitArea.contains(bounds(find(keypad, "↊"), workspace)));
-                            assertEquals(multiply, bounds(find(keypad, "×"), workspace));
-                            Button dozenal = find(keypad, "↊");
+                            assertTrue(
+                                    digitArea.contains(bounds(findButton(keypad, "↊"), workspace)));
+                            assertEquals(multiply, bounds(findButton(keypad, "×"), workspace));
+                            Button dozenal = findButton(keypad, "↊");
                             android.text.Spanned dozenalLabel =
                                     (android.text.Spanned) dozenal.getText();
                             TurnedDigitSpan[] turned =
@@ -293,18 +284,20 @@ public final class AdaptiveKeypadTest {
                             size(context, workspace, 392, 700);
                             assertEquals(stackHeight, stack.getHeight());
                             assertEquals(keypadHeight, keypad.getHeight());
-                            assertTrue(digitArea.contains(bounds(find(keypad, "F"), workspace)));
-                            assertEquals(multiply, bounds(find(keypad, "×"), workspace));
+                            assertTrue(
+                                    digitArea.contains(bounds(findButton(keypad, "F"), workspace)));
+                            assertEquals(multiply, bounds(findButton(keypad, "×"), workspace));
                             assertEquals(
-                                    find(keypad, "0").getPaint().measureText("0"),
-                                    find(keypad, "F").getPaint().measureText("F"),
+                                    findButton(keypad, "0").getPaint().measureText("0"),
+                                    findButton(keypad, "F").getPaint().measureText("F"),
                                     .01f);
 
-                            find(keypad, "f()").performClick();
+                            findButton(keypad, "f()").performClick();
                             size(context, workspace, 392, 700);
                             assertTrue(
-                                    bounds(find(keypad, "×"), workspace).height()
-                                            > bounds(find(keypad, "sin"), workspace).height());
+                                    bounds(findButton(keypad, "×"), workspace).height()
+                                            > bounds(findButton(keypad, "sin"), workspace)
+                                                    .height());
                         });
     }
 
@@ -322,17 +315,17 @@ public final class AdaptiveKeypadTest {
                                     new CalculatorWorkspace(context, stack, keypad);
                             size(context, workspace, 760, 280);
                             int closedWidth = stack.getWidth();
-                            find(keypad, "f()").performClick();
+                            findButton(keypad, "f()").performClick();
                             size(context, workspace, 760, 280);
                             assertTrue(stack.getWidth() < closedWidth);
-                            Rect sin = bounds(find(keypad, "sin"), workspace),
-                                    clear = bounds(find(keypad, "AC"), workspace);
+                            Rect sin = bounds(findButton(keypad, "sin"), workspace),
+                                    clear = bounds(findButton(keypad, "AC"), workspace);
                             assertTrue("Functions must open to the left", sin.right <= clear.left);
-                            Rect cos = bounds(find(keypad, "cos"), workspace),
-                                    ln = bounds(find(keypad, "ln"), workspace),
-                                    pi = bounds(find(keypad, "π"), workspace),
-                                    rem = bounds(find(keypad, "rem"), workspace),
-                                    zero = bounds(find(keypad, "0"), workspace);
+                            Rect cos = bounds(findButton(keypad, "cos"), workspace),
+                                    ln = bounds(findButton(keypad, "ln"), workspace),
+                                    pi = bounds(findButton(keypad, "π"), workspace),
+                                    rem = bounds(findButton(keypad, "rem"), workspace),
+                                    zero = bounds(findButton(keypad, "0"), workspace);
                             assertTrue(
                                     "Each function group is a column",
                                     cos.top >= sin.bottom && Math.abs(cos.left - sin.left) <= 2);
@@ -346,28 +339,28 @@ public final class AdaptiveKeypadTest {
                                     "Function rows line up with the five keypad rows",
                                     Math.abs(sin.top - clear.top) <= 2
                                             && Math.abs(rem.bottom - zero.bottom) <= 2);
-                            Rect undo = bounds(find(keypad, "⎌"), workspace),
-                                    functions = bounds(find(keypad, "f()"), workspace);
+                            Rect undo = bounds(findButton(keypad, "⎌"), workspace),
+                                    functions = bounds(findButton(keypad, "f()"), workspace);
                             assertTrue(functions.width() > undo.width() * 1.6);
                             assertTrue(undo.bottom <= clear.top);
                             assertTrue(
                                     "Controls stay above digits (allow pixel rounding)",
                                     Math.abs(undo.left - clear.left) <= 1);
-                            find(keypad, "f()").performClick();
+                            findButton(keypad, "f()").performClick();
                             size(context, workspace, 760, 280);
                             assertEquals(closedWidth, stack.getWidth());
-                            find(keypad, "f⁻¹()").performClick();
+                            findButton(keypad, "f⁻¹()").performClick();
                             size(context, workspace, 392, 700);
                             assertTrue(keypad.isExpanded());
-                            assertNotNull(find(keypad, "asin"));
+                            assertNotNull(findButton(keypad, "asin"));
                             assertTrue(
-                                    bounds(find(keypad, "asin"), workspace).bottom
-                                            <= bounds(find(keypad, "AC"), workspace).top);
+                                    bounds(findButton(keypad, "asin"), workspace).bottom
+                                            <= bounds(findButton(keypad, "AC"), workspace).top);
                             size(context, workspace, 560, 300);
                             assertTrue(
                                     "Narrow landscape stacks the function rows",
-                                    bounds(find(keypad, "asin"), workspace).bottom
-                                            <= bounds(find(keypad, "AC"), workspace).top);
+                                    bounds(findButton(keypad, "asin"), workspace).bottom
+                                            <= bounds(findButton(keypad, "AC"), workspace).top);
                             assertTrue(stack.getWidth() >= dp(context, 200));
                         });
     }

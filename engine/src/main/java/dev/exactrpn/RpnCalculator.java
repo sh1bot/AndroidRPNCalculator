@@ -66,16 +66,6 @@ public final class RpnCalculator {
     /** History owns references independently of the mutable current stack. */
     private final class History extends ArrayDeque<State> {
         @Override
-        public void push(State state) {
-            addFirst(state);
-        }
-
-        @Override
-        public State pop() {
-            return removeFirst();
-        }
-
-        @Override
         public void addFirst(State state) {
             for (UnifiedReal value : state.stack) retain(value);
             super.addFirst(state);
@@ -85,12 +75,6 @@ public final class RpnCalculator {
         public void addLast(State state) {
             for (UnifiedReal value : state.stack) retain(value);
             super.addLast(state);
-        }
-
-        @Override
-        public boolean addAll(java.util.Collection<? extends State> states) {
-            for (State state : states) addLast(state);
-            return !states.isEmpty();
         }
 
         @Override
@@ -239,21 +223,19 @@ public final class RpnCalculator {
         remember(before);
     }
 
+    private void transfer(Deque<State> from, Deque<State> to) {
+        to.push(new State(this));
+        restore(from.peek());
+        from.pop();
+    }
+
     public void key(String key) {
         if (key.equals(Command.UNDO)) {
-            if (!undo.isEmpty()) {
-                redo.push(new State(this));
-                restore(undo.peek());
-                undo.pop();
-            }
+            if (!undo.isEmpty()) transfer(undo, redo);
             return;
         }
         if (key.equals(Command.REDO)) {
-            if (!redo.isEmpty()) {
-                undo.push(new State(this));
-                restore(redo.peek());
-                redo.pop();
-            }
+            if (!redo.isEmpty()) transfer(redo, undo);
             return;
         }
         State before = new State(this);
