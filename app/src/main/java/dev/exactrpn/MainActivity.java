@@ -778,8 +778,12 @@ public class MainActivity extends Activity {
     private void showMenu(Button button) {
         dismissErrorNotice();
         android.widget.PopupMenu menu = new android.widget.PopupMenu(this, button);
-        menuItem(menu, R.string.help, () -> AboutDialog.show(this, true));
-        menuItem(menu, R.string.licenses, () -> AboutDialog.show(this, false));
+        menuItem(menu, R.string.about, () -> AboutDialog.show(this, AboutDialog.Section.ABOUT));
+        menuItem(menu, R.string.help, () -> AboutDialog.show(this, AboutDialog.Section.HELP));
+        menuItem(
+                menu,
+                R.string.licenses,
+                () -> AboutDialog.show(this, AboutDialog.Section.LICENSES));
         menuItem(menu, R.string.source_code, () -> AboutDialog.source(this));
         menu.setOnDismissListener(dismissed -> button.setActivated(false));
         menu.show();

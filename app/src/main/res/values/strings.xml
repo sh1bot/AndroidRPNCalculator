@@ -113,6 +113,7 @@
     <string name="unlock_to_resume">Unlock the phone to resume the saved calculation</string>
     <string name="temporary_status">TEMP</string>
     <string name="temporary_description">Temporary calculation, never saved. %1$s</string>
+    <string name="about">About</string>
     <string name="help">Help</string>
     <string name="licenses">Licenses</string>
     <string name="source_code">Source code</string>
