@@ -445,6 +445,7 @@ public class MainActivity extends Activity {
                             || selecting != renderedSelecting
                             || !Objects.equals(rendered.stackId, display.stackId)
                             || rendered.numberMode != display.numberMode
+                            || rendered.notation != display.notation
                             || rendered.radixMode != display.radixMode
                             || rendered.editing != display.editing
                             || !rendered.rows.equals(display.rows);
