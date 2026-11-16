@@ -149,7 +149,7 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
             legal += '<h2>' + title + '</h2><p>' + framing + '</p>' + flowed(text)
         }
         addText('Source credits',
-                'The project\u2019s NOTICE file, as it appears in the source repository.',
+                'The project\u2019s NOTICE file.',
                 rootProject.file('NOTICE').getText('UTF-8'))
         addText('Apache License 2.0',
                 'The licence covering this app and the Android Open Source Project code in it, as bundled with that code.',
@@ -157,18 +157,6 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
         addText('Constructive-real library notices',
                 'The copyright file published with Hans-J. Boehm\u2019s constructive-real library (com.hp.creals); "this directory" in it means the library\u2019s source directory.',
                 crNotices)
-
-        // NOTICE names two of the bundled texts by their paths in the
-        // repository; in this document those texts are the sections below,
-        // so the references name the sections instead. Each replacement is
-        // asserted, so a change to NOTICE's wording fails the build rather
-        // than shipping a reference that no longer resolves.
-        ['and licenses/APACHE-2.0.txt.': 'and the <a href="#licenses">Apache License 2.0</a> section.',
-         'and licenses/CR-COPYRIGHT.txt.': 'and the <a href="#licenses">Constructive-real library notices</a> section.',
-         '; see LICENSE.': '; see the <a href="#licenses">Apache License 2.0</a> section.'].each { from, to ->
-            assert legal.contains(from): 'NOTICE no longer contains the expected reference: ' + from
-            legal = legal.replace(from, to)
-        }
 
         // Minify the converted sections: whitespace that sits purely between
         // tags is renderer formatting. The licence texts are exempt: their
