@@ -106,12 +106,57 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
                 .replace('href="LICENSE"', 'href="#licenses"')
                 .replace('href="NOTICE"', 'href="#licenses"')
 
-        // The licence texts are bundled verbatim; the only change is that
-        // bare URLs become links.
+        // The licence texts are bundled with their wording verbatim; the
+        // changes are presentation only: bare URLs become links, and the
+        // hard-wrapped lines are flowed into paragraphs (below).
+        // CR-COPYRIGHT.txt appends a full copy of
+        // the Apache License to its own notices, and that text is already
+        // bundled from licenses/APACHE-2.0.txt, so only the file's own
+        // notices are taken from it. The build first verifies, word for
+        // word, that the part being left out is that same licence, so
+        // nothing unique to the file can be dropped silently.
+        def wordsOf = { text -> text.split(/\s+/).findAll { !it.isEmpty() } }
+        def apacheLines = rootProject.file('licenses/APACHE-2.0.txt').readLines()
+        def apacheTitle = apacheLines.findIndexOf { it.trim() == 'Apache License' }
+        def crLines = rootProject.file('licenses/CR-COPYRIGHT.txt').readLines()
+        def crTitle = crLines.findIndexOf { it.trim() == 'Apache License' }
+        assert apacheTitle >= 0 && crTitle > 0: 'Combined licence files no longer have the expected shape'
+        assert wordsOf(crLines[crTitle..-1].join('\n')) == wordsOf(apacheLines[apacheTitle..-1].join('\n')):
+                'The Apache License appended to CR-COPYRIGHT.txt differs from licenses/APACHE-2.0.txt'
+        def crNotices = crLines[0..<crTitle].join('\n').replaceAll(/\s+$/, '') + '\n'
+        // Each text is headed by what it is and where it comes from, so
+        // that references inside the texts (to files, or to the directory
+        // a library was published in) have their context.
         def legal = '<h1 id="licenses">Licenses and source credits</h1>'
-        ['Source credits':'NOTICE', 'Apache License 2.0':'licenses/APACHE-2.0.txt', 'Constructive-real library notices':'licenses/CR-COPYRIGHT.txt'].each { title, path ->
-            legal += '<h2>' + title + '</h2><p>' + escape(rootProject.file(path).getText('UTF-8')).replace('\n', '<br>') + '</p>'
+        // The texts are hard-wrapped for paper. In the app their lines are
+        // joined into paragraphs, breaking only where the source breaks
+        // (blank lines), so the text wraps to the reader's screen instead;
+        // only the layout changes, never the words.
+        def flowed = { text ->
+            def paragraphs = []
+            def currentLines = []
+            text.readLines().each { line ->
+                if (line.trim().isEmpty()) {
+                    if (!currentLines.isEmpty()) { paragraphs << currentLines.join(' '); currentLines = [] }
+                } else {
+                    currentLines << line.trim()
+                }
+            }
+            if (!currentLines.isEmpty()) paragraphs << currentLines.join(' ')
+            paragraphs.collect { '<p>' + escape(it.replaceAll(/\s+/, ' ')) + '</p>' }.join('')
         }
+        def addText = { title, framing, text ->
+            legal += '<h2>' + title + '</h2><p>' + framing + '</p>' + flowed(text)
+        }
+        addText('Source credits',
+                'The project\u2019s NOTICE file.',
+                rootProject.file('NOTICE').getText('UTF-8'))
+        addText('Apache License 2.0',
+                'The licence covering this app and the Android Open Source Project code in it, as bundled with that code.',
+                rootProject.file('licenses/APACHE-2.0.txt').getText('UTF-8'))
+        addText('Constructive-real library notices',
+                'The copyright file published with Hans-J. Boehm\u2019s constructive-real library (com.hp.creals); "this directory" in it means the library\u2019s source directory.',
+                crNotices)
 
         // Minify the converted sections: whitespace that sits purely between
         // tags is renderer formatting. The licence texts are exempt: their

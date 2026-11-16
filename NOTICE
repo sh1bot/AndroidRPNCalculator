@@ -4,7 +4,7 @@ This project uses arithmetic code from the Android Open Source Project:
 UnifiedReal.java, BoundedRational.java, and StringUtils.java.
 Copyright (C) 2015, 2016 The Android Open Source Project.
 Copyright notices and the Apache License 2.0 terms are retained in those files
-and licenses/APACHE-2.0.txt.
+and in the accompanying Apache License 2.0 text.
 
 Upstream project:
 https://android.googlesource.com/platform/packages/apps/ExactCalculator/
@@ -13,11 +13,12 @@ https://github.com/LineageOS/android_packages_apps_ExactCalculator/tree/lineage-
 
 The constructive-real arithmetic library (com.hp.creals) is by Hans-J. Boehm,
 with Silicon Graphics and Hewlett-Packard copyright and permissive license
-notices retained in its source files and licenses/CR-COPYRIGHT.txt.
+notices retained in its source files and in the accompanying constructive-real
+copyright notices.
 Upstream project:
 https://android.googlesource.com/platform/external/crcalc/
 Source mirror used:
 https://github.com/lineage-next/crcalc
 
-New code in this project is licensed under Apache License 2.0; see LICENSE.
+New code in this project is licensed under Apache License 2.0.
 Upstream components retain their respective licenses.

@@ -44,7 +44,7 @@ and licensed under [Apache 2.0](LICENSE). The arithmetic engine also includes:
   Hans-J. Boehm, from [AOSP crcalc](https://android.googlesource.com/platform/external/crcalc/),
   imported through [lineage-next](https://github.com/lineage-next/crcalc).
   It carries the original Silicon Graphics and Hewlett-Packard permissive
-  notices, reproduced in [licenses/CR-COPYRIGHT.txt](licenses/CR-COPYRIGHT.txt),
+  notices, reproduced in the [constructive-real library notices](licenses/CR-COPYRIGHT.txt),
   with AOSP additions under Apache 2.0.
 
 The full licence texts are also bundled in the app itself: the three-dot menu's
