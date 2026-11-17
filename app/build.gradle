@@ -62,6 +62,9 @@ dependencies {
 def licenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
 def generateLicenseAssets = tasks.register('generateLicenseAssets') {
     inputs.files(rootProject.file('README.md'), rootProject.file('HELP.md'), rootProject.file('PRIVACY.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
+    inputs.property('privacyContactEmailHash', providers.environmentVariable('PRIVACY_CONTACT_EMAIL').map {
+        java.security.MessageDigest.getInstance('SHA-256').digest(it.getBytes('UTF-8')).encodeHex().toString()
+    }.orElse(''))
     outputs.dir(licenseAssets)
     doLast {
         def parser = org.commonmark.parser.Parser.builder().build()

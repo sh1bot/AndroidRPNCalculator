@@ -14,6 +14,7 @@ env:
   RELEASE_VERSION: ${{ inputs.release_version }}
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -76,6 +77,25 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
+          # Record a public-input, unsigned release before introducing either
+          # the signing key or the private contact address. This is directly
+          # comparable with the unsigned release built for pull requests.
+          env \
+            -u ANDROID_KEYSTORE_PATH \
+            -u ANDROID_KEYSTORE_PASSWORD \
+            -u ANDROID_KEY_ALIAS \
+            -u ANDROID_KEY_PASSWORD \
+            -u PRIVACY_CONTACT_EMAIL \
+            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
+          python3 - <<'PYTHON'
+          import hashlib, json, os, pathlib
+          apk = pathlib.Path("app/build/outputs/apk/release/app-release-unsigned.apk")
+          pathlib.Path("dist/unsigned-apk-size.json").write_text(json.dumps({
+              "bytes": apk.stat().st_size,
+              "commit": os.environ["GITHUB_SHA"],
+              "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
+          }, indent=2) + "\n")
+          PYTHON
           if [[ -n "$ANDROID_KEYSTORE_BASE64" ]]; then
             : "${ANDROID_KEYSTORE_PASSWORD:?Missing keystore password}"
             : "${ANDROID_KEY_ALIAS:?Missing key alias}"
@@ -86,7 +106,7 @@ jobs:
             printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
             echo "Signing with the permanent key configured in repository secrets."
             echo "permanent_signing=true" >> "$GITHUB_OUTPUT"
-            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
+            gradle --no-daemon --console=plain :app:assembleRelease :app:bundleRelease
             cp app/build/outputs/apk/release/app-release.apk dist/ExactRPN.apk
             cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
           else
@@ -94,7 +114,6 @@ jobs:
               echo "::error::Signing secrets are incomplete: ANDROID_KEYSTORE_BASE64 is missing."
               exit 1
             fi
-            gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
             cp app/build/outputs/apk/release/app-release-unsigned.apk dist/ExactRPN.apk
             cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
             echo "::warning::No permanent signing key configured. Artifacts are intentionally unsigned and will not be published."
@@ -107,6 +126,52 @@ jobs:
           mkdir -p dist
           cp app/build/outputs/apk/release/app-release-unsigned.apk dist/ExactRPN.apk
           cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
+
+      - name: Find latest successful main size baseline
+        id: main_size
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          run_id=$(gh api "repos/$GH_REPO/actions/workflows/android.yml/runs?branch=main&status=success&per_page=20" \
+            --jq '[.workflow_runs[] | select(.event == "push" or .event == "workflow_dispatch")][0].id // empty')
+          if [[ -z "$run_id" ]]; then
+            echo "::error::No successful main workflow run is available for the APK size comparison."
+            exit 1
+          fi
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download latest main size baseline
+        if: github.event_name == 'pull_request'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ExactRPN-size-baseline
+          path: size-baseline
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.main_size.outputs.run_id }}
+
+      - name: Compare unsigned APK size with main
+        if: github.event_name == 'pull_request'
+        run: |
+          python3 - <<'PYTHON'
+          import json, os, pathlib
+          baseline = json.loads(pathlib.Path("size-baseline/unsigned-apk-size.json").read_text())
+          current = pathlib.Path("dist/ExactRPN.apk").stat().st_size
+          delta = current - baseline["bytes"]
+          percent = delta * 100 / baseline["bytes"]
+          comparison = "larger than" if delta > 0 else "smaller than" if delta < 0 else "the same size as"
+          summary = os.environ["GITHUB_STEP_SUMMARY"]
+          with open(summary, "a") as out:
+              out.write("## Unsigned release APK size\n\n")
+              out.write("| Build | Bytes | Change |\n|---|---:|---:|\n")
+              out.write(f'| Main (`{baseline["commit"][:12]}`) | {baseline["bytes"]:,} | — |\n')
+              out.write(f"| This PR | {current:,} | {delta:+,} ({percent:+.2f}%) |\n")
+          message = (f"Unsigned release APK is {current:,} bytes: {abs(delta):,} bytes "
+                     f"({abs(percent):.2f}%) {comparison} main {baseline['commit'][:12]}.")
+          level = "warning" if delta > 0 else "notice"
+          print(f"::{level} title=Unsigned APK size::{message}")
+          PYTHON
 
       - name: Verify APK signing policy and record checksum
         env:
@@ -199,6 +264,15 @@ jobs:
           path: dist/ExactRPN.aab
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload unsigned APK size baseline
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ExactRPN-size-baseline
+          path: dist/unsigned-apk-size.json
+          if-no-files-found: error
+          retention-days: 90
 
 
   publish:
