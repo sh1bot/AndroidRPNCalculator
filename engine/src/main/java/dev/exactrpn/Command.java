@@ -15,6 +15,8 @@ public final class Command {
         PICK_ROWS(true),
         SUM_ROWS(true),
         PRODUCT_ROWS(true),
+        MEAN_ROWS(true),
+        SD_ROWS(true),
         READ_VALUES(true),
         UNARY_ROWS(true),
         HOLD_DIGIT,
@@ -206,6 +208,12 @@ public final class Command {
                 break;
             case PRODUCT_ROWS:
                 calculator.productRows(rows);
+                break;
+            case MEAN_ROWS:
+                calculator.meanRows(rows);
+                break;
+            case SD_ROWS:
+                calculator.sdRows(rows);
                 break;
             case HOLD_DIGIT:
                 calculator.holdDigit(text);
