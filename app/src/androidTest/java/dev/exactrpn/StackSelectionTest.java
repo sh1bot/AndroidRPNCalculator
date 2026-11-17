@@ -499,11 +499,70 @@ public final class StackSelectionTest {
                     () -> {
                         assertFalse(tagged(a, "Factor").isEnabled());
                         assertFalse(tagged(a, "xʸ").isEnabled());
-                        assertFalse(tagged(a, "÷").isEnabled());
+                        assertTrue(tagged(a, "÷").isEnabled());
                     });
             key(a, "UNDO");
             key(a, "UNDO");
             assertEquals(java.util.Arrays.asList("1", "2", "3"), session.display.rows);
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
+    public void meanAndSdReplaceDivideAndSubtractInSelectionMode() throws Exception {
+        MainActivity a = open();
+        CalculatorSession session = session(a);
+        try {
+            seed(a);
+            selectEnds(a);
+            instrumentation.runOnMainSync(
+                    () -> {
+                        Button divide = (Button) tagged(a, "÷");
+                        Button subtract = (Button) tagged(a, "−");
+                        assertTrue(divide.isEnabled());
+                        assertTrue(subtract.isEnabled());
+                        assertEquals("x̄", divide.getText().toString());
+                        assertEquals("σ", subtract.getText().toString());
+                        assertEquals(
+                                "Mean of selected values",
+                                divide.getContentDescription().toString());
+                        assertEquals(
+                                "Standard deviation of selected values",
+                                subtract.getContentDescription().toString());
+                    });
+            key(a, "÷");
+            assertEquals(
+                    java.util.Arrays.asList("1", "2", "3", "2"), session.display.rows);
+            key(a, "−");
+            assertEquals(
+                    java.util.Arrays.asList("1", "2", "3", "2", "1"), session.display.rows);
+            assertEquals(2, session.selectedRows.size());
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
+    public void longPressNegateAppliesAbsoluteValueToSelectedRows() throws Exception {
+        MainActivity a = open();
+        CalculatorSession session = session(a);
+        try {
+            for (String k : new String[] {"1", "±", "ENTER", "2", "ENTER", "3", "±", "ENTER"})
+                key(a, k);
+            awaitHere(
+                    "Timed out waiting for stack UI",
+                    () -> tagged(a, "stack-label:2") != null);
+            assertEquals(
+                    java.util.Arrays.asList("-1", "2", "-3"), session.display.rows);
+            selectEnds(a);
+            instrumentation.runOnMainSync(() -> tagged(a, "±").performLongClick());
+            awaitHere(
+                    "Timed out waiting for absolute values",
+                    () ->
+                            session.display.rows.equals(
+                                    java.util.Arrays.asList("1", "2", "3")));
+            assertEquals(2, session.selectedRows.size());
         } finally {
             finish(a);
         }

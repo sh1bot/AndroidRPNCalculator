@@ -160,7 +160,7 @@ public final class RpnCalculator {
     public static byte[] saveWithEntry(byte[] calculation, EntryEditor draft, boolean newBranch)
             throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(calculation));
-        if (in.readInt() != 0x52504e37)
+        if (in.readInt() != 0x52504e38)
             throw new IOException("Unsupported snapshot for entry replacement");
         int length = in.readInt();
         if (length < 0 || length > calculation.length - 13)
@@ -346,27 +346,124 @@ public final class RpnCalculator {
     private void aggregateRows(Operation operation, int... indices) {
         TreeSet<Integer> rows = rowSet(indices);
         if (rows.isEmpty()) return;
-        UnifiedReal sum = null;
+        Fold fold = foldRows(operation, rows);
+        State before = new State(this);
+        stack.add(fold.value);
+        saveValue(fold.value, fold.expression);
+        remember(before);
+    }
+
+    /** A folded value together with the exact expression that produced it. */
+    private static final class Fold {
+        final UnifiedReal value;
+        final SavedValue expression;
+
+        Fold(UnifiedReal value, SavedValue expression) {
+            this.value = value;
+            this.expression = expression;
+        }
+    }
+
+    /** Left-fold the distinct rows with a binary operation, tracking the saved expression. */
+    private Fold foldRows(Operation operation, TreeSet<Integer> rows) {
+        UnifiedReal result = null;
         SavedValue expression = null;
         for (int index : rows) {
             UnifiedReal value = stack.get(index);
-            if (sum == null) {
-                sum = value;
+            if (result == null) {
+                result = value;
                 expression = savedValues.get(value);
             } else {
-                sum = operation.evaluate(sum, value, angleUnit);
+                result = operation.evaluate(result, value, angleUnit);
                 expression =
                         SavedValue.of(
-                                sum,
+                                result,
                                 operation,
                                 angleUnit,
                                 expression,
                                 savedValues.get(value));
             }
         }
+        return new Fold(result, expression);
+    }
+
+    /** Append the exact mean of distinct selected rows, leaving the originals and entry intact. */
+    public void meanRows(int... indices) {
+        TreeSet<Integer> rows = rowSet(indices);
+        if (rows.isEmpty()) return;
+        Fold sum = foldRows(Operation.ADD, rows);
+        UnifiedReal count = new UnifiedReal(rows.size());
+        UnifiedReal mean = Operation.DIVIDE.evaluate(sum.value, count, angleUnit);
+        SavedValue expression =
+                SavedValue.of(
+                        mean,
+                        Operation.DIVIDE,
+                        angleUnit,
+                        sum.expression,
+                        SavedValue.rational(count));
         State before = new State(this);
-        stack.add(sum);
-        saveValue(sum, expression);
+        stack.add(mean);
+        saveValue(mean, expression);
+        remember(before);
+    }
+
+    /**
+     * Append the population standard deviation of distinct selected rows:
+     * the square root of the mean squared deviation from the mean.
+     */
+    public void sdRows(int... indices) {
+        TreeSet<Integer> rows = rowSet(indices);
+        if (rows.isEmpty()) return;
+        Fold sum = foldRows(Operation.ADD, rows);
+        UnifiedReal count = new UnifiedReal(rows.size());
+        SavedValue countExpression = SavedValue.rational(count);
+        UnifiedReal mean = Operation.DIVIDE.evaluate(sum.value, count, angleUnit);
+        SavedValue meanExpression =
+                SavedValue.of(mean, Operation.DIVIDE, angleUnit, sum.expression, countExpression);
+        UnifiedReal squares = null;
+        SavedValue squaresExpression = null;
+        for (int index : rows) {
+            UnifiedReal value = stack.get(index);
+            UnifiedReal deviation = Operation.SUBTRACT.evaluate(value, mean, angleUnit);
+            SavedValue deviationExpression =
+                    SavedValue.of(
+                            deviation,
+                            Operation.SUBTRACT,
+                            angleUnit,
+                            savedValues.get(value),
+                            meanExpression);
+            UnifiedReal square = Operation.MULTIPLY.evaluate(deviation, deviation, angleUnit);
+            SavedValue squareExpression =
+                    SavedValue.of(
+                            square,
+                            Operation.MULTIPLY,
+                            angleUnit,
+                            deviationExpression,
+                            deviationExpression);
+            if (squares == null) {
+                squares = square;
+                squaresExpression = squareExpression;
+            } else {
+                squares = Operation.ADD.evaluate(squares, square, angleUnit);
+                squaresExpression =
+                        SavedValue.of(
+                                squares,
+                                Operation.ADD,
+                                angleUnit,
+                                squaresExpression,
+                                squareExpression);
+            }
+        }
+        UnifiedReal variance = Operation.DIVIDE.evaluate(squares, count, angleUnit);
+        SavedValue varianceExpression =
+                SavedValue.of(
+                        variance, Operation.DIVIDE, angleUnit, squaresExpression, countExpression);
+        UnifiedReal sd = Operation.SQRT.evaluate(variance, null, angleUnit);
+        SavedValue expression =
+                SavedValue.of(sd, Operation.SQRT, angleUnit, varianceExpression, null);
+        State before = new State(this);
+        stack.add(sd);
+        saveValue(sd, expression);
         remember(before);
     }
 
@@ -463,7 +560,7 @@ public final class RpnCalculator {
                 body.length + currentEntry.length + 13, CalculationLimits.ARITHMETIC_BYTES);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e37);
+        out.writeInt(0x52504e38);
         out.writeInt(body.length);
         out.write(body);
         out.writeInt(currentEntry.length);
@@ -538,7 +635,7 @@ public final class RpnCalculator {
     public static RpnCalculator load(byte[] bytes) throws IOException {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            if (in.readInt() != 0x52504e37) throw new IOException("Unknown saved state version");
+            if (in.readInt() != 0x52504e38) throw new IOException("Unknown saved state version");
             byte[] body = readSection(in), entry = readSection(in);
             boolean branch = in.readBoolean();
             if (in.available() != 0) throw new IOException("Trailing saved state data");

@@ -21,6 +21,7 @@ public enum Operation {
     REMAINDER(CalculatorKey.REMAINDER, 2),
     MODULO(CalculatorKey.MODULO, 2),
     NEGATE(CalculatorKey.NEGATE, 1),
+    ABS(CalculatorKey.ABS, 1),
     SQRT(CalculatorKey.SQRT, 1),
     SQUARE(CalculatorKey.SQUARE, 1),
     FACTORIAL(CalculatorKey.FACTORIAL, 1),
@@ -122,6 +123,8 @@ public enum Operation {
                 return ExactFunctions.remainder(a, b, this == MODULO);
             case NEGATE:
                 return a.negate();
+            case ABS:
+                return a.signum() < 0 ? a.negate() : a;
             case SQRT:
                 return a.sqrt();
             case SQUARE:
