@@ -22,7 +22,7 @@ Long-press a digit in stack mode to copy that level to X: `1` picks X, `2` picks
 
 ## Functions and constants
 
-`f()` opens functions; `f⁻¹()` opens inverse and complementary functions. Tap the active panel button again to close it. Inverse trigonometric results use the selected angle unit.
+`ƒ()` opens functions; `ƒ⁻¹()` opens inverse and complementary functions. Tap the active panel button again to close it. Inverse trigonometric results use the selected angle unit. Long-press `±` to apply `|x|`, the absolute value.
 
 `rem` gives Y remainder X with the sign of Y; `mod` uses the sign of X. `⌊x⌋` rounds toward negative infinity; `⌈x⌉` rounds toward positive infinity. `x!` requires a nonnegative integer. `Factorise` replaces an integer greater than 1 with its prime factors, smallest first: `84 Factorise` gives 2, 2, 3, 7, with 7 at X. Large factorisations can take time; Cancel stops them.
 
@@ -42,7 +42,9 @@ Long-press `Enter` or press Ctrl+V to paste. Multiple non-empty lines are added 
 
 Tap a stack row to select it; checkboxes appear, and tapping a row toggles it. Selection is available only in stack mode. Back/Escape exits selection.
 
-In selection mode `Enter` becomes `Pick`, `AC` selects all rows, and `⎌` clears the selection. Trash drops the selected values, `+` becomes `Σ` (sum), and `×` becomes `Π` (product). Pick, sum and product append results without removing the originals. Unary functions replace each selected value in place as one undoable action; if any result fails, none are changed. Binary operations are unavailable while selecting.
+In selection mode `Enter` becomes `Pick`, `AC` selects all rows, and the undo key clears the selection. Trash drops the selected values, `+` becomes `Σ` (sum), `×` becomes `Π` (product), `÷` becomes `x̄` (mean), and `−` becomes `σ` (standard deviation). Pick, sum, product, mean and standard deviation append results without removing the originals. Unary functions replace each selected value in place as one undoable action; if any result fails, none are changed. Binary operations are unavailable while selecting.
+
+Root mean square is composed, not built in: select the values, apply `x²` from the `ƒ⁻¹()` panel to square each selected value in place, press `x̄` to append the mean of the squares, clear the selection with the undo key, then press `√`.
 
 Large calculations or copied text can exceed the app’s 256 KiB data limit. The action then reports an error and preserves the previous calculation. Reducing the stack or copying fewer rows may help.
 

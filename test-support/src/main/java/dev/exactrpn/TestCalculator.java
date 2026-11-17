@@ -52,7 +52,8 @@ final class TestCalculator {
                                         || command.is("DELETE")
                                         || command.is("HOLD_DROP")
                                         || command.is("SMART_CLEAR")
-                                        || command.is("±"));
+                                        || command.is("±")
+                                        || command.is("|x|"));
         if (command.kind == Command.Kind.PASTE_RAW)
             local =
                     java.util.Arrays.stream(command.text.split("\\R", -1))
@@ -240,6 +241,14 @@ final class TestCalculator {
 
     void productRows(int... rows) {
         rowAction(() -> engine.productRows(rows));
+    }
+
+    void meanRows(int... rows) {
+        rowAction(() -> engine.meanRows(rows));
+    }
+
+    void sdRows(int... rows) {
+        rowAction(() -> engine.sdRows(rows));
     }
 
     void transformRows(Operation operation, int... rows) {

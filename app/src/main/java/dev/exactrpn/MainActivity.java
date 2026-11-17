@@ -377,6 +377,12 @@ public class MainActivity extends Activity {
             case "×":
                 action = Command.Kind.PRODUCT_ROWS;
                 break;
+            case "÷":
+                action = Command.Kind.MEAN_ROWS;
+                break;
+            case "−":
+                action = Command.Kind.SD_ROWS;
+                break;
             case "HOLD_DROP":
             case "ROLL_UP":
                 return true;

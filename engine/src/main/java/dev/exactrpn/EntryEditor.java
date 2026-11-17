@@ -334,6 +334,12 @@ public final class EntryEditor {
             entry = negative ? entry.substring(1) : "-" + entry;
             select(selectionStart + (negative ? -1 : 1), selectionEnd + (negative ? -1 : 1));
             resolveRaw();
+        } else if (key.equals("|x|") && editing) {
+            if (entry.startsWith("-") || entry.startsWith("−")) {
+                entry = entry.substring(1);
+                select(selectionStart - 1, selectionEnd - 1);
+            }
+            resolveRaw();
         } else if (clearsEntry) {
             entry = "";
             if (!key.equals("CE")) editing = false;
