@@ -362,17 +362,31 @@ public final class CalculatorKeypad extends ViewGroup {
                 enabled = !selecting;
                 if (!selecting) hold = send("ROLL_UP");
             }
-            case ADD, MULTIPLY -> {
+            case ADD, MULTIPLY, DIVIDE, SUBTRACT -> {
                 enabled = true;
                 if (selecting) {
-                    label = definition == CalculatorKey.ADD ? "Σ" : "Π";
-                    description =
-                            string(
-                                    definition == CalculatorKey.ADD
-                                            ? R.string.sum_selected
-                                            : R.string.product_selected);
+                    switch (definition) {
+                        case ADD -> {
+                            label = "Σ";
+                            description = string(R.string.sum_selected);
+                        }
+                        case MULTIPLY -> {
+                            label = "Π";
+                            description = string(R.string.product_selected);
+                        }
+                        case DIVIDE -> {
+                            label = "x̄";
+                            description = string(R.string.mean_selected);
+                        }
+                        case SUBTRACT -> {
+                            label = "σ";
+                            description = string(R.string.standard_deviation_selected);
+                        }
+                        default -> {}
+                    }
                 }
             }
+            case NEGATE -> hold = send(CalculatorKey.ABS.wire);
             case ENTER -> {
                 label = string(selecting ? R.string.pick : R.string.enter);
                 description =

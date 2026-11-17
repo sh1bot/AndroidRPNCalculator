@@ -15,6 +15,7 @@
         <item>@string/remainder_description</item> <!-- REMAINDER -->
         <item>@string/modulo_description</item> <!-- MODULO -->
         <item>""</item> <!-- NEGATE -->
+        <item>@string/abs_description</item> <!-- ABS -->
         <item>""</item> <!-- SQRT -->
         <item>""</item> <!-- SQUARE -->
         <item>@string/factorial_description</item> <!-- FACTORIAL -->

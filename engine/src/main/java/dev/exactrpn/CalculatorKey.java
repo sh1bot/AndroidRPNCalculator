@@ -19,6 +19,7 @@ public enum CalculatorKey {
     REMAINDER,
     MODULO,
     NEGATE,
+    ABS,
     SQRT,
     SQUARE,
     FACTORIAL,
@@ -90,7 +91,7 @@ public enum CalculatorKey {
     }
 
     CalculatorKey() {
-        String[] row = Data.ROWS[ordinal()].split("\\|", -1);
+        String[] row = Data.ROWS[ordinal()].split("(?<!\\\\)\\|", -1);
         if (!name().equals(row[0])) throw new IllegalStateException("Key table order");
         wire = field(row, 1, name());
         label = field(row, 2, wire);
@@ -105,11 +106,13 @@ public enum CalculatorKey {
     }
 
     private static String field(String[] row, int index, String fallback) {
-        return index < row.length && !row[index].isEmpty() ? row[index] : fallback;
+        String value = index < row.length && !row[index].isEmpty() ? row[index] : fallback;
+        return value.replace("\\|", "|");
     }
 
     // ID | wire (defaults to ID) | label | size (26sp) | inverse | characters | Ctrl | key codes.
     // IDs make row order explicit and checked; trailing defaults are omitted.
+    // A literal pipe inside a field (only ABS's wire and label) is written \|.
     private static final class Data {
         static final String[] ROWS =
                 """
@@ -126,6 +129,7 @@ public enum CalculatorKey {
                 REMAINDER|rem||20|MODULO|%
                 MODULO|mod||20
                 NEGATE|±||||||139
+                ABS|\\|x\\|
                 SQRT|√||24|SQUARE|r
                 SQUARE|x²||22
                 FACTORIAL|!|x!|22||!

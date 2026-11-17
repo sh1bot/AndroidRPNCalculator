@@ -138,7 +138,9 @@ final class CalculatorSession {
                     || command.is("Factor")
                     || command.kind == Command.Kind.UNARY_ROWS
                     || command.kind == Command.Kind.SUM_ROWS
-                    || command.kind == Command.Kind.PRODUCT_ROWS) operationPending = true;
+                    || command.kind == Command.Kind.PRODUCT_ROWS
+                    || command.kind == Command.Kind.MEAN_ROWS
+                    || command.kind == Command.Kind.SD_ROWS) operationPending = true;
             start = !busy;
             if (start) {
                 cancelRequested = false;
@@ -178,7 +180,8 @@ final class CalculatorSession {
                                         || key.is("DELETE")
                                         || key.is("HOLD_DROP")
                                         || key.is("SMART_CLEAR")
-                                        || key.is("±"))
+                                        || key.is("±")
+                                        || key.is("|x|"))
                         || key.is(Command.UNDO) && editor.undoCount() > 0
                         || key.is(Command.REDO) && editor.redoCount() > 0;
         if (editing && key.kind == Command.Kind.HOLD_DIGIT) local = true;
