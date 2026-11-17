@@ -153,6 +153,14 @@ public class MainActivity extends Activity {
                     if (session.canUseSavedState())
                         getPreferences(0).edit().putBoolean("tauConstant", enabled).apply();
                 });
+        keys.setMirrorPreference(
+                session.mirrored,
+                enabled -> {
+                    dismissErrorNotice();
+                    session.mirrored = enabled;
+                    if (session.canUseSavedState())
+                        getPreferences(0).edit().putBoolean("mirrored", enabled).apply();
+                });
         root.addView(
                 new CalculatorWorkspace(this, stackPanel, keys),
                 new LinearLayout.LayoutParams(-1, 0, 1));
@@ -638,6 +646,7 @@ public class MainActivity extends Activity {
                                 savedRadix(),
                                 false);
                 session.tauConstant = getPreferences(0).getBoolean("tauConstant", false);
+                session.mirrored = getPreferences(0).getBoolean("mirrored", false);
             }
         }
         session.attach(this);
@@ -697,8 +706,20 @@ public class MainActivity extends Activity {
                     @Override
                     protected void onMeasure(int widthSpec, int heightSpec) {
                         int width = View.MeasureSpec.getSize(widthSpec);
-                        int menuWidth = Math.min(dp(48), width / 6);
-                        int buttonWidth = Math.min(dp(54), (width - menuWidth) / 6);
+                        // Size the buttons from the workspace's header basis — the
+                        // expanded plan's stack width — rather than from this header's
+                        // own width: in R1 the stack panel narrows when the function
+                        // column opens, and sizing from the instantaneous width would
+                        // resize the buttons on every panel toggle. The status view
+                        // remains the flexible element and absorbs the width change.
+                        int basis = width;
+                        if (getParent() instanceof View panel
+                                && panel.getParent() instanceof CalculatorWorkspace workspace
+                                && workspace.headerBasisWidth() > 0) {
+                            basis = workspace.headerBasisWidth();
+                        }
+                        int menuWidth = Math.min(dp(48), basis / 6);
+                        int buttonWidth = Math.min(dp(54), (basis - menuWidth) / 6);
                         for (int i = 0; i < getChildCount(); i++)
                             if (getChildAt(i) instanceof Button)
                                 getChildAt(i).getLayoutParams().width =

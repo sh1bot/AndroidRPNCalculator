@@ -204,12 +204,15 @@ final class StackRowRenderer {
         if (probe.kind != FormattedValue.Kind.EXPONENTIAL)
             return new RowFit(probeText, MINIMUM_SIZE, probe.approximate);
         // The font is monospaced, so the digit budget is arithmetic: count
-        // the cells that fit at the nominal size, then subtract the cells
-        // the fixed parts occupy. The marker (" ×10") is drawn at 75% size
-        // and the exponent at 72%, and one spare cell absorbs a rounding
-        // carry growing the exponent (9.9…e99 rounding up to 1.0…e100).
+        // the cells that fit at the normal row size, then subtract the
+        // cells the fixed parts occupy. The marker (" ×10") is drawn at
+        // 75% size and the exponent at 72%, and one spare cell absorbs a
+        // rounding carry growing the exponent (9.9…e99 rounding up to
+        // 1.0…e100). The budget is counted at the normal size for every
+        // row, x included: precision is fixed uniformly, never traded for
+        // a larger display size, so a bigger nominal size costs no digits.
         android.text.TextPaint paint = new android.text.TextPaint(view.getPaint());
-        paint.setTextSize(sp(normalSize));
+        paint.setTextSize(sp(ROW_SIZE));
         int cells = (int) (width / paint.measureText("0")) - 1;
         int suffixCells = 3 + (int) Math.ceil(probe.exponent.length() * .72f);
         int signCells = probe.whole.startsWith("-") ? 1 : 0;
@@ -221,12 +224,24 @@ final class StackRowRenderer {
                         : ValueFormatter.exponentialPresentation(
                                 display.values.get(index), display.notation, digits);
         CharSequence text = numbers.stack(compact, colors.muted);
-        // Truncated to fit at the nominal size; should the span estimates
-        // ever undershoot, the minimum size fits the same text by scaling.
-        int size =
-                android.text.Layout.getDesiredWidth(text, paint) <= width
-                        ? normalSize
-                        : MINIMUM_SIZE;
+        // Truncated to fit at the normal row size, the text then expands
+        // into any room left over, up to the row's nominal size; widths
+        // scale linearly with size, so the expanded size is a direct
+        // calculation. (The budget's spare cell means a width-filling
+        // text still comes out at the normal size or above.) Expansion
+        // is gravy: if the expanded size does not actually fit (font
+        // metrics are not perfectly proportional), the resting state is
+        // the normal row size, at which the text fits by construction --
+        // never below it. The minimum size remains only as a final
+        // safety if the text somehow does not fit even there.
+        float widthAtBudget = desiredWidth(text, view, ROW_SIZE);
+        int size = Math.min(normalSize, (int) (ROW_SIZE * width / widthAtBudget));
+        paint.setTextSize(sp(size));
+        if (android.text.Layout.getDesiredWidth(text, paint) > width) {
+            size = ROW_SIZE;
+            paint.setTextSize(sp(size));
+            if (android.text.Layout.getDesiredWidth(text, paint) > width) size = MINIMUM_SIZE;
+        }
         return new RowFit(text, size, compact.approximate);
     }
 
@@ -234,8 +249,9 @@ final class StackRowRenderer {
     // At the shared minimum size the value is tried in its chosen
     // format -- decimal, mixed fraction or improper fraction, as a single
     // line. If it does not fit there it is replaced by an exponential
-    // truncated to fit at the nominal size. A value that does fit is then
-    // scaled up to the largest size that fits, up to its nominal size.
+    // truncated to fit at the normal row size, which then expands into
+    // any room left over, up to the row's nominal size. A value that does
+    // fit is scaled up the same way, to the largest size that fits.
     private void fitRow(
             FractionTextView value,
             TextView label,

@@ -54,6 +54,7 @@ final class CalculatorSession {
     final boolean temporary;
     private volatile boolean restorePending;
     boolean tauConstant;
+    boolean mirrored;
     private volatile boolean loaded;
     boolean scientificExpanded, inverse;
     volatile long busySince;
