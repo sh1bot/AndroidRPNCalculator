@@ -164,8 +164,8 @@ public enum CalculatorKey {
                 ESCAPE|||16||||111
                 DECIMAL|.||||.||158
                 FACTOR|Factor||16||f
-                FUNCTIONS||f()|16
-                COMPLEMENTS||f⁻¹()|16
+                FUNCTIONS||ƒ()|16
+                COMPLEMENTS||ƒ⁻¹()|16
                 ROLL_UP|||16
                 ROLL_DOWN|||16
                 ZERO|0||||||144

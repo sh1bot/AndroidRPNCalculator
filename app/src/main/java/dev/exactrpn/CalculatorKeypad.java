@@ -23,7 +23,7 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-/** Round primary keys become shorter capsules to make room for scientific functions. */
+/** The keypad view: control row, scientific function rows and primary rows, laid out from the {@link KeypadLayout} plan supplied by the workspace. */
 public final class CalculatorKeypad extends ViewGroup {
     private final List<ViewGroup> primaryRows = new ArrayList<>();
     private final List<LinearLayout> scientificRows = new ArrayList<>();
@@ -40,8 +40,8 @@ public final class CalculatorKeypad extends ViewGroup {
     private InteractionMode mode = InteractionMode.STACK;
     private boolean expanded, inverse;
     private final BiConsumer<Boolean, Boolean> savePanel;
-    private boolean functionsBeside;
-    private int primaryWidth;
+    private KeypadLayout plan;
+    private KeypadLayout.FunctionPlacement placement = KeypadLayout.FunctionPlacement.SQUEEZE;
     private final Consumer<Command> command;
     private Runnable beforeInput = () -> {};
 
@@ -157,6 +157,11 @@ public final class CalculatorKeypad extends ViewGroup {
         colors = new ThemeColors(context);
         numbers = new LocaleNumbers(context.getResources().getConfiguration().getLocales().get(0));
         controls = new LinearLayout(context);
+        // The three control buttons all take the plan's control height, so there is no
+        // baseline to align: with baseline alignment on, LinearLayout placed the ƒ()
+        // and ƒ⁻¹() buttons from baselines sampled mid-measure, and they landed 1px
+        // lower or higher depending on whether the function panel was open.
+        controls.setBaselineAligned(false);
         controls.addView(button(CalculatorKey.UNDO), new LinearLayout.LayoutParams(0, dp(44), 1));
         functions = button(CalculatorKey.FUNCTIONS);
         complements = button(CalculatorKey.COMPLEMENTS);
@@ -619,14 +624,19 @@ public final class CalculatorKeypad extends ViewGroup {
     private void rebuildFunctionRows() {
         for (LinearLayout row : scientificRows) removeView(row);
         scientificRows.clear();
-        addRows(functionsBeside ? transpose(FUNCTION_KEYS) : FUNCTION_KEYS, scientificRows);
+        // A column on either side is the transposed grid; a band keeps the row order.
+        boolean column =
+                placement == KeypadLayout.FunctionPlacement.LEFT
+                        || placement == KeypadLayout.FunctionPlacement.RIGHT;
+        addRows(column ? transpose(FUNCTION_KEYS) : FUNCTION_KEYS, scientificRows);
         updateExpansion();
     }
 
-    void setGeometry(boolean beside, int primaryWidth) {
-        this.primaryWidth = primaryWidth;
-        if (functionsBeside == beside) return;
-        functionsBeside = beside;
+    /** Takes the layout plan from the workspace; the keypad computes no geometry of its own. */
+    void setGeometry(KeypadLayout plan) {
+        this.plan = plan;
+        if (placement == plan.functionPlacement) return;
+        placement = plan.functionPlacement;
         rebuildFunctionRows();
     }
 
@@ -648,9 +658,19 @@ public final class CalculatorKeypad extends ViewGroup {
     }
 
     private void setExpansionIndicator(Button button, boolean open) {
-        android.graphics.drawable.Drawable indicator =
-                getContext()
-                        .getDrawable(open ? R.drawable.ic_expand_less : R.drawable.ic_expand_more);
+        // Each twisty is a disclosure arrow for its own set: while the set is open it
+        // points in the direction of its content, and while closed it points the opposite
+        // way, away from the content. The content sits below the button in SQUEEZE, above
+        // it in ABOVE, to its left in LEFT and to its right in RIGHT — RIGHT is LEFT's
+        // mirror, so its two directions swap.
+        int resource =
+                switch (placement) {
+                    case LEFT -> open ? R.drawable.ic_expand_left : R.drawable.ic_expand_right;
+                    case RIGHT -> open ? R.drawable.ic_expand_right : R.drawable.ic_expand_left;
+                    case SQUEEZE -> open ? R.drawable.ic_expand_more : R.drawable.ic_expand_less;
+                    case ABOVE -> open ? R.drawable.ic_expand_less : R.drawable.ic_expand_more;
+                };
+        android.graphics.drawable.Drawable indicator = getContext().getDrawable(resource);
         indicator.setTint(open ? colors.accent : colors.text);
         button.setCompoundDrawablePadding(dp(4));
         button.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, indicator, null);
@@ -708,25 +728,37 @@ public final class CalculatorKeypad extends ViewGroup {
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
         int width = MeasureSpec.getSize(widthSpec), height = MeasureSpec.getSize(heightSpec);
-        int digitsWidth = functionsBeside ? Math.min(primaryWidth, width) : width;
-        int controlHeight = Math.min(dp(48), Math.max(1, height / 6));
-        int gap = Math.min(dp(8), controlHeight / 6);
+        // Every size comes from the plan. The fallback covers a keypad measured before its
+        // workspace has supplied one: a plain block with no function panel showing.
+        int digitsWidth = plan == null ? width : plan.primaryWidth;
+        int controlHeight = plan == null ? Math.round(height / 11f) : plan.controlHeight;
+        int functionWidth = plan == null ? width : plan.functionWidth;
+        int functionHeight = plan == null ? 0 : plan.functionHeight;
+        int planGap = plan == null ? 0 : plan.gap;
+        int inset = Math.min(dp(8), controlHeight / 6);
         for (int i = 0; i < controls.getChildCount(); i++) {
             Button control = (Button) controls.getChildAt(i);
             LinearLayout.LayoutParams lp = (LinearLayout.LayoutParams) control.getLayoutParams();
-            lp.height = Math.max(1, controlHeight - gap);
-            lp.topMargin = gap / 2;
-            lp.bottomMargin = gap - gap / 2;
-            lp.leftMargin = gap / 2;
-            lp.rightMargin = gap / 2;
-            fitLabel(control, digitsWidth * (i == 0 ? 1 : 2) / 5 - gap, lp.height);
+            lp.height = Math.max(1, controlHeight - inset);
+            lp.topMargin = inset / 2;
+            lp.bottomMargin = inset - inset / 2;
+            lp.leftMargin = inset / 2;
+            lp.rightMargin = inset / 2;
+            fitLabel(control, digitsWidth * (i == 0 ? 1 : 2) / 5 - inset, lp.height);
         }
         controls.measure(
                 MeasureSpec.makeMeasureSpec(digitsWidth, MeasureSpec.EXACTLY),
                 MeasureSpec.makeMeasureSpec(controlHeight, MeasureSpec.EXACTLY));
         int body = Math.max(1, height - controlHeight);
-        int functionBody = expanded && !functionsBeside ? body * 36 / 100 : 0;
-        int primaryBody = body - functionBody;
+        // The primary rows fill what the function panel leaves of the body: a LEFT column
+        // leaves the whole body, a SQUEEZE band takes its height off it, and an ABOVE band
+        // takes its height plus the one plan gap the view holds between band and controls.
+        int primaryBody =
+                switch (placement) {
+                    case LEFT, RIGHT -> body;
+                    case SQUEEZE -> Math.max(1, body - functionHeight);
+                    case ABOVE -> Math.max(1, body - functionHeight - (functionHeight > 0 ? planGap : 0));
+                };
         int unit = 0;
         for (int i = 0; i < primaryRows.size(); i++) {
             ViewGroup primary = primaryRows.get(i);
@@ -740,14 +772,18 @@ public final class CalculatorKeypad extends ViewGroup {
                         MeasureSpec.makeMeasureSpec(rowHeight, MeasureSpec.EXACTLY));
             unit += span;
         }
-        if (expanded)
+        if (expanded) {
+            int rowsHeight =
+                    placement == KeypadLayout.FunctionPlacement.LEFT
+                                    || placement == KeypadLayout.FunctionPlacement.RIGHT
+                            ? body
+                            : functionHeight;
             for (int i = 0, n = scientificRows.size(); i < n; i++) {
-                int functionWidth = functionsBeside ? width - digitsWidth - dp(12) : width;
-                int functionHeight = functionsBeside ? body : functionBody;
-                int rowHeight = functionHeight * (i + 1) / n - functionHeight * i / n;
+                int rowHeight = rowsHeight * (i + 1) / n - rowsHeight * i / n;
                 measureRow(
                         scientificRows.get(i), Math.max(1, functionWidth), Math.max(1, rowHeight));
             }
+        }
         setMeasuredDimension(width, height);
     }
 
@@ -774,20 +810,40 @@ public final class CalculatorKeypad extends ViewGroup {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         int digitsWidth = controls.getMeasuredWidth();
-        int digitsX = getWidth() - digitsWidth;
-        controls.layout(digitsX, 0, getWidth(), controls.getMeasuredHeight());
-        int y = controls.getMeasuredHeight();
+        // Horizontal positions come from the plan verbatim. The fallback covers a keypad
+        // laid out before its workspace has supplied a plan; that block is measured at the
+        // full width, so every left edge is 0.
+        int digitsX = plan == null ? 0 : plan.primaryX;
+        int functionX = plan == null ? digitsX : plan.functionX;
+        int functionHeight = plan == null ? 0 : plan.functionHeight;
+        // An ABOVE band sits at the very top of the view, one plan gap over the control row;
+        // every other placement starts with the control row.
+        int controlY =
+                placement == KeypadLayout.FunctionPlacement.ABOVE && functionHeight > 0
+                        ? functionHeight + plan.gap
+                        : 0;
+        controls.layout(
+                digitsX, controlY, digitsX + digitsWidth, controlY + controls.getMeasuredHeight());
         if (expanded) {
-            int fy = y;
+            int fy =
+                    placement == KeypadLayout.FunctionPlacement.ABOVE
+                            ? 0
+                            : controlY + controls.getMeasuredHeight();
             for (LinearLayout row : scientificRows) {
-                int x = functionsBeside ? 0 : digitsX;
-                row.layout(x, fy, x + row.getMeasuredWidth(), fy + row.getMeasuredHeight());
+                row.layout(
+                        functionX,
+                        fy,
+                        functionX + row.getMeasuredWidth(),
+                        fy + row.getMeasuredHeight());
                 fy += row.getMeasuredHeight();
             }
-            if (!functionsBeside) y = fy;
         }
+        int y =
+                controlY
+                        + controls.getMeasuredHeight()
+                        + (placement == KeypadLayout.FunctionPlacement.SQUEEZE ? functionHeight : 0);
         for (ViewGroup row : primaryRows) {
-            row.layout(digitsX, y, getWidth(), y + row.getMeasuredHeight());
+            row.layout(digitsX, y, digitsX + row.getMeasuredWidth(), y + row.getMeasuredHeight());
             y += row.getMeasuredHeight();
         }
     }
