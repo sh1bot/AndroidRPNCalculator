@@ -46,33 +46,20 @@ final class CalculatorWorkspace extends ViewGroup {
                         width,
                         height,
                         keypad.isExpanded(),
-                        // No left-handed control exists yet — how the user would invoke it
-                        // is still to be designed — so the layout is never mirrored for now.
-                        false,
+                        // Mirroring is only effective beside the stack, so the keypad's
+                        // left-handed preference applies only when the window is wider
+                        // than tall; portrait layouts are never mirrored.
+                        keypad.isMirrored() && width > height,
                         gap,
                         minStackWidth,
                         minStackHeight,
                         keypad.primaryColumns(),
                         keypad.primaryRowCount());
-        // The mode header sizes its buttons from the expanded plan's stack width, not
+        // The mode header sizes its buttons from the plan's expanded stack width, not
         // from the panel's current width: in R1 the panel narrows when the function
         // column opens, and a header sized from its instantaneous width would resize
-        // its buttons on every toggle. The expanded width is toggle-stable — in every
-        // other regime the two states' stack widths already agree.
-        headerBasisWidth =
-                keypad.isExpanded()
-                        ? plan.stackWidth
-                        : KeypadLayout.choose(
-                                        width,
-                                        height,
-                                        true,
-                                        false,
-                                        gap,
-                                        minStackWidth,
-                                        minStackHeight,
-                                        keypad.primaryColumns(),
-                                        keypad.primaryRowCount())
-                                .stackWidth;
+        // its buttons on every toggle.
+        headerBasisWidth = plan.expandedStackWidth;
         keypad.setGeometry(plan);
         stack.measure(
                 MeasureSpec.makeMeasureSpec(plan.stackWidth, MeasureSpec.EXACTLY),

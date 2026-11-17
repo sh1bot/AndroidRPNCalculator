@@ -26,7 +26,7 @@ Long-press a digit in stack mode to copy that level to X: `1` picks X, `2` picks
 
 `rem` gives Y remainder X with the sign of Y; `mod` uses the sign of X. `⌊x⌋` rounds toward negative infinity; `⌈x⌉` rounds toward positive infinity. `x!` requires a nonnegative integer. `Factorise` replaces an integer greater than 1 with its prime factors, smallest first: `84 Factorise` gives 2, 2, 3, 7, with 7 at X. Large factorisations can take time; Cancel stops them.
 
-The constants are π, e and φ (the exact golden ratio). Long-press the `π`/`τ` key to switch it between pi and tau; the choice is remembered. A short press inserts the displayed constant. Tau is represented as exactly 2π.
+The constants are π, e and φ (the exact golden ratio). Long-press the `π`/`τ` key to switch it between pi and tau; the choice is remembered. Long-press `ƒ⁻¹()` in landscape to mirror the layout for left-handed use; long-press it again to switch back. A short press inserts the displayed constant. Tau is represented as exactly 2π.
 
 ## Display modes
 

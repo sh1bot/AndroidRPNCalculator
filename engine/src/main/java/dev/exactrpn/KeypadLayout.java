@@ -56,6 +56,12 @@ public final class KeypadLayout {
     public final boolean besideStack;
     public final FunctionPlacement functionPlacement;
     public final int stackWidth, stackHeight;
+    /**
+     * The stack width this plan would have with the function panel expanded. Equal to {@link
+     * #stackWidth} in every regime except R1, where opening the column narrows the stack; the
+     * mode header sizes itself from this width so its buttons do not resize on every toggle.
+     */
+    public final int expandedStackWidth;
     /** The keypad view's total extent, including the R5 function band when open. */
     public final int keypadWidth, keypadHeight;
 
@@ -82,6 +88,7 @@ public final class KeypadLayout {
             FunctionPlacement functionPlacement,
             int stackWidth,
             int stackHeight,
+            int expandedStackWidth,
             int keypadWidth,
             int keypadHeight,
             int primaryWidth,
@@ -98,6 +105,7 @@ public final class KeypadLayout {
         this.functionPlacement = functionPlacement;
         this.stackWidth = stackWidth;
         this.stackHeight = stackHeight;
+        this.expandedStackWidth = expandedStackWidth;
         this.keypadWidth = keypadWidth;
         this.keypadHeight = keypadHeight;
         this.primaryWidth = primaryWidth;
@@ -124,6 +132,7 @@ public final class KeypadLayout {
             int width,
             int stackWidth,
             int stackHeight,
+            int expandedStackWidth,
             int keypadWidth,
             int keypadHeight,
             int primaryWidth,
@@ -139,6 +148,7 @@ public final class KeypadLayout {
                 functionPlacement,
                 stackWidth,
                 stackHeight,
+                expandedStackWidth,
                 keypadWidth,
                 keypadHeight,
                 primaryWidth,
@@ -162,6 +172,7 @@ public final class KeypadLayout {
                         : functionPlacement,
                 stackWidth,
                 stackHeight,
+                expandedStackWidth,
                 keypadWidth,
                 keypadHeight,
                 primaryWidth,
@@ -176,10 +187,10 @@ public final class KeypadLayout {
     }
 
     /**
-     * @param mirrored whether to mirror every horizontal position (the coming left-handed
-     *     mode); the mirror covers block placement only — the order of buttons within a row and
-     *     the digit grid itself are not mirrored, as whether a left-handed mode should mirror
-     *     those too is an undecided design question
+     * @param mirrored whether to mirror every horizontal position (the left-handed mode);
+     *     the mirror covers block placement only — the order of buttons within a row and the
+     *     digit grid itself are not mirrored, as whether a left-handed mode should mirror those
+     *     too is an undecided design question
      * @param minStackWidth the stack's minimum width: room for its longest line plus labels
      * @param minStackHeight the stack's minimum height: its header plus its minimum line count
      */
@@ -211,7 +222,7 @@ public final class KeypadLayout {
             int columns,
             int primaryRows) {
         double unit = height / (primaryRows + .5);
-        int controlHeight = (int) Math.round(height / (2.0 * primaryRows + 1));
+        int controlHeight = (int) Math.round(unit / 2);
         int primaryWidth = (int) Math.round(columns * unit);
         int functionWidth = (int) Math.round(FN_UNITS * unit);
         // R1: the keypad is natural at the full height and the function column is ceded by the
@@ -219,34 +230,20 @@ public final class KeypadLayout {
         // view, so an open plan crosses two gaps: workspace and column-to-digits.
         int openStackWidth = width - gap - (functionWidth + gap + primaryWidth);
         if (openStackWidth >= minStackWidth) {
-            if (expanded)
-                return plan(
-                        Regime.R1,
-                        true,
-                        FunctionPlacement.LEFT,
-                        width,
-                        openStackWidth,
-                        height,
-                        functionWidth + gap + primaryWidth,
-                        height,
-                        primaryWidth,
-                        controlHeight,
-                        functionWidth,
-                        height - controlHeight,
-                        gap);
             return plan(
                     Regime.R1,
                     true,
                     FunctionPlacement.LEFT,
                     width,
-                    width - gap - primaryWidth,
+                    expanded ? openStackWidth : width - gap - primaryWidth,
                     height,
-                    primaryWidth,
+                    openStackWidth,
+                    expanded ? functionWidth + gap + primaryWidth : primaryWidth,
                     height,
                     primaryWidth,
                     controlHeight,
-                    0,
-                    0,
+                    expanded ? functionWidth : 0,
+                    expanded ? height - controlHeight : 0,
                     gap);
         }
         // R2: fixed boundary at 50%; the functions squeeze into the keypad body.
@@ -261,6 +258,7 @@ public final class KeypadLayout {
                 width,
                 stackWidth,
                 height,
+                stackWidth,
                 keypadWidth,
                 height,
                 keypadWidth,
@@ -280,8 +278,8 @@ public final class KeypadLayout {
             int primaryRows) {
         int stackHeight = height * 36 / 100;
         int blockHeight = Math.max(1, height - stackHeight - gap);
-        int controlHeight = (int) Math.round(blockHeight / (2.0 * primaryRows + 1));
         double unit = blockHeight / (primaryRows + .5);
+        int controlHeight = (int) Math.round(unit / 2);
         // R3: the fixed 36% boundary leaves a band wide enough for the function column beside a
         // natural keypad; any leftover width widens the digits.
         if ((columns + FN_UNITS) * unit + gap <= width) {
@@ -293,6 +291,7 @@ public final class KeypadLayout {
                     width,
                     width,
                     stackHeight,
+                    width,
                     width,
                     blockHeight,
                     expanded ? width - functionWidth - gap : width,
@@ -308,37 +307,21 @@ public final class KeypadLayout {
         int bandHeight = (int) Math.round(FN_UNITS * widthUnit);
         int naturalHeight = (int) Math.round((primaryRows + .5) * widthUnit);
         if (height - 2 * gap - bandHeight - naturalHeight >= minStackHeight) {
-            int naturalControl = (int) Math.round(widthUnit / 2);
-            if (expanded) {
-                int keypadHeight = bandHeight + gap + naturalHeight;
-                return plan(
-                        Regime.R5,
-                        false,
-                        FunctionPlacement.ABOVE,
-                        width,
-                        width,
-                        height - gap - keypadHeight,
-                        width,
-                        keypadHeight,
-                        width,
-                        naturalControl,
-                        width,
-                        bandHeight,
-                        gap);
-            }
+            int keypadHeight = expanded ? bandHeight + gap + naturalHeight : naturalHeight;
             return plan(
                     Regime.R5,
                     false,
                     FunctionPlacement.ABOVE,
                     width,
                     width,
-                    height - gap - naturalHeight,
+                    height - gap - keypadHeight,
                     width,
-                    naturalHeight,
                     width,
-                    naturalControl,
-                    0,
-                    0,
+                    keypadHeight,
+                    width,
+                    (int) Math.round(widthUnit / 2),
+                    expanded ? width : 0,
+                    expanded ? bandHeight : 0,
                     gap);
         }
         // R4: fixed boundary at 36%; the functions squeeze into the keypad body.
@@ -351,6 +334,7 @@ public final class KeypadLayout {
                 width,
                 width,
                 stackHeight,
+                width,
                 width,
                 blockHeight,
                 width,

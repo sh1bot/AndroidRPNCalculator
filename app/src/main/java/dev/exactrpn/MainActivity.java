@@ -153,6 +153,14 @@ public class MainActivity extends Activity {
                     if (session.canUseSavedState())
                         getPreferences(0).edit().putBoolean("tauConstant", enabled).apply();
                 });
+        keys.setMirrorPreference(
+                session.mirrored,
+                enabled -> {
+                    dismissErrorNotice();
+                    session.mirrored = enabled;
+                    if (session.canUseSavedState())
+                        getPreferences(0).edit().putBoolean("mirrored", enabled).apply();
+                });
         root.addView(
                 new CalculatorWorkspace(this, stackPanel, keys),
                 new LinearLayout.LayoutParams(-1, 0, 1));
@@ -638,6 +646,7 @@ public class MainActivity extends Activity {
                                 savedRadix(),
                                 false);
                 session.tauConstant = getPreferences(0).getBoolean("tauConstant", false);
+                session.mirrored = getPreferences(0).getBoolean("mirrored", false);
             }
         }
         session.attach(this);

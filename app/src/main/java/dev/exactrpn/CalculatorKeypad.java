@@ -36,6 +36,8 @@ public final class CalculatorKeypad extends ViewGroup {
     private final LinearLayout controls;
     private boolean tau;
     private Consumer<Boolean> saveTau = enabled -> {};
+    private boolean mirrored;
+    private Consumer<Boolean> saveMirror = enabled -> {};
     private boolean calculating;
     private InteractionMode mode = InteractionMode.STACK;
     private boolean expanded, inverse;
@@ -223,6 +225,16 @@ public final class CalculatorKeypad extends ViewGroup {
         bindButtons();
     }
 
+    public void setMirrorPreference(boolean enabled, Consumer<Boolean> save) {
+        mirrored = enabled;
+        saveMirror = save;
+        requestLayout();
+    }
+
+    boolean isMirrored() {
+        return mirrored;
+    }
+
     public void setNumberFormat(LocaleNumbers format) {
         if (numbers == format) return;
         numbers = format;
@@ -312,6 +324,21 @@ public final class CalculatorKeypad extends ViewGroup {
                                                 ? R.string.close_functions
                                                 : R.string.open_functions);
                 click = () -> togglePanel(complementary);
+                if (complementary) {
+                    // Long-press ƒ⁻¹() toggles the left-handed mirror, but only beside the
+                    // stack, where mirroring has an effect. In a stacked layout the hold
+                    // keeps the gesture's established meaning and toggles the panel.
+                    hold =
+                            () -> {
+                                if (plan != null && plan.besideStack) {
+                                    mirrored = !mirrored;
+                                    saveMirror.accept(mirrored);
+                                    requestLayout();
+                                } else {
+                                    togglePanel(true);
+                                }
+                            };
+                }
             }
             case PI -> {
                 description =
@@ -742,13 +769,13 @@ public final class CalculatorKeypad extends ViewGroup {
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
         int width = MeasureSpec.getSize(widthSpec), height = MeasureSpec.getSize(heightSpec);
-        // Every size comes from the plan. The fallback covers a keypad measured before its
-        // workspace has supplied one: a plain block with no function panel showing.
-        int digitsWidth = plan == null ? width : plan.primaryWidth;
-        int controlHeight = plan == null ? Math.round(height / 11f) : plan.controlHeight;
-        int functionWidth = plan == null ? width : plan.functionWidth;
-        int functionHeight = plan == null ? 0 : plan.functionHeight;
-        int planGap = plan == null ? 0 : plan.gap;
+        // Every size comes from the plan, which the workspace always supplies before
+        // measuring; the keypad computes no geometry of its own.
+        int digitsWidth = plan.primaryWidth;
+        int controlHeight = plan.controlHeight;
+        int functionWidth = plan.functionWidth;
+        int functionHeight = plan.functionHeight;
+        int planGap = plan.gap;
         int inset = Math.min(dp(8), controlHeight / 6);
         for (int i = 0; i < controls.getChildCount(); i++) {
             Button control = (Button) controls.getChildAt(i);
@@ -824,12 +851,10 @@ public final class CalculatorKeypad extends ViewGroup {
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
         int digitsWidth = controls.getMeasuredWidth();
-        // Horizontal positions come from the plan verbatim. The fallback covers a keypad
-        // laid out before its workspace has supplied a plan; that block is measured at the
-        // full width, so every left edge is 0.
-        int digitsX = plan == null ? 0 : plan.primaryX;
-        int functionX = plan == null ? digitsX : plan.functionX;
-        int functionHeight = plan == null ? 0 : plan.functionHeight;
+        // Horizontal positions come from the plan verbatim.
+        int digitsX = plan.primaryX;
+        int functionX = plan.functionX;
+        int functionHeight = plan.functionHeight;
         // An ABOVE band sits at the very top of the view, one plan gap over the control row;
         // every other placement starts with the control row.
         int controlY =
