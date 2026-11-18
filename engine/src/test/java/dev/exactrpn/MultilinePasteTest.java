@@ -47,6 +47,27 @@ final class MultilinePasteTest {
     }
 
     @Test
+    void pasteAcceptsExactlyTheValueCap() {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < RpnCalculator.MAX_PASTE_VALUES; i++) text.append("1\n");
+        assertEquals(
+                RpnCalculator.MAX_PASTE_VALUES,
+                ClipboardNumbers.parse(text.toString(), NumberText.COMPUTER).length);
+    }
+
+    @Test
+    void pasteRejectsMoreThanTheValueCap() {
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i <= RpnCalculator.MAX_PASTE_VALUES; i++) text.append("1\n");
+        IllegalArgumentException ex =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> ClipboardNumbers.parse(text.toString(), NumberText.COMPUTER));
+        assertEquals(CalculationError.Code.TOO_MANY_VALUES, ((CalculationError) ex).code());
+        assertEquals(RpnCalculator.MAX_PASTE_VALUES, ((CalculationError) ex).argument());
+    }
+
+    @Test
     void invalidExistingEntryBlocksBatchAndSingleValueStillEdits() throws Exception {
         TestCalculator c = new TestCalculator();
         c.pasteClipboard("1,234", NumberText.COMPUTER);
