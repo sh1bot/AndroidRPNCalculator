@@ -274,7 +274,7 @@ public final class StackSelectionTest {
                                     .getSystemService(Context.CLIPBOARD_SERVICE);
             for (int mode = 0; mode < 7; mode++) {
                 int slot = mode % 3;
-                String expectedMode = new String[] {"DEC", "FRAC", "IMPR"}[slot];
+                String expectedMode = new String[] {"1.5", "1+½", "3/2"}[slot];
                 awaitHere("Timed out waiting for stack UI",
                         () -> {
                             android.widget.TextView modeButton =
