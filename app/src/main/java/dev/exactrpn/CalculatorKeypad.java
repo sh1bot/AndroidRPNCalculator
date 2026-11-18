@@ -295,9 +295,10 @@ public final class CalculatorKeypad extends ViewGroup {
         boolean editing = mode == InteractionMode.ENTRY, selecting = mode == InteractionMode.SELECT;
         Runnable click = send(key);
         Runnable hold = null;
-        Operation operation = Operation.find(key);
         boolean enabled =
-                !selecting || !key.equals("Factor") && (operation == null || operation.arity != 2);
+                !selecting
+                        || InteractionMode.selectionAction(key)
+                                != InteractionMode.SelectionAction.UNAVAILABLE;
         if (EntryEditor.isEntryKey(key)) {
             android.text.SpannableString digit =
                     new android.text.SpannableString(numbers.entry(label.toString()));
