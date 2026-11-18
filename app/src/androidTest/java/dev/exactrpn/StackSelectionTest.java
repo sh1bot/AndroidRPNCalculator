@@ -461,7 +461,11 @@ public final class StackSelectionTest {
                                 session.selectedRows);
                         assertEquals("Pick", ((Button) tagged(a, "ENTER")).getText().toString());
                         assertFalse(tagged(a, "ENTER").isLongClickable());
-                        assertFalse(tagged(a, "SWAP").isEnabled());
+                        assertTrue(tagged(a, "SWAP").isEnabled());
+                        assertEquals("", ((Button) tagged(a, "SWAP")).getText().toString());
+                        assertEquals(
+                                "Copy selected values",
+                                tagged(a, "SWAP").getContentDescription().toString());
                         tagged(a, "CLEAR").performClick();
                         assertEquals(3, session.selectedRows.size());
                         tagged(a, "CLEAR").performClick();
@@ -472,13 +476,17 @@ public final class StackSelectionTest {
             selectEnds(a);
             key(a, "ENTER");
             assertEquals(java.util.Arrays.asList("1", "2", "3", "1", "3"), session.display.rows);
+            // Pick leaves the copies selected, so the aggregates and the drop below all
+            // apply to the copies at rows 3 and 4, not to the originals at rows 0 and 2.
+            assertEquals(
+                    new java.util.TreeSet<>(java.util.Arrays.asList(3, 4)), session.selectedRows);
             key(a, "+");
             key(a, "×");
             assertEquals(
                     java.util.Arrays.asList("1", "2", "3", "1", "3", "4", "3"),
                     session.display.rows);
             key(a, "BACK");
-            assertEquals(java.util.Arrays.asList("2", "1", "3", "4", "3"), session.display.rows);
+            assertEquals(java.util.Arrays.asList("1", "2", "3", "4", "3"), session.display.rows);
         } finally {
             finish(a);
         }
@@ -522,7 +530,7 @@ public final class StackSelectionTest {
                         Button subtract = (Button) tagged(a, "−");
                         assertTrue(divide.isEnabled());
                         assertTrue(subtract.isEnabled());
-                        assertEquals("x̄", divide.getText().toString());
+                        assertEquals("μ", divide.getText().toString());
                         assertEquals("σ", subtract.getText().toString());
                         assertEquals(
                                 "Mean of selected values",
@@ -607,6 +615,120 @@ public final class StackSelectionTest {
             assertTrue(session.selectedRows.isEmpty());
             instrumentation.runOnMainSync(() -> tagged(a, "stack-row:0").performClick());
             assertTrue(session.selectedRows.isEmpty());
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
+    public void swapKeyCopiesSelectedValuesInSelectionMode() throws Exception {
+        MainActivity a = open();
+        CalculatorSession session = session(a);
+        try {
+            seed(a);
+            selectEnds(a);
+            ClipboardManager clipboard =
+                    (ClipboardManager)
+                            instrumentation
+                                    .getTargetContext()
+                                    .getSystemService(Context.CLIPBOARD_SERVICE);
+            instrumentation.runOnMainSync(() -> tagged(a, "SWAP").performClick());
+            awaitHere(
+                    "Timed out waiting for the selected values to be copied",
+                    () ->
+                            clipboard.getPrimaryClip() != null
+                                    && "1\n3"
+                                            .contentEquals(
+                                                    clipboard
+                                                            .getPrimaryClip()
+                                                            .getItemAt(0)
+                                                            .getText()));
+            // Copying changes neither the stack nor the selection.
+            assertEquals(java.util.Arrays.asList("1", "2", "3"), session.display.rows);
+            assertEquals(
+                    new java.util.TreeSet<>(java.util.Arrays.asList(0, 2)), session.selectedRows);
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
+    public void pickReselectsCopiesAndUnaryAppliesOnlyToCopies() throws Exception {
+        MainActivity a = open();
+        CalculatorSession session = session(a);
+        try {
+            seed(a);
+            selectEnds(a);
+            key(a, "ENTER");
+            assertEquals(java.util.Arrays.asList("1", "2", "3", "1", "3"), session.display.rows);
+            assertEquals(
+                    new java.util.TreeSet<>(java.util.Arrays.asList(3, 4)), session.selectedRows);
+            key(a, "±");
+            // Only the copies are negated; the originals at rows 0 and 2 are untouched.
+            assertEquals(
+                    java.util.Arrays.asList("1", "2", "3", "-1", "-3"), session.display.rows);
+            assertEquals(
+                    new java.util.TreeSet<>(java.util.Arrays.asList(3, 4)), session.selectedRows);
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
+    public void factoriseSelectsItsFactors() throws Exception {
+        MainActivity a = open();
+        CalculatorSession session = session(a);
+        try {
+            // An integer below 2 cannot be factorised: the stack and selection stay put.
+            key(a, "1");
+            key(a, "ENTER");
+            key(a, "FUNCTIONS");
+            key(a, "Factor");
+            assertEquals(java.util.Arrays.asList("1"), session.display.rows);
+            assertTrue(session.selectedRows.isEmpty());
+            key(a, "CLEAR");
+            for (String k : new String[] {"3", "6", "0", "ENTER"}) key(a, k);
+            key(a, "Factor");
+            assertEquals(
+                    java.util.Arrays.asList("2", "2", "2", "3", "3", "5"), session.display.rows);
+            assertEquals(
+                    new java.util.TreeSet<>(java.util.Arrays.asList(0, 1, 2, 3, 4, 5)),
+                    session.selectedRows);
+            // The factors are selected together, so Σ combines exactly them.
+            key(a, "+");
+            assertEquals(
+                    java.util.Arrays.asList("2", "2", "2", "3", "3", "5", "17"),
+                    session.display.rows);
+            assertEquals(6, session.selectedRows.size());
+            // A prime factorises to itself, which becomes the selection.
+            key(a, "UNDO");
+            key(a, "CLEAR");
+            key(a, "7");
+            key(a, "ENTER");
+            key(a, "Factor");
+            assertEquals(java.util.Arrays.asList("7"), session.display.rows);
+            assertEquals(
+                    new java.util.TreeSet<>(java.util.Arrays.asList(0)), session.selectedRows);
+        } finally {
+            finish(a);
+        }
+    }
+
+    @Test
+    public void factoriseWhileEditingSelectsFactorsOfCommittedValue() throws Exception {
+        MainActivity a = open();
+        CalculatorSession session = session(a);
+        try {
+            key(a, "8");
+            key(a, "4");
+            assertTrue(session.display.editing);
+            key(a, "FUNCTIONS");
+            key(a, "Factor");
+            assertFalse(session.display.editing);
+            assertEquals(java.util.Arrays.asList("2", "2", "3", "7"), session.display.rows);
+            assertEquals(
+                    new java.util.TreeSet<>(java.util.Arrays.asList(0, 1, 2, 3)),
+                    session.selectedRows);
         } finally {
             finish(a);
         }

@@ -4,6 +4,7 @@
     <string name="pick">Pick</string>
     <string name="pick_selected">Pick selected values</string>
     <string name="drop_selected">Drop selected values</string>
+    <string name="copy_selected">Copy selected values</string>
     <string name="sum_selected">Sum selected values</string>
     <string name="product_selected">Product of selected values</string>
     <string name="mean_selected">Mean of selected values</string>
