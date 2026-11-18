@@ -804,6 +804,8 @@ public final class RpnCalculator {
             value = value.substring(0, marker);
             boolean powerNegative = power.startsWith("-");
             if (powerNegative || power.startsWith("+")) power = power.substring(1);
+            if (power.indexOf('+') >= 0 || power.indexOf('-') >= 0)
+                throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
             if (power.isEmpty() || power.length() > 8)
                 throw CalculationError.invalid(CalculationError.Code.NUMBER_TOO_LARGE);
             try {
@@ -818,6 +820,8 @@ public final class RpnCalculator {
             throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
         int fractional = point < 0 ? 0 : value.length() - point - 1;
         String digits = point < 0 ? value : value.substring(0, point) + value.substring(point + 1);
+        if (digits.indexOf('+') >= 0 || digits.indexOf('-') >= 0)
+            throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
         if (digits.isEmpty()) throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
         int first = 0;
         while (first < digits.length() && digits.charAt(first) == '0') first++;

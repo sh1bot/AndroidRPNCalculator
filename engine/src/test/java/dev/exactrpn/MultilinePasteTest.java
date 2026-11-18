@@ -82,4 +82,45 @@ final class MultilinePasteTest {
         assertTrue(single.isEditing());
         assertEquals("12", single.entry());
     }
+
+    @Test
+    void mixedSignComesFromTheCanonicalText() {
+        // U+2212 and a bidi mark must behave exactly like the ASCII minus:
+        // the sign is read from the canonicalised whole part, not the raw line.
+        for (String text : new String[] {"-2 1/3\n5", "\u22122 1/3\n5", "\u200e-2 1/3\n5"})
+            assertFraction(text, "-7", "3");
+        // The sign comes from the canonical text, not the value: -0 is negative.
+        assertFraction("-0 1/3\n5", "-1", "3");
+    }
+
+    @Test
+    void decimalOrSignedFractionPartsAreInvalidLines() {
+        for (String text :
+                new String[] {
+                    "1.5/3\n5", "1/2.5\n5", "2 -1/3\n5", "2 +1/3\n5", "-2 1/-3\n5", "2/-3\n5"
+                }) {
+            IllegalArgumentException ex =
+                    assertThrows(
+                            IllegalArgumentException.class,
+                            () -> ClipboardNumbers.parse(text, NumberText.COMPUTER));
+            assertEquals(CalculationError.Code.INVALID_PASTE_LINE, ((CalculationError) ex).code());
+            assertEquals(1, ((CalculationError) ex).argument());
+        }
+    }
+
+    @Test
+    void validFractionFormsStillPaste() {
+        assertFraction("-2 1/3\n5", "-7", "3");
+        assertFraction("2 1/3\n5", "7", "3");
+        assertFraction("+2 1/3\n5", "7", "3");
+        assertFraction("-2/3\n5", "-2", "3");
+        assertFraction("2/3\n5", "2", "3");
+        assertFraction("1.0/3\n5", "1", "3");
+    }
+
+    private static void assertFraction(String text, String numerator, String denominator) {
+        RationalValue[] values = ClipboardNumbers.parse(text, NumberText.COMPUTER);
+        assertEquals(new java.math.BigInteger(numerator), values[0].numerator);
+        assertEquals(new java.math.BigInteger(denominator), values[0].denominator);
+    }
 }
