@@ -252,7 +252,8 @@ public class MainActivity extends Activity {
         }
         if (key.kind == Command.Kind.KEY && executeSelectionAction(key.wire)) return;
         if (!key.preservesSelection()) clearStackSelection(false);
-        session.enqueue(key);
+        if (key.is("Factor")) session.factorTop(key);
+        else session.enqueue(key);
         if (!key.isEntryUpdate()) refresh();
     }
 
@@ -391,6 +392,16 @@ public class MainActivity extends Activity {
             case "−":
                 action = Command.Kind.SD_ROWS;
                 break;
+            case "SWAP":
+                if (!stackActionAllowed(session.display)) return true;
+                session.copyRows(
+                        session.selectedRows.stream().mapToInt(Integer::intValue).toArray(),
+                        text ->
+                                copyValue(
+                                        text,
+                                        session.display.numberMode,
+                                        session.display.radixMode));
+                return true;
             case "HOLD_DROP":
             case "ROLL_UP":
                 return true;
@@ -399,9 +410,7 @@ public class MainActivity extends Activity {
                     action = Command.Kind.UNARY_ROWS;
                     break;
                 }
-                if (key.equals("Factor")
-                        || key.equals("SWAP")
-                        || operation != null && operation.arity == 2) {
+                if (key.equals("Factor") || operation != null && operation.arity == 2) {
                     showNotice(getString(R.string.selection_operation_unavailable), true);
                     return true;
                 }
@@ -409,10 +418,12 @@ public class MainActivity extends Activity {
         }
         if (!stackActionAllowed(session.display)) return true;
         int[] rows = session.selectedRows.stream().mapToInt(Integer::intValue).toArray();
-        session.enqueue(
-                action == Command.Kind.UNARY_ROWS
-                        ? Command.unaryRows(operation, rows)
-                        : Command.rows(action, rows));
+        if (action == Command.Kind.PICK_ROWS) session.pickRows(rows);
+        else
+            session.enqueue(
+                    action == Command.Kind.UNARY_ROWS
+                            ? Command.unaryRows(operation, rows)
+                            : Command.rows(action, rows));
         refresh();
         return true;
     }

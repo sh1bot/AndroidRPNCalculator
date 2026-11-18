@@ -400,9 +400,16 @@ public final class CalculatorKeypad extends ViewGroup {
                 if (!selecting) hold = send(editing ? "BACK" : "ROLL_DOWN");
             }
             case SWAP -> {
-                label = "⇅";
-                enabled = !selecting;
-                if (!selecting) hold = send("ROLL_UP");
+                // In selection mode the swap key copies the selection to the clipboard.
+                enabled = true;
+                if (selecting) {
+                    label = "";
+                    icon = R.drawable.ic_copy;
+                    description = string(R.string.copy_selected);
+                } else {
+                    label = "⇅";
+                    hold = send("ROLL_UP");
+                }
             }
             case ADD, MULTIPLY, DIVIDE, SUBTRACT -> {
                 enabled = true;
@@ -417,7 +424,7 @@ public final class CalculatorKeypad extends ViewGroup {
                             description = string(R.string.product_selected);
                         }
                         case DIVIDE -> {
-                            label = "x̄";
+                            label = "μ";
                             description = string(R.string.mean_selected);
                         }
                         case SUBTRACT -> {
