@@ -344,6 +344,57 @@ public final class FunctionsTest {
                                     plus.getSpanStart(dimmedPlus[0]),
                                     plus.getSpanEnd(dimmedPlus[0]))
                             .toString());
+            android.text.Spanned minus =
+                    (android.text.Spanned)
+                            new LocaleNumbers(Locale.US, NumberMode.DOT)
+                                    .stack(formatted("-2-1/3"), 0);
+            assertEquals("-2− 1/3", minus.toString());
+            android.text.style.ForegroundColorSpan[] dimmedMinus =
+                    minus.getSpans(
+                            0, minus.length(), android.text.style.ForegroundColorSpan.class);
+            assertEquals(1, dimmedMinus.length);
+            assertEquals(
+                    "−",
+                    minus.subSequence(
+                                    minus.getSpanStart(dimmedMinus[0]),
+                                    minus.getSpanEnd(dimmedMinus[0]))
+                            .toString());
+            LocaleNumbers.FractionParts positiveParts =
+                    new LocaleNumbers(Locale.US, NumberMode.DOT)
+                            .fractionParts(formatted("2+1/3"), 0);
+            assertEquals("2+", positiveParts.whole.toString());
+            android.text.Spanned positiveWhole = (android.text.Spanned) positiveParts.whole;
+            android.text.style.ForegroundColorSpan[] dimmedPositiveWhole =
+                    positiveWhole.getSpans(
+                            0,
+                            positiveWhole.length(),
+                            android.text.style.ForegroundColorSpan.class);
+            assertEquals(1, dimmedPositiveWhole.length);
+            assertEquals(
+                    "+",
+                    positiveWhole
+                            .subSequence(
+                                    positiveWhole.getSpanStart(dimmedPositiveWhole[0]),
+                                    positiveWhole.getSpanEnd(dimmedPositiveWhole[0]))
+                            .toString());
+            LocaleNumbers.FractionParts negativeParts =
+                    new LocaleNumbers(Locale.US, NumberMode.DOT)
+                            .fractionParts(formatted("-2-1/3"), 0);
+            assertEquals("-2−", negativeParts.whole.toString());
+            android.text.Spanned negativeWhole = (android.text.Spanned) negativeParts.whole;
+            android.text.style.ForegroundColorSpan[] dimmedNegativeWhole =
+                    negativeWhole.getSpans(
+                            0,
+                            negativeWhole.length(),
+                            android.text.style.ForegroundColorSpan.class);
+            assertEquals(1, dimmedNegativeWhole.length);
+            assertEquals(
+                    "−",
+                    negativeWhole
+                            .subSequence(
+                                    negativeWhole.getSpanStart(dimmedNegativeWhole[0]),
+                                    negativeWhole.getSpanEnd(dimmedNegativeWhole[0]))
+                            .toString());
             android.text.Spanned longFraction =
                     (android.text.Spanned)
                             new LocaleNumbers(Locale.US, NumberMode.UNGROUPED)
