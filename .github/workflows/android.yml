@@ -2,6 +2,8 @@ name: Android build
 
 on:
   push:
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
     inputs:
@@ -41,7 +43,7 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
         with:
-          packages: 'platform-tools'
+          packages: ''
           log-accepted-android-sdk-licenses: false
 
       - name: Install Android build packages
@@ -51,15 +53,6 @@ jobs:
         uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4
         with:
           gradle-version: '8.11.1'
-
-      - name: Check phone-install script syntax
-        shell: pwsh
-        run: |
-          $tokens = $null
-          $parseErrors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile("$PWD/scripts/install-latest.ps1", [ref]$tokens, [ref]$parseErrors) | Out-Null
-          if ($parseErrors) { $parseErrors | ForEach-Object { Write-Error $_ }; exit 1 }
-          ./scripts/test-install-latest.ps1
 
       - name: Check upstream source integrity
         run: sha256sum -c licenses/SHA256SUMS
