@@ -19,6 +19,8 @@ import java.util.concurrent.ExecutionException;
 
 /** One request at a time. Cancelling destroys the remote process, never the UI process. */
 final class RemoteCalculator {
+    // Startup (bind + HELLO) must complete promptly; arithmetic itself stays unbounded.
+    private static final long HELLO_TIMEOUT_MS = 5000;
     static final class UserFailure extends IllegalStateException {
         UserFailure(String message) {
             super(message);
@@ -46,6 +48,7 @@ final class RemoteCalculator {
     private String remoteSnapshotId;
     private CompletableFuture<Bundle> pending;
     private Bundle pendingRequest;
+    private Runnable helloWatchdog;
     private final Messenger replies =
             new Messenger(
                     new Handler(
@@ -57,6 +60,10 @@ final class RemoteCalculator {
                                     }
                                     if (message.what == CalculationService.HELLO) {
                                         pid = message.arg1;
+                                        if (helloWatchdog != null) {
+                                            main.removeCallbacks(helloWatchdog);
+                                            helloWatchdog = null;
+                                        }
                                         if (pending != null) sendPending();
                                     } else if (message.what == CalculationService.EVALUATE
                                             && pending != null
@@ -201,6 +208,17 @@ final class RemoteCalculator {
                     }
                 };
         ServiceConnection binding = connection;
+        Runnable watchdog =
+                () -> {
+                    synchronized (RemoteCalculator.this) {
+                        if (epoch == generation && pending != null && pid == 0)
+                            fail(
+                                    new IllegalStateException(
+                                            context.getString(R.string.process_start_failed)));
+                    }
+                };
+        helloWatchdog = watchdog;
+        main.postDelayed(watchdog, HELLO_TIMEOUT_MS);
         main.post(
                 () -> {
                     synchronized (RemoteCalculator.this) {
@@ -242,6 +260,10 @@ final class RemoteCalculator {
     }
 
     private void disconnect(boolean terminate) {
+        if (helloWatchdog != null) {
+            main.removeCallbacks(helloWatchdog);
+            helloWatchdog = null;
+        }
         ++generation;
         remoteSnapshotId = null;
         int process = pid;

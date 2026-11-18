@@ -26,6 +26,7 @@ final class ErrorMessages {
                 switch (code) {
                     case NEED_VALUES -> R.string.error_need_values;
                     case ENTRY_TOO_LONG -> R.string.error_entry_too_long;
+                    case TOO_MANY_VALUES -> R.string.error_too_many_values;
                     case ROW_MISSING -> R.string.error_row_missing;
                     case NUMBER_TOO_LARGE -> R.string.error_number_too_large;
                     case FACTORIAL_INTEGER -> R.string.error_factorial_integer;

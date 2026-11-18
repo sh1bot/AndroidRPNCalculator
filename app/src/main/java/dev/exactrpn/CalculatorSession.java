@@ -29,6 +29,10 @@ final class CalculatorSession {
     private boolean editorDirty, localBranch;
     private final java.util.Map<NumberMode, NumberText.Profile> inputProfiles =
             new java.util.EnumMap<>(NumberMode.class);
+    // Guards inputProfiles and localeTag: profiles are built on both the UI thread
+    // (local editing) and the worker thread (paste parsing), and attach() must swap
+    // the cached profiles and the locale tag atomically.
+    private final Object inputProfilesLock = new Object();
     volatile Display display;
     volatile String error = "";
     volatile long errorRevision;
@@ -78,8 +82,11 @@ final class CalculatorSession {
 
     void attach(android.content.Context context) {
         this.context = context.getApplicationContext();
-        inputProfiles.clear();
-        localeTag = context.getResources().getConfiguration().getLocales().get(0).toLanguageTag();
+        synchronized (inputProfilesLock) {
+            inputProfiles.clear();
+            localeTag =
+                    context.getResources().getConfiguration().getLocales().get(0).toLanguageTag();
+        }
         if (remote == null) {
             if (!temporary) {
                 store = new CalculatorStore(context.getNoBackupFilesDir(), this::canUseSavedState);
@@ -154,14 +161,16 @@ final class CalculatorSession {
     }
 
     private NumberText.Profile inputProfile(NumberMode mode) {
-        return inputProfiles.computeIfAbsent(
-                mode,
-                m ->
-                        new LocaleNumbers(
-                                        java.util.Locale.forLanguageTag(localeTag),
-                                        m,
-                                        display.radixMode)
-                                .profile());
+        synchronized (inputProfilesLock) {
+            return inputProfiles.computeIfAbsent(
+                    mode,
+                    m ->
+                            new LocaleNumbers(
+                                            java.util.Locale.forLanguageTag(localeTag),
+                                            m,
+                                            display.radixMode)
+                                    .profile());
+        }
     }
 
     private boolean editLocally(Command key, long generation) {
@@ -401,7 +410,9 @@ final class CalculatorSession {
         Display accepted = next;
         runOnMain(
                 () -> {
-                    inputProfiles.clear();
+                    synchronized (inputProfilesLock) {
+                        inputProfiles.clear();
+                    }
                     arithmeticDisplay = accepted;
                     display = new Display(accepted, editor == null ? entry : editor);
                     setError(generation, "");
