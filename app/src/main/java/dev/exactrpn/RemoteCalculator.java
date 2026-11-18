@@ -21,6 +21,12 @@ import java.util.concurrent.ExecutionException;
 final class RemoteCalculator {
     // Startup (bind + HELLO) must complete promptly; arithmetic itself stays unbounded.
     private static final long HELLO_TIMEOUT_MS = 5000;
+    static final class StartupTimeout extends IllegalStateException {
+        StartupTimeout(String message) {
+            super(message);
+        }
+    }
+
     static final class UserFailure extends IllegalStateException {
         UserFailure(String message) {
             super(message);
@@ -213,7 +219,7 @@ final class RemoteCalculator {
                     synchronized (RemoteCalculator.this) {
                         if (epoch == generation && pending != null && pid == 0)
                             fail(
-                                    new IllegalStateException(
+                                    new StartupTimeout(
                                             context.getString(R.string.process_start_failed)));
                     }
                 };

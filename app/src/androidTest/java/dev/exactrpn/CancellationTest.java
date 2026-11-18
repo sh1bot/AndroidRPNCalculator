@@ -59,6 +59,7 @@ public final class CancellationTest {
     }
 
     @Test
+    @CancellationRecovery
     public void cancelStopsWorkerAndPreservesCheckpoint() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
         RemoteCalculator remote = new RemoteCalculator(context, false);
@@ -103,9 +104,19 @@ public final class CancellationTest {
                     "Cancelled work cannot replace committed storage",
                     committed,
                     Files.readAllBytes(new File(StoreTestSupport.checkpoint(store)).toPath()));
-            DisplayResult cleared =
-                    worker.submit(() -> remote.evaluate(request("CLEAR", accepted)))
-                            .get(15, TimeUnit.SECONDS);
+            DisplayResult cleared;
+            try {
+                cleared = worker.submit(() -> remote.evaluate(request("CLEAR", accepted)))
+                        .get(15, TimeUnit.SECONDS);
+            } catch (ExecutionException failure) {
+                if (failure.getCause() instanceof RemoteCalculator.UserFailure
+                        && failure.getCause().getCause() instanceof ExecutionException
+                        && failure.getCause().getCause().getCause()
+                                instanceof RemoteCalculator.StartupTimeout) {
+                    throw new AssertionError("Recovery worker startup watchdog expired", failure);
+                }
+                throw failure;
+            }
             assertTrue("A fresh worker must accept new operations", cleared.values.isEmpty());
             DisplayResult undone =
                     worker.submit(() -> remote.evaluate(request("UNDO", cleared.state)))
@@ -119,3 +130,6 @@ public final class CancellationTest {
         }
     }
 }
+
+@java.lang.annotation.Retention(java.lang.annotation.RetentionPolicy.RUNTIME)
+@interface CancellationRecovery {}
