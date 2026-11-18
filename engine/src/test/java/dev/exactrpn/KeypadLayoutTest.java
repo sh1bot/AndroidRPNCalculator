@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.exactrpn.KeypadLayout.FunctionPlacement;
+import dev.exactrpn.KeypadLayout.Regime;
 
 import org.junit.jupiter.api.Test;
 
@@ -16,19 +17,6 @@ import org.junit.jupiter.api.Test;
  * property sweeps stand guard over everything else.
  */
 final class KeypadLayoutTest {
-    private enum Regime {
-        R1, R2, R3, R4, R5
-    }
-
-    private static Regime regime(KeypadLayout plan) {
-        if (plan.besideStack)
-            return plan.functionPlacement == FunctionPlacement.SQUEEZE ? Regime.R2 : Regime.R1;
-        return switch (plan.functionPlacement) {
-            case LEFT, RIGHT -> Regime.R3;
-            case SQUEEZE -> Regime.R4;
-            case ABOVE -> Regime.R5;
-        };
-    }
     // The workspace's defaults at font scale 1: gap 12, minimum stack rectangle 300 by 208,
     // a key grid 4 columns by 5 primary rows, function keys spanning 2 units.
     private static final int GAP = 12, MIN_WIDTH = 300, MIN_HEIGHT = 208;
@@ -73,7 +61,7 @@ final class KeypadLayoutTest {
         // R1 boundary is 717, so these widths are all in R2.)
         for (int width : new int[] {716, 715, 700, 500}) {
             KeypadLayout plan = choose(width, 360, true);
-            assertEquals(Regime.R2, regime(plan));
+            assertEquals(Regime.R2, plan.regime);
             assertEquals(width * 50 / 100, plan.stackWidth);
         }
         // R3 and R4: the stack keeps 36% of the height.
@@ -103,9 +91,9 @@ final class KeypadLayoutTest {
             KeypadLayout open = choose(size[0], size[1], true);
             KeypadLayout closed = choose(size[0], size[1], false);
             assertTrue(
-                    regime(open) == Regime.R2 || regime(open) == Regime.R4,
+                    open.regime == Regime.R2 || open.regime == Regime.R4,
                     size[0] + "x" + size[1]);
-            assertEquals(regime(open), regime(closed));
+            assertEquals(open.regime, closed.regime);
             assertEquals(open.stackWidth, closed.stackWidth);
             assertEquals(open.stackHeight, closed.stackHeight);
             assertEquals(open.keypadWidth, closed.keypadWidth);
@@ -121,9 +109,9 @@ final class KeypadLayoutTest {
         double unit = 360 / (ROWS + .5);
         int boundary = MIN_WIDTH + 2 * GAP + (int) Math.round(FN_UNITS * unit)
                 + (int) Math.round(COLUMNS * unit);
-        assertEquals(Regime.R2, regime(choose(boundary - 1, 360, true)));
+        assertEquals(Regime.R2, choose(boundary - 1, 360, true).regime);
         KeypadLayout first = choose(boundary, 360, true);
-        assertEquals(Regime.R1, regime(first));
+        assertEquals(Regime.R1, first.regime);
         assertEquals(MIN_WIDTH, first.stackWidth);
     }
 
@@ -134,9 +122,9 @@ final class KeypadLayoutTest {
         double widthUnit = 360.0 / COLUMNS;
         int boundary = MIN_HEIGHT + 2 * GAP + (int) Math.round(FN_UNITS * widthUnit)
                 + (int) Math.round((ROWS + .5) * widthUnit);
-        assertEquals(Regime.R4, regime(choose(360, boundary - 1, true)));
+        assertEquals(Regime.R4, choose(360, boundary - 1, true).regime);
         KeypadLayout first = choose(360, boundary, true);
-        assertEquals(Regime.R5, regime(first));
+        assertEquals(Regime.R5, first.regime);
         assertEquals(MIN_HEIGHT, first.stackHeight);
     }
 
@@ -159,7 +147,7 @@ final class KeypadLayoutTest {
         for (int height = 240; height <= 1200; height += 40) {
             int previous = Integer.MAX_VALUE;
             for (int width = 200; width <= 1400; width += 2) {
-                int rank = rank(regime(choose(width, height, true)));
+                int rank = rank(choose(width, height, true).regime);
                 assertTrue(rank <= previous, width + "x" + height);
                 previous = rank;
             }
@@ -167,7 +155,7 @@ final class KeypadLayoutTest {
         for (int width = 240; width <= 1200; width += 40) {
             int previous = Integer.MIN_VALUE;
             for (int height = 200; height <= 1400; height += 2) {
-                int rank = rank(regime(choose(width, height, true)));
+                int rank = rank(choose(width, height, true).regime);
                 assertTrue(rank >= previous, width + "x" + height);
                 previous = rank;
             }
@@ -194,7 +182,7 @@ final class KeypadLayoutTest {
             for (int height = 200; height <= 1000; height += 19)
                 for (boolean expanded : new boolean[] {false, true}) {
                     KeypadLayout plan = choose(width, height, expanded);
-                    switch (regime(plan)) {
+                    switch (plan.regime) {
                         case R1 -> {
                             // The stack's minimum survives the cession, and the digits are
                             // exactly their natural width — width is never squeezed: the
@@ -233,9 +221,9 @@ final class KeypadLayoutTest {
                 KeypadLayout closed = choose(width, height, false);
                 // The regime is chosen as if expanded, so it never flips, and the
                 // header's basis width is toggle-stable.
-                assertEquals(regime(open), regime(closed), width + "x" + height);
+                assertEquals(open.regime, closed.regime, width + "x" + height);
                 assertEquals(open.expandedStackWidth, closed.expandedStackWidth);
-                switch (regime(open)) {
+                switch (open.regime) {
                     case R1 -> {
                         // The boundary moves: the column and its gap come out of the stack
                         // and into the keypad; the cession is conserved and everything
@@ -285,7 +273,7 @@ final class KeypadLayoutTest {
             for (boolean expanded : new boolean[] {false, true}) {
                 KeypadLayout plan = choose(width, height, expanded);
                 KeypadLayout mirror = chooseMirrored(width, height, expanded);
-                assertEquals(regime(plan), regime(mirror));
+                assertEquals(plan.regime, mirror.regime);
                 assertEquals(plan.besideStack, mirror.besideStack);
                 assertEquals(plan.stackWidth, mirror.stackWidth);
                 assertEquals(plan.stackHeight, mirror.stackHeight);
@@ -306,14 +294,14 @@ final class KeypadLayoutTest {
 
     @Test
     void goldenRegimesAtTheStandardSizes() {
-        assertEquals(Regime.R1, regime(choose(740, 360, true)));
-        assertEquals(Regime.R2, regime(choose(810, 800, true)));
-        assertEquals(Regime.R3, regime(choose(700, 840, true)));
-        assertEquals(Regime.R4, regime(choose(360, 840, true)));
-        assertEquals(Regime.R5, regime(choose(360, 920, true)));
+        assertEquals(Regime.R1, choose(740, 360, true).regime);
+        assertEquals(Regime.R2, choose(810, 800, true).regime);
+        assertEquals(Regime.R3, choose(700, 840, true).regime);
+        assertEquals(Regime.R4, choose(360, 840, true).regime);
+        assertEquals(Regime.R5, choose(360, 920, true).regime);
         // Exactly square is stacked: rotation always crosses the family boundary.
         assertFalse(choose(800, 800, true).besideStack);
-        assertEquals(Regime.R3, regime(choose(800, 800, true)));
+        assertEquals(Regime.R3, choose(800, 800, true).regime);
     }
 
     @Test

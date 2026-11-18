@@ -89,6 +89,7 @@ jobs:
               "sha256": hashlib.sha256(apk.read_bytes()).hexdigest(),
           }, indent=2) + "\n")
           PYTHON
+          cat dist/unsigned-apk-size.json
           if [[ -n "$ANDROID_KEYSTORE_BASE64" ]]; then
             : "${ANDROID_KEYSTORE_PASSWORD:?Missing keystore password}"
             : "${ANDROID_KEY_ALIAS:?Missing key alias}"
