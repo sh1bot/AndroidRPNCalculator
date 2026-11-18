@@ -301,12 +301,6 @@ final class CalculatorSession {
             if (changeRadix(key, generation)) return;
             if (changeFormat(key, generation)) return;
             Display settings = display;
-            int selectFrom =
-                    key.kind == Command.Kind.PICK_ROWS
-                            ? settings.rows.size()
-                            : key.is("Factor")
-                                    ? settings.rows.size() + (settings.editing ? 1 : 0) - 1
-                                    : -1;
             DisplayResult result = remote.evaluate(request(key));
             if (key.kind == Command.Kind.READ_VALUES) {
                 java.util.StringJoiner text = new java.util.StringJoiner("\n");
@@ -329,8 +323,7 @@ final class CalculatorSession {
                     new Display(result, incoming, settings),
                     incoming,
                     key,
-                    generation,
-                    selectFrom);
+                    generation);
             if (key.is(Command.RESTORE) && !temporary) acknowledgeRestore();
             if (background) saveForLifecycle();
         } catch (RuntimeException ex) {
@@ -511,12 +504,18 @@ final class CalculatorSession {
             Display nextDisplay,
             EntryEditor incoming,
             Command key,
-            long generation,
-            int selectFrom) {
-        Runnable accept =
+            long generation) {
+        runOnMain(
                 () -> {
                     synchronized (this) {
                         checkCancelled();
+                        Display before = display;
+                        int selectFrom =
+                                key.kind == Command.Kind.PICK_ROWS
+                                        ? before.rows.size()
+                                        : key.is("Factor")
+                                                ? before.rows.size() + (before.editing ? 1 : 0) - 1
+                                                : -1;
                         if (key.kind == Command.Kind.DROP_ROWS) {
                             SortedSet<Integer> removed = new TreeSet<>();
                             for (int index : key.rows()) removed.add(index);
@@ -564,8 +563,7 @@ final class CalculatorSession {
                             pending.removeIf(input -> input.generation <= generation);
                         loaded = true;
                     }
-                };
-        runOnMain(() -> accept.run());
+                });
     }
 
     void saveForLifecycle() {
