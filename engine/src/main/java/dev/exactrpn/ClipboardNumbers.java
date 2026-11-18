@@ -33,17 +33,18 @@ public final class ClipboardNumbers {
                     var match = FRACTION.matcher(line);
                     if (!match.matches())
                         throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
-                    BigInteger whole = integer(match.group(1), locale),
-                            denominator = integer(match.group(3), locale);
+                    String wholeText = canonical(match.group(1), locale);
+                    BigInteger whole = integerValue(wholeText, locale),
+                            denominator = unsignedInteger(match.group(3), locale);
                     BigInteger numerator =
                             match.group(2) == null
                                     ? whole
                                     : whole.abs()
                                             .multiply(denominator)
-                                            .add(integer(match.group(2), locale))
+                                            .add(unsignedInteger(match.group(2), locale))
                                             .multiply(
                                                     BigInteger.valueOf(
-                                                            line.startsWith("-") ? -1 : 1));
+                                                            wholeText.startsWith("-") ? -1 : 1));
                     values.add(new RationalValue(numerator, denominator));
                 }
             } catch (IllegalArgumentException | ArithmeticException ex) {
@@ -57,10 +58,22 @@ public final class ClipboardNumbers {
         return values.toArray(new RationalValue[0]);
     }
 
-    private static BigInteger integer(String text, NumberText.Profile profile) {
+    private static BigInteger unsignedInteger(String text, NumberText.Profile profile) {
+        String canonical = canonical(text, profile);
+        if (canonical.startsWith("-") || canonical.startsWith("+"))
+            throw new IllegalArgumentException("Fraction part must be unsigned");
+        return integerValue(canonical, profile);
+    }
+
+    private static BigInteger integerValue(String canonical, NumberText.Profile profile) {
+        BigInteger value = RpnCalculator.parse(canonical, profile.radix).bigIntegerValue();
+        if (value == null) throw new IllegalArgumentException("Fraction part is not an integer");
+        return value;
+    }
+
+    private static String canonical(String text, NumberText.Profile profile) {
         NumberText.Profile plain =
                 new NumberText.Profile(profile.decimal, (char) 0, 0, 0, profile.radix);
-        return RpnCalculator.parse(NumberText.selected(text, plain), profile.radix)
-                .bigIntegerValue();
+        return NumberText.selected(text, plain);
     }
 }

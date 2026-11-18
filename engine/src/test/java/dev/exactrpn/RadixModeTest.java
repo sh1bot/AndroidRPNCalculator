@@ -3,6 +3,7 @@ package dev.exactrpn;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.android.calculator2.UnifiedReal;
@@ -60,6 +61,24 @@ final class RadixModeTest {
         assertEquals(new java.math.BigInteger("255"), values[0].numerator);
         assertEquals(new java.math.BigInteger("1"), values[1].numerator);
         assertEquals(new java.math.BigInteger("2"), values[1].denominator);
+    }
+
+    @Test
+    void parseRejectsSignsOutsideTheLeadingAndExponentPositions() {
+        for (String text :
+                new String[] {"--5", "+-5", "-+5", "-.-5", "5-3", "1E--3", "1E+-3", "1E-+3"})
+            assertThrows(IllegalArgumentException.class, () -> RpnCalculator.parse(text), text);
+        assertThrows(
+                IllegalArgumentException.class, () -> RpnCalculator.parse("1P--3", 12), "1P--3");
+        // The two legitimate sign positions keep working, as do the marker
+        // forms and E as a hexadecimal digit.
+        exact("-5", "-5", 10);
+        exact("5", "+5", 10);
+        exact("0.001", "1E-3", 10);
+        exact("1000", "1E+3", 10);
+        exact("0.001", "1P-3", 10);
+        exact("1728", "1p+3", 12);
+        exact("483", "1E3", 16);
     }
 
     private static void exact(String decimal, String text, int radix) {
