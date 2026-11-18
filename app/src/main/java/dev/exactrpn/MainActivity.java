@@ -252,8 +252,7 @@ public class MainActivity extends Activity {
         }
         if (key.kind == Command.Kind.KEY && executeSelectionAction(key.wire)) return;
         if (!key.preservesSelection()) clearStackSelection(false);
-        if (key.is("Factor")) session.factorTop(key);
-        else session.enqueue(key);
+        session.enqueue(key);
         if (!key.isEntryUpdate()) refresh();
     }
 
@@ -418,12 +417,10 @@ public class MainActivity extends Activity {
         }
         if (!stackActionAllowed(session.display)) return true;
         int[] rows = session.selectedRows.stream().mapToInt(Integer::intValue).toArray();
-        if (action == Command.Kind.PICK_ROWS) session.pickRows(rows);
-        else
-            session.enqueue(
-                    action == Command.Kind.UNARY_ROWS
-                            ? Command.unaryRows(operation, rows)
-                            : Command.rows(action, rows));
+        session.enqueue(
+                action == Command.Kind.UNARY_ROWS
+                        ? Command.unaryRows(operation, rows)
+                        : Command.rows(action, rows));
         refresh();
         return true;
     }
