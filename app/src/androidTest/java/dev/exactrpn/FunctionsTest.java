@@ -295,15 +295,20 @@ public final class FunctionsTest {
             NumericValue number = improper.values.get(0);
             assertEquals(
                     "7/3",
-                    ValueFormatter.format(
-                            number,
-                            true,
-                            ValueFormatter.Notation.SCIENTIFIC,
-                            FractionMode.IMPROPER));
+                    ValueFormatter.presentation(
+                                    number,
+                                    true,
+                                    ValueFormatter.Notation.SCIENTIFIC,
+                                    FractionMode.IMPROPER)
+                            .canonical);
             assertEquals(
                     "2 1/3",
-                    ValueFormatter.format(
-                            number, true, ValueFormatter.Notation.SCIENTIFIC, FractionMode.MIXED));
+                    ValueFormatter.presentation(
+                                    number,
+                                    true,
+                                    ValueFormatter.Notation.SCIENTIFIC,
+                                    FractionMode.MIXED)
+                            .canonical);
             DisplayResult mixed = improper;
             DisplayResult copied =
                     worker.submit(

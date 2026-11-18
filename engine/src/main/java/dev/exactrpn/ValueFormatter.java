@@ -14,15 +14,6 @@ public final class ValueFormatter {
 
     private ValueFormatter() {}
 
-    public static String format(NumericValue value, boolean newest, Notation notation) {
-        return format(value, newest, notation, FractionMode.DECIMAL);
-    }
-
-    public static String format(
-            NumericValue value, boolean newest, Notation notation, FractionMode mode) {
-        return presentation(value, newest, notation, mode).canonical;
-    }
-
     public static FormattedValue presentation(
             NumericValue value, boolean newest, Notation notation, FractionMode mode) {
         RationalValue rational = value.rational;
@@ -126,10 +117,6 @@ public final class ValueFormatter {
                 (power >= 0 ? "+" : "−") + radixDigits(Math.abs(power), value.base),
                 !exact,
                 value.base);
-    }
-
-    public static String clipboard(NumericValue value, Notation notation) {
-        return clipboard(value, notation, FractionMode.DECIMAL);
     }
 
     private static boolean fits(BigInteger value, int base) {
