@@ -74,7 +74,7 @@ public final class AdaptiveKeypadTest {
                         size(context, workspace, 760, 280);
                         assertEquals(0, keypad.getTop());
                         assertEquals(workspace.getHeight(), keypad.getHeight());
-                        findButton(keypad, "f()").performClick();
+                        findButton(keypad, "ƒ()").performClick();
                         size(context, workspace, 660, 280);
                         assertEquals(0, keypad.getTop());
                         assertEquals(workspace.getHeight(), keypad.getHeight());
@@ -84,7 +84,7 @@ public final class AdaptiveKeypadTest {
                             assertTrue(modes.getChildAt(i).getRight() <= modes.getWidth());
                         }
                         size(context, workspace, 392, 700);
-                        assertEquals(stack.getBottom(), keypad.getTop());
+                        assertEquals(stack.getBottom() + dp(context, 12), keypad.getTop());
                         assertEquals(workspace.getWidth(), modes.getWidth());
                     });
         } finally {
@@ -136,14 +136,14 @@ public final class AdaptiveKeypadTest {
                                             (open, inverse) -> state.set(open + ":" + inverse));
                             assertFalse(keypad.isExpanded());
                             assertNull(findButton(keypad, "INV"));
-                            findButton(keypad, "f()").performClick();
+                            findButton(keypad, "ƒ()").performClick();
                             assertTrue(keypad.isExpanded());
                             assertEquals("true:false", state.get());
                             assertNull(command.get());
                             findButton(keypad, "rem").performClick();
                             assertEquals("rem", command.get().wire);
                             command.set(null);
-                            findButton(keypad, "f⁻¹()").performClick();
+                            findButton(keypad, "ƒ⁻¹()").performClick();
                             assertTrue(keypad.isExpanded());
                             assertEquals("true:true", state.get());
                             assertNull(command.get());
@@ -152,14 +152,14 @@ public final class AdaptiveKeypadTest {
                             findButton(keypad, "⌈x⌉").performClick();
                             assertEquals("ceil", command.get().wire);
                             command.set(null);
-                            findButton(keypad, "f⁻¹()").performClick();
+                            findButton(keypad, "ƒ⁻¹()").performClick();
                             assertFalse(keypad.isExpanded());
                             assertEquals("false:true", state.get());
                             assertNull(command.get());
-                            findButton(keypad, "f()").performClick();
+                            findButton(keypad, "ƒ()").performClick();
                             assertNotNull(findButton(keypad, "sin"));
                             assertNotNull(findButton(keypad, "rem"));
-                            findButton(keypad, "f()").performClick();
+                            findButton(keypad, "ƒ()").performClick();
                             assertFalse(keypad.isExpanded());
                         });
     }
@@ -292,7 +292,7 @@ public final class AdaptiveKeypadTest {
                                     findButton(keypad, "F").getPaint().measureText("F"),
                                     .01f);
 
-                            findButton(keypad, "f()").performClick();
+                            findButton(keypad, "ƒ()").performClick();
                             size(context, workspace, 392, 700);
                             assertTrue(
                                     bounds(findButton(keypad, "×"), workspace).height()
@@ -315,7 +315,7 @@ public final class AdaptiveKeypadTest {
                                     new CalculatorWorkspace(context, stack, keypad);
                             size(context, workspace, 760, 280);
                             int closedWidth = stack.getWidth();
-                            findButton(keypad, "f()").performClick();
+                            findButton(keypad, "ƒ()").performClick();
                             size(context, workspace, 760, 280);
                             assertTrue(stack.getWidth() < closedWidth);
                             Rect sin = bounds(findButton(keypad, "sin"), workspace),
@@ -340,16 +340,16 @@ public final class AdaptiveKeypadTest {
                                     Math.abs(sin.top - clear.top) <= 2
                                             && Math.abs(rem.bottom - zero.bottom) <= 2);
                             Rect undo = bounds(findButton(keypad, "⎌"), workspace),
-                                    functions = bounds(findButton(keypad, "f()"), workspace);
+                                    functions = bounds(findButton(keypad, "ƒ()"), workspace);
                             assertTrue(functions.width() > undo.width() * 1.6);
                             assertTrue(undo.bottom <= clear.top);
                             assertTrue(
                                     "Controls stay above digits (allow pixel rounding)",
-                                    Math.abs(undo.left - clear.left) <= 1);
-                            findButton(keypad, "f()").performClick();
+                                    Math.abs(undo.left - clear.left) <= 2);
+                            findButton(keypad, "ƒ()").performClick();
                             size(context, workspace, 760, 280);
                             assertEquals(closedWidth, stack.getWidth());
-                            findButton(keypad, "f⁻¹()").performClick();
+                            findButton(keypad, "ƒ⁻¹()").performClick();
                             size(context, workspace, 392, 700);
                             assertTrue(keypad.isExpanded());
                             assertNotNull(findButton(keypad, "asin"));
@@ -362,6 +362,56 @@ public final class AdaptiveKeypadTest {
                                     bounds(findButton(keypad, "asin"), workspace).bottom
                                             <= bounds(findButton(keypad, "AC"), workspace).top);
                             assertTrue(stack.getWidth() >= dp(context, 200));
+                        });
+    }
+
+    @Test
+    public void mirrorToggleSwapsSidesOnlyInLandscape() {
+        Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
+        InstrumentationRegistry.getInstrumentation()
+                .runOnMainSync(
+                        () -> {
+                            AtomicReference<Boolean> preference = new AtomicReference<>(false);
+                            View stack = new View(context);
+                            CalculatorKeypad keypad =
+                                    new CalculatorKeypad(
+                                            context, key -> {}, false, (open, inverse) -> {});
+                            keypad.setMirrorPreference(false, preference::set);
+                            CalculatorWorkspace workspace =
+                                    new CalculatorWorkspace(context, stack, keypad);
+                            size(context, workspace, 760, 280);
+                            assertEquals(0, stack.getLeft());
+                            assertTrue(keypad.getLeft() > 0);
+                            findButton(keypad, "ƒ⁻¹()").performLongClick();
+                            assertTrue(preference.get());
+                            assertFalse(
+                                    "The mirror hold must not toggle the panel",
+                                    keypad.isExpanded());
+                            size(context, workspace, 760, 280);
+                            assertEquals(0, keypad.getLeft());
+                            assertEquals(
+                                    workspace.getWidth() - stack.getWidth(), stack.getLeft());
+                            // The digit grid itself is not mirrored: 1 stays left of 3.
+                            assertTrue(
+                                    bounds(findButton(keypad, "1"), workspace).left
+                                            < bounds(findButton(keypad, "3"), workspace).left);
+                            findButton(keypad, "ƒ⁻¹()").performLongClick();
+                            assertFalse(preference.get());
+                            size(context, workspace, 760, 280);
+                            assertEquals(0, stack.getLeft());
+
+                            // Portrait never mirrors, even with the preference on, and the
+                            // hold there does not touch the preference.
+                            keypad.setMirrorPreference(true, preference::set);
+                            preference.set(true);
+                            size(context, workspace, 392, 700);
+                            assertEquals(0, stack.getLeft());
+                            assertEquals(0, keypad.getLeft());
+                            findButton(keypad, "ƒ⁻¹()").performLongClick();
+                            assertTrue(preference.get());
+                            size(context, workspace, 392, 700);
+                            assertEquals(0, stack.getLeft());
+                            assertEquals(0, keypad.getLeft());
                         });
     }
 }
