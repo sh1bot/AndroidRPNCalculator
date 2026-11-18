@@ -25,12 +25,19 @@ final class RadixModeTest {
         NumericValue hex =
                 NumericEvaluator.read(
                         RpnCalculator.parse("255"), NumericRequest.display(RadixMode.HEX));
-        assertEquals("FF", ValueFormatter.format(hex, true, ValueFormatter.Notation.SCIENTIFIC));
+        assertEquals(
+                "FF",
+                ValueFormatter.presentation(
+                                hex, true, ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL)
+                        .canonical);
 
         UnifiedReal half = RpnCalculator.parse("0.5");
         NumericValue dozenal =
                 NumericEvaluator.read(half, NumericRequest.precise(RadixMode.DOZENAL));
-        assertEquals("0.6", ValueFormatter.clipboard(dozenal, ValueFormatter.Notation.SCIENTIFIC));
+        assertEquals(
+                "0.6",
+                ValueFormatter.clipboard(
+                        dozenal, ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
         assertEquals("↊↋", RadixMode.DOZENAL.digits("AB"));
     }
 
