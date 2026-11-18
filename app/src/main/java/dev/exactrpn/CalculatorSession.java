@@ -451,6 +451,7 @@ final class CalculatorSession {
         }
         if (input != null) input.input(request);
         request.angle = display.angleUnit;
+        request.radix = display.radixMode;
         return request;
     }
 

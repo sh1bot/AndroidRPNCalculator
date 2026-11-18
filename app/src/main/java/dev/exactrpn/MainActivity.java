@@ -975,8 +975,15 @@ public class MainActivity extends Activity {
         radixButton.setText(new String[] {"DEC", "HEX", "DOZ"}[display.radixMode.ordinal()]);
         radixButton.setContentDescription(
                 getString(R.string.radix_description, radixButton.getText()));
+        // The chip shows 3/2 as each mode renders it; the point form is
+        // written in the current radix (1.5, 1.8 in hex, 1.6 in dozenal,
+        // indexed by RadixMode ordinal as on the radix chip).
         fractionButton.setText(
-                new String[] {"DEC", "FRAC", "IMPR"}[display.fractionMode.ordinal()]);
+                switch (display.fractionMode) {
+                    case DECIMAL -> new String[] {"1.5", "1.8", "1.6"}[display.radixMode.ordinal()];
+                    case MIXED -> "1+½";
+                    case IMPROPER -> "3/2";
+                });
         fractionButton.setContentDescription(
                 new String[] {
                             getString(R.string.decimal_description),

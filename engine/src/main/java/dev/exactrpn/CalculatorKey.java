@@ -26,12 +26,8 @@ public enum CalculatorKey {
     RECIPROCAL,
     FLOOR,
     CEIL,
-    LOG10,
-    TEN_POWER,
-    LOG12,
-    TWELVE_POWER,
-    LOG16,
-    SIXTEEN_POWER,
+    LOG,
+    BASE_POWER,
     LN,
     EXP,
     SIN,
@@ -136,12 +132,8 @@ public enum CalculatorKey {
                 RECIPROCAL|1/x||22||i
                 FLOOR|floor|⌊x⌋|22|CEIL
                 CEIL|ceil|⌈x⌉|22
-                LOG10|log10||20|TEN_POWER
-                TEN_POWER|10ˣ||22
-                LOG12|log12||20|TWELVE_POWER
-                TWELVE_POWER|12ˣ||22
-                LOG16|log16||20|SIXTEEN_POWER
-                SIXTEEN_POWER|16ˣ||22
+                LOG|log10||20|BASE_POWER
+                BASE_POWER|10ˣ||22
                 LN|ln||20|EXP|l
                 EXP|eˣ||20||E
                 SIN|sin||20|ASIN|s
