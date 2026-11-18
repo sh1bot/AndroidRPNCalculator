@@ -104,6 +104,9 @@ public final class LocaleNumbers {
                 if (symbol == '+') {
                     appendDimmed(text, "+", groupingColor);
                     text.append(" ");
+                } else if (symbol == '-') {
+                    appendDimmed(text, "−", groupingColor);
+                    text.append(" ");
                 } else text.append(symbol == ' ' ? "\u00a0" : " − ");
             } else if (value.numerator.startsWith("-")) {
                 text.append(((DecimalFormat) integers).getNegativePrefix());
@@ -290,7 +293,7 @@ public final class LocaleNumbers {
         SpannableStringBuilder displayedWhole =
                 new SpannableStringBuilder(integer(value.whole, groupingColor));
         if (!value.whole.isEmpty()) {
-            if (value.fractionOperator == '-') displayedWhole.append(" −");
+            if (value.fractionOperator == '-') appendDimmed(displayedWhole, "−", groupingColor);
             else appendDimmed(displayedWhole, "+", groupingColor);
         }
         // The parts are drawn on single lines by StackRowRenderer, so they
