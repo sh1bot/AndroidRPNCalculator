@@ -20,12 +20,15 @@ final class OperationTest {
                         : UnifiedReal.TWO;
         UnifiedReal b = new UnifiedReal(3);
         for (RpnCalculator.AngleUnit unit : RpnCalculator.AngleUnit.values()) {
-            UnifiedReal live = op.evaluate(a, b, unit);
-            UnifiedReal saved = SavedValue.operation(op, unit, null, null).evaluate(a, b);
-            assertEquals(
-                    TestValueFormatter.clipboard(live, ValueFormatter.Notation.SCIENTIFIC),
-                    TestValueFormatter.clipboard(saved, ValueFormatter.Notation.SCIENTIFIC),
-                    op + " " + unit);
+            for (RadixMode radix : RadixMode.values()) {
+                UnifiedReal live = op.evaluate(a, b, unit, radix);
+                UnifiedReal saved =
+                        SavedValue.operation(op, unit, radix, null, null).evaluate(a, b);
+                assertEquals(
+                        TestValueFormatter.clipboard(live, ValueFormatter.Notation.SCIENTIFIC),
+                        TestValueFormatter.clipboard(saved, ValueFormatter.Notation.SCIENTIFIC),
+                        op + " " + unit + " " + radix);
+            }
         }
     }
 
@@ -33,7 +36,11 @@ final class OperationTest {
     void replayValidatesFactorial() {
         SavedValue factorial =
                 SavedValue.operation(
-                        Operation.FACTORIAL, RpnCalculator.AngleUnit.RAD, null, null);
+                        Operation.FACTORIAL,
+                        RpnCalculator.AngleUnit.RAD,
+                        RadixMode.DECIMAL,
+                        null,
+                        null);
         assertThrows(
                 IllegalArgumentException.class,
                 () -> factorial.evaluate(UnifiedReal.MINUS_ONE, null));

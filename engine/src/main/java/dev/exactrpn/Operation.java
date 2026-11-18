@@ -28,12 +28,8 @@ public enum Operation {
     RECIPROCAL(CalculatorKey.RECIPROCAL, 1),
     FLOOR(CalculatorKey.FLOOR, 1),
     CEIL(CalculatorKey.CEIL, 1),
-    LOG10(CalculatorKey.LOG10, 1, 10),
-    TEN_POWER(CalculatorKey.TEN_POWER, 1, 10),
-    LOG12(CalculatorKey.LOG12, 1, 12),
-    TWELVE_POWER(CalculatorKey.TWELVE_POWER, 1, 12),
-    LOG16(CalculatorKey.LOG16, 1, 16),
-    SIXTEEN_POWER(CalculatorKey.SIXTEEN_POWER, 1, 16),
+    LOG(CalculatorKey.LOG, 1),
+    BASE_POWER(CalculatorKey.BASE_POWER, 1),
     LN(CalculatorKey.LN, 1),
     EXP(CalculatorKey.EXP, 1),
     SIN(CalculatorKey.SIN, 1),
@@ -45,7 +41,6 @@ public enum Operation {
 
     public final String key;
     public final int arity;
-    private final int base;
     private static final UnifiedReal DEGREES = new UnifiedReal(180),
             GRADIANS = new UnifiedReal(200);
     private static final Map<String, Operation> OPERATIONS = new HashMap<>();
@@ -55,13 +50,8 @@ public enum Operation {
     }
 
     Operation(CalculatorKey key, int arity) {
-        this(key, arity, 0);
-    }
-
-    Operation(CalculatorKey key, int arity, int base) {
         this.key = key.wire;
         this.arity = arity;
-        this.base = base;
     }
 
     public static Operation find(String key) {
@@ -84,7 +74,8 @@ public enum Operation {
                 : value.divide(UnifiedReal.PI).multiply(angleDivisor(unit));
     }
 
-    public UnifiedReal evaluate(UnifiedReal a, UnifiedReal b, RpnCalculator.AngleUnit unit) {
+    public UnifiedReal evaluate(
+            UnifiedReal a, UnifiedReal b, RpnCalculator.AngleUnit unit, RadixMode radix) {
         if (arity > 0 && a == null || arity > 1 && b == null)
             throw new IllegalArgumentException("Missing operation operand");
         switch (this) {
@@ -100,10 +91,10 @@ public enum Operation {
                 return ExactFunctions.floor(a);
             case CEIL:
                 return ExactFunctions.floor(a.negate()).negate();
-            case LOG10, LOG12, LOG16:
-                return a.ln().divide(new UnifiedReal(base).ln());
-            case TEN_POWER, TWELVE_POWER, SIXTEEN_POWER:
-                return new UnifiedReal(base).pow(a);
+            case LOG:
+                return a.ln().divide(new UnifiedReal(radix.radix).ln());
+            case BASE_POWER:
+                return new UnifiedReal(radix.radix).pow(a);
             case ADD:
                 return a.add(b);
             case SUBTRACT:

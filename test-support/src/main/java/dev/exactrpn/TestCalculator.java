@@ -204,6 +204,10 @@ final class TestCalculator {
         engine.setAngleUnit(unit);
     }
 
+    void setRadixMode(RadixMode mode) {
+        engine.setRadixMode(mode);
+    }
+
     void holdDigit(String digit) {
         apply(Command.holdDigit(digit), NumberText.COMPUTER, editor.inputProfile);
     }

@@ -34,6 +34,7 @@ public final class RpnCalculator {
     }
 
     private AngleUnit angleUnit = AngleUnit.RAD;
+    private RadixMode radixMode = RadixMode.DECIMAL;
     private final IdentityHashMap<UnifiedReal, SavedValue> savedValues = new IdentityHashMap<>();
     private final Set<UnifiedReal> pendingValues =
             Collections.newSetFromMap(new IdentityHashMap<>());
@@ -161,7 +162,7 @@ public final class RpnCalculator {
     public static byte[] saveWithEntry(byte[] calculation, EntryEditor draft, boolean newBranch)
             throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(calculation));
-        if (in.readInt() != 0x52504e38)
+        if (in.readInt() != 0x52504e39)
             throw new IOException("Unsupported snapshot for entry replacement");
         int length = in.readInt();
         if (length < 0 || length > calculation.length - 13)
@@ -196,6 +197,10 @@ public final class RpnCalculator {
 
     public void setAngleUnit(AngleUnit unit) {
         angleUnit = Objects.requireNonNull(unit);
+    }
+
+    public void setRadixMode(RadixMode mode) {
+        radixMode = Objects.requireNonNull(mode);
     }
 
     public List<UnifiedReal> values() {
@@ -375,12 +380,12 @@ public final class RpnCalculator {
                 result = value;
                 expression = savedValues.get(value);
             } else {
-                result = operation.evaluate(result, value, angleUnit);
+                result = operation.evaluate(result, value, angleUnit, radixMode);
                 expression =
                         SavedValue.of(
                                 result,
                                 operation,
-                                angleUnit,
+                                angleUnit, radixMode,
                                 expression,
                                 savedValues.get(value));
             }
@@ -394,12 +399,12 @@ public final class RpnCalculator {
         if (rows.isEmpty()) return;
         Fold sum = foldRows(Operation.ADD, rows);
         UnifiedReal count = new UnifiedReal(rows.size());
-        UnifiedReal mean = Operation.DIVIDE.evaluate(sum.value, count, angleUnit);
+        UnifiedReal mean = Operation.DIVIDE.evaluate(sum.value, count, angleUnit, radixMode);
         SavedValue expression =
                 SavedValue.of(
                         mean,
                         Operation.DIVIDE,
-                        angleUnit,
+                        angleUnit, radixMode,
                         sum.expression,
                         SavedValue.rational(count));
         State before = new State(this);
@@ -418,50 +423,50 @@ public final class RpnCalculator {
         Fold sum = foldRows(Operation.ADD, rows);
         UnifiedReal count = new UnifiedReal(rows.size());
         SavedValue countExpression = SavedValue.rational(count);
-        UnifiedReal mean = Operation.DIVIDE.evaluate(sum.value, count, angleUnit);
+        UnifiedReal mean = Operation.DIVIDE.evaluate(sum.value, count, angleUnit, radixMode);
         SavedValue meanExpression =
-                SavedValue.of(mean, Operation.DIVIDE, angleUnit, sum.expression, countExpression);
+                SavedValue.of(mean, Operation.DIVIDE, angleUnit, radixMode, sum.expression, countExpression);
         UnifiedReal squares = null;
         SavedValue squaresExpression = null;
         for (int index : rows) {
             UnifiedReal value = stack.get(index);
-            UnifiedReal deviation = Operation.SUBTRACT.evaluate(value, mean, angleUnit);
+            UnifiedReal deviation = Operation.SUBTRACT.evaluate(value, mean, angleUnit, radixMode);
             SavedValue deviationExpression =
                     SavedValue.of(
                             deviation,
                             Operation.SUBTRACT,
-                            angleUnit,
+                            angleUnit, radixMode,
                             savedValues.get(value),
                             meanExpression);
-            UnifiedReal square = Operation.MULTIPLY.evaluate(deviation, deviation, angleUnit);
+            UnifiedReal square = Operation.MULTIPLY.evaluate(deviation, deviation, angleUnit, radixMode);
             SavedValue squareExpression =
                     SavedValue.of(
                             square,
                             Operation.MULTIPLY,
-                            angleUnit,
+                            angleUnit, radixMode,
                             deviationExpression,
                             deviationExpression);
             if (squares == null) {
                 squares = square;
                 squaresExpression = squareExpression;
             } else {
-                squares = Operation.ADD.evaluate(squares, square, angleUnit);
+                squares = Operation.ADD.evaluate(squares, square, angleUnit, radixMode);
                 squaresExpression =
                         SavedValue.of(
                                 squares,
                                 Operation.ADD,
-                                angleUnit,
+                                angleUnit, radixMode,
                                 squaresExpression,
                                 squareExpression);
             }
         }
-        UnifiedReal variance = Operation.DIVIDE.evaluate(squares, count, angleUnit);
+        UnifiedReal variance = Operation.DIVIDE.evaluate(squares, count, angleUnit, radixMode);
         SavedValue varianceExpression =
                 SavedValue.of(
-                        variance, Operation.DIVIDE, angleUnit, squaresExpression, countExpression);
-        UnifiedReal sd = Operation.SQRT.evaluate(variance, null, angleUnit);
+                        variance, Operation.DIVIDE, angleUnit, radixMode, squaresExpression, countExpression);
+        UnifiedReal sd = Operation.SQRT.evaluate(variance, null, angleUnit, radixMode);
         SavedValue expression =
-                SavedValue.of(sd, Operation.SQRT, angleUnit, varianceExpression, null);
+                SavedValue.of(sd, Operation.SQRT, angleUnit, radixMode, varianceExpression, null);
         State before = new State(this);
         stack.add(sd);
         saveValue(sd, expression);
@@ -478,14 +483,14 @@ public final class RpnCalculator {
         List<SavedValue> expressions = new ArrayList<>();
         for (int row : rows) {
             UnifiedReal original = stack.get(row);
-            UnifiedReal result = operation.evaluate(original, null, angleUnit);
+            UnifiedReal result = operation.evaluate(original, null, angleUnit, radixMode);
             NumericEvaluator.read(result, NumericRequest.DEFAULT);
             results.add(result);
             expressions.add(
                     SavedValue.of(
                             result,
                             operation,
-                            angleUnit,
+                            angleUnit, radixMode,
                             savedValues.get(original),
                             null));
         }
@@ -561,7 +566,7 @@ public final class RpnCalculator {
                 body.length + currentEntry.length + 13, CalculationLimits.ARITHMETIC_BYTES);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e38);
+        out.writeInt(0x52504e39);
         out.writeInt(body.length);
         out.write(body);
         out.writeInt(currentEntry.length);
@@ -613,6 +618,7 @@ public final class RpnCalculator {
             } else {
                 out.writeByte(node.operation.ordinal());
                 out.writeByte(node.angle.ordinal());
+                out.writeByte(node.radix.ordinal());
             }
             out.writeInt(node.left == null ? -1 : ids.get(node.left));
             out.writeInt(node.right == null ? -1 : ids.get(node.right));
@@ -636,7 +642,7 @@ public final class RpnCalculator {
     public static RpnCalculator load(byte[] bytes) throws IOException {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            if (in.readInt() != 0x52504e38) throw new IOException("Unknown saved state version");
+            if (in.readInt() != 0x52504e39) throw new IOException("Unknown saved state version");
             byte[] body = readSection(in), entry = readSection(in);
             boolean branch = in.readBoolean();
             if (in.available() != 0) throw new IOException("Trailing saved state data");
@@ -662,6 +668,7 @@ public final class RpnCalculator {
                     rational ? new RationalValue(readInteger(in), readInteger(in)) : null;
             Operation operation = rational ? null : readEnum(in, Operation.values());
             AngleUnit angle = rational ? null : readEnum(in, AngleUnit.values());
+            RadixMode radix = rational ? null : readEnum(in, RadixMode.values());
             int left = in.readInt(), right = in.readInt();
             if (left < -1 || right < -1 || left >= i || right >= i)
                 throw new IOException("Invalid expression reference");
@@ -671,6 +678,7 @@ public final class RpnCalculator {
                             : SavedValue.operation(
                                     operation,
                                     angle,
+                                    radix,
                                     left < 0 ? null : nodes.get(left),
                                     right < 0 ? null : nodes.get(right));
             UnifiedReal value =
@@ -761,13 +769,13 @@ public final class RpnCalculator {
         need(operation.arity);
         UnifiedReal a = operation.arity == 0 ? null : stack.get(stack.size() - operation.arity);
         UnifiedReal b = operation.arity == 2 ? top() : null;
-        UnifiedReal result = operation.evaluate(a, b, angleUnit);
+        UnifiedReal result = operation.evaluate(a, b, angleUnit, radixMode);
         saveValue(
                 result,
                 SavedValue.of(
                         result,
                         operation,
-                        angleUnit,
+                        angleUnit, radixMode,
                         savedValues.get(a),
                         savedValues.get(b)));
         for (int i = 0; i < operation.arity; i++) stack.remove(stack.size() - 1);

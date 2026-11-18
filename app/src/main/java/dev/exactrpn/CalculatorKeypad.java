@@ -189,26 +189,21 @@ public final class CalculatorKeypad extends ViewGroup {
     private String effectiveKey(String wire) {
         CalculatorKey key = CalculatorKey.find(wire);
         if (key == CalculatorKey.PI && tau) return CalculatorKey.TAU.wire;
-        if (key == CalculatorKey.LOG10) {
-            int base = radixMode.radix;
-            if (!inverse) return base == 10 ? key.wire : "log" + base;
-            return base == 10 ? key.inverse().wire : base + "ˣ";
-        }
         return inverse && key != null && key.inverse() != null ? key.inverse().wire : wire;
     }
 
     private CharSequence functionLabel(String wire) {
         CalculatorKey key = CalculatorKey.find(wire);
-        if (wire.equals("log12") || wire.equals("log16") || key == CalculatorKey.LOG10) {
-            String base = wire.equals("log12") ? "12" : wire.equals("log16") ? "16" : "10";
-            SpannableString logarithm = new SpannableString("log" + base);
+        if (key == CalculatorKey.LOG) {
+            // The base is written in the current base, where it always reads
+            // "10" -- the same convention as the stack's ×10 marker.
+            SpannableString logarithm = new SpannableString("log10");
             logarithm.setSpan(
                     new RelativeSizeSpan(.7f), 3, logarithm.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             logarithm.setSpan(
                     new SubscriptSpan(), 3, logarithm.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             return logarithm;
         }
-        if (wire.equals("12ˣ") || wire.equals("16ˣ")) return wire;
         if (key == null) return wire;
         int resource =
                 switch (key) {
@@ -369,7 +364,7 @@ public final class CalculatorKeypad extends ViewGroup {
                 fraction.setSpan(new ReciprocalSpan(), 0, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 label = fraction;
             }
-            case LOG10 ->
+            case LOG ->
                     description =
                             string(
                                     inverse
@@ -657,7 +652,7 @@ public final class CalculatorKeypad extends ViewGroup {
         },
         {
             CalculatorKey.LN,
-            CalculatorKey.LOG10,
+            CalculatorKey.LOG,
             CalculatorKey.SQRT,
             CalculatorKey.FLOOR,
             CalculatorKey.FACTOR

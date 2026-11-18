@@ -12,6 +12,7 @@ final class CalculationRequest {
     byte[] input, entryDraft;
     boolean entryBranch;
     RpnCalculator.AngleUnit angle = RpnCalculator.AngleUnit.RAD;
+    RadixMode radix = RadixMode.DECIMAL;
     NumericRequest numbers = NumericRequest.DEFAULT;
 
     CalculationRequest(Command command) {
@@ -29,6 +30,7 @@ final class CalculationRequest {
         writeBytes(out, entryDraft);
         out.writeBoolean(entryBranch);
         out.writeByte(angle.ordinal());
+        out.writeByte(radix.ordinal());
         NumericCodec.writeRequest(out, numbers);
         return require(bytes.toByteArray());
     }
@@ -43,6 +45,7 @@ final class CalculationRequest {
         result.entryDraft = readBytes(in);
         result.entryBranch = in.readBoolean();
         result.angle = readEnum(in, RpnCalculator.AngleUnit.values());
+        result.radix = readEnum(in, RadixMode.values());
         result.numbers = NumericCodec.readRequest(in);
         if (result.sessionId == null || in.available() != 0)
             throw new IOException("Invalid request data");
