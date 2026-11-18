@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 package dev.exactrpn;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 /** Typed actions shared by the editor, keypad and arithmetic process. */
 public final class Command {
     public enum Kind {
@@ -35,6 +39,8 @@ public final class Command {
             RESTORE = "RESTORE",
             CANCEL = "CANCEL",
             PASTE = "PASTE";
+    private static final Set<String> PRESENTATION =
+            new HashSet<>(Arrays.asList("FORMAT", "NUMBER_FORMAT", "FRACTION", "RADIX", "ANGLE"));
     public final Kind kind;
     // Only KEY actions have a key identifier; entry text is never interpreted as a command.
     public final String wire;
@@ -163,11 +169,7 @@ public final class Command {
     }
 
     public boolean isDisplayOnly() {
-        if (kind != Kind.KEY) return false;
-        return switch (wire) {
-            case "FORMAT", "NUMBER_FORMAT", "FRACTION", "RADIX", "ANGLE" -> true;
-            default -> false;
-        };
+        return kind == Kind.KEY && PRESENTATION.contains(wire);
     }
 
     public boolean preservesSelection() {
