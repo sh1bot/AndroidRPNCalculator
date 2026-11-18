@@ -13,6 +13,7 @@ import android.view.DisplayCutout;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewTreeObserver;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -43,6 +44,8 @@ public class MainActivity extends Activity {
     private StackRowRenderer rowRenderer;
     private boolean selectionDirty, renderedSelecting;
     private boolean resumed, refreshPosted;
+    private ViewTreeObserver.OnPreDrawListener pendingAnchorRestore;
+    private ViewTreeObserver pendingAnchorObserver;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable sessionChanged =
             () -> {
@@ -333,20 +336,73 @@ public class MainActivity extends Activity {
             return false;
         int scrollY = scroll.getScrollY();
         View oldRow = stackRows.findViewWithTag("stack-row:" + index);
-        int anchorCenter = oldRow == null ? 0 : oldRow.getTop() + oldRow.getHeight() / 2 - scrollY;
+        // Anchor on the row's top edge: its viewport offset does not move
+        // when the row itself grows during the renderer's fit pass.
+        int anchorTop = oldRow == null ? 0 : oldRow.getTop() - scrollY;
         if (!session.selectedRows.remove(index)) session.selectedRows.add(index);
         selectionDirty = true;
         refresh();
-        scroll.post(
-                () -> {
-                    View newRow = stackRows.findViewWithTag("stack-row:" + index);
-                    scroll.scrollTo(
-                            0,
-                            oldRow == null || newRow == null
-                                    ? scrollY
-                                    : newRow.getTop() + newRow.getHeight() / 2 - anchorCenter);
-                });
+        restoreRowTopWhenSettled(index, anchorTop, scrollY, oldRow == null);
         return true;
+    }
+
+    // Fraction rows reach their final height only in a second layout pass:
+    // StackRowRenderer's pre-draw fit rewrites the row's text and requests a
+    // relayout, so geometry read before that pass is short by the growth of
+    // the fraction rows above the tapped row, and every toggle would ratchet
+    // the stack downwards. Defer the scroll restore until no stack row has a
+    // layout pending -- the renderer's own settle condition -- and measure
+    // the rebuilt row only then. The restore is attempted from two triggers
+    // that share the settle check: a pre-draw listener (the fit's own
+    // traversal is what settles the rows on a device) and a posted runnable
+    // (an environment that never pumps another draw after the toggle, such
+    // as the Robolectric harness, would otherwise strand the restore; the
+    // check keeps it from ever reading pre-fit geometry). A newer toggle
+    // supersedes a pending restore.
+    private void restoreRowTopWhenSettled(
+            int index, int anchorTop, int scrollY, boolean rowWasMissing) {
+        cancelPendingAnchorRestore();
+        ViewTreeObserver observer = scroll.getViewTreeObserver();
+        ViewTreeObserver.OnPreDrawListener listener =
+                new ViewTreeObserver.OnPreDrawListener() {
+                    @Override
+                    public boolean onPreDraw() {
+                        restoreAnchorIfSettled(this, index, anchorTop, scrollY, rowWasMissing);
+                        return true;
+                    }
+                };
+        pendingAnchorRestore = listener;
+        pendingAnchorObserver = observer;
+        observer.addOnPreDrawListener(listener);
+        scroll.post(
+                () -> restoreAnchorIfSettled(listener, index, anchorTop, scrollY, rowWasMissing));
+    }
+
+    // Restores the anchored row's top edge if this restore is still the
+    // pending one and every stack row has settled; returns whether it fired.
+    private boolean restoreAnchorIfSettled(
+            ViewTreeObserver.OnPreDrawListener listener,
+            int index,
+            int anchorTop,
+            int scrollY,
+            boolean rowWasMissing) {
+        if (pendingAnchorRestore != listener) return false;
+        for (int i = 0; i < stackRows.getChildCount(); i++)
+            if (stackRows.getChildAt(i).isLayoutRequested()) return false;
+        cancelPendingAnchorRestore();
+        View newRow = stackRows.findViewWithTag("stack-row:" + index);
+        // ScrollView.scrollTo clamps to the valid scroll range.
+        scroll.scrollTo(
+                0, rowWasMissing || newRow == null ? scrollY : newRow.getTop() - anchorTop);
+        return true;
+    }
+
+    private void cancelPendingAnchorRestore() {
+        if (pendingAnchorRestore == null) return;
+        if (pendingAnchorObserver != null && pendingAnchorObserver.isAlive())
+            pendingAnchorObserver.removeOnPreDrawListener(pendingAnchorRestore);
+        pendingAnchorRestore = null;
+        pendingAnchorObserver = null;
     }
 
     private void stackRowTapped(int index, Display snapshot) {
@@ -590,6 +646,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        cancelPendingAnchorRestore();
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
         if (!isChangingConfigurations()) {
