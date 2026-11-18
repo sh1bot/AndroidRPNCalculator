@@ -32,6 +32,15 @@ final class KeypadLayoutTest {
                 width, height, expanded, true, GAP, MIN_WIDTH, MIN_HEIGHT, COLUMNS, ROWS);
     }
 
+    private static void assertSameGeometry(KeypadLayout first, KeypadLayout second) {
+        assertEquals(first.stackWidth, second.stackWidth);
+        assertEquals(first.stackHeight, second.stackHeight);
+        assertEquals(first.keypadWidth, second.keypadWidth);
+        assertEquals(first.keypadHeight, second.keypadHeight);
+        assertEquals(first.stackX, second.stackX);
+        assertEquals(first.keypadX, second.keypadX);
+    }
+
     // ---------- The table's coefficients, derived from the design constants ----------
 
     @Test
@@ -94,12 +103,7 @@ final class KeypadLayoutTest {
                     open.regime == Regime.R2 || open.regime == Regime.R4,
                     size[0] + "x" + size[1]);
             assertEquals(open.regime, closed.regime);
-            assertEquals(open.stackWidth, closed.stackWidth);
-            assertEquals(open.stackHeight, closed.stackHeight);
-            assertEquals(open.keypadWidth, closed.keypadWidth);
-            assertEquals(open.keypadHeight, closed.keypadHeight);
-            assertEquals(open.stackX, closed.stackX);
-            assertEquals(open.keypadX, closed.keypadX);
+            assertSameGeometry(open, closed);
         }
     }
 
@@ -236,18 +240,12 @@ final class KeypadLayoutTest {
                     }
                     case R2, R4 -> {
                         // The squeeze is internal to the keypad: the plan is unchanged.
-                        assertEquals(open.stackWidth, closed.stackWidth);
-                        assertEquals(open.stackHeight, closed.stackHeight);
-                        assertEquals(open.keypadWidth, closed.keypadWidth);
-                        assertEquals(open.keypadHeight, closed.keypadHeight);
+                        assertSameGeometry(open, closed);
                     }
                     case R3 -> {
                         // The boundary is fixed; the column spends keypad width only, so
                         // every extent the plan carries is invariant.
-                        assertEquals(open.stackWidth, closed.stackWidth);
-                        assertEquals(open.stackHeight, closed.stackHeight);
-                        assertEquals(open.keypadWidth, closed.keypadWidth);
-                        assertEquals(open.keypadHeight, closed.keypadHeight);
+                        assertSameGeometry(open, closed);
                     }
                     case R5 -> {
                         // The boundary moves vertically: stack and keypad trade height
