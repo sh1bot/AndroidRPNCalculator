@@ -41,18 +41,12 @@ public final class AboutTest {
             onView(withText("Help")).inRoot(isPlatformPopup()).perform(click());
             onView(withTagValue(is("document-text")))
                     .check(matches(withSubstring("Your first calculation")));
-            pressBack();
-            onView(withTagValue(is("overflow-menu"))).perform(click());
-            onView(withText("Licenses")).inRoot(isPlatformPopup()).perform(click());
-            onView(withTagValue(is("document-text")))
-                    .check(matches(withSubstring("TERMS AND CONDITIONS")));
-            assertTrue(AboutDialog.read(activity, "docs.html").contains("Hans-J. Boehm"));
-            assertTrue(AboutDialog.read(activity, "docs.html").contains("Silicon Graphics"));
-            pressBack();
-            onView(withTagValue(is("overflow-menu"))).perform(click());
-            onView(withText("Privacy")).inRoot(isPlatformPopup()).perform(click());
-            onView(withTagValue(is("document-text")))
-                    .check(matches(withSubstring("does not collect")));
+            String document = AboutDialog.read(activity, "docs.html");
+            assertTrue(document.contains("TERMS AND CONDITIONS"));
+            assertTrue(document.contains("Hans-J. Boehm"));
+            assertTrue(document.contains("Silicon Graphics"));
+            assertTrue(document.contains("does not collect"));
+            assertTrue(document.contains(AboutDialog.REPOSITORY));
             pressBack();
         } catch (Throwable failure) {
             android.util.Log.e("MenuTest", LockScreenTest.shell("dumpsys window windows"));
