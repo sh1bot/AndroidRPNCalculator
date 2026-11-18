@@ -39,6 +39,9 @@ final class RemoteCalculator {
 
     private final Context context;
     private final boolean temporary;
+    private final long helloTimeoutMs;
+    private final boolean traceStartup;
+    private long startupMs;
     private final Handler main = new Handler(Looper.getMainLooper());
     private Messenger remote;
     private ServiceConnection connection;
@@ -59,6 +62,7 @@ final class RemoteCalculator {
                                         return true;
                                     }
                                     if (message.what == CalculationService.HELLO) {
+                                        traceStartup("HELLO", generation);
                                         pid = message.arg1;
                                         if (helloWatchdog != null) {
                                             main.removeCallbacks(helloWatchdog);
@@ -77,6 +81,12 @@ final class RemoteCalculator {
                             }));
 
     RemoteCalculator(Context context, boolean temporary) {
+        this(context, temporary, HELLO_TIMEOUT_MS, false);
+    }
+
+    RemoteCalculator(Context context, boolean temporary, long helloTimeoutMs, boolean traceStartup) {
+        this.helloTimeoutMs = helloTimeoutMs;
+        this.traceStartup = traceStartup;
         this.context = context.getApplicationContext();
         this.temporary = temporary;
     }
@@ -165,7 +175,15 @@ final class RemoteCalculator {
         }
     }
 
+    private void traceStartup(String event, int epoch) {
+        if (traceStartup) {
+            android.util.Log.i("WorkerStartup", event + " generation=" + epoch
+                    + " elapsedMs=" + (android.os.SystemClock.uptimeMillis() - startupMs));
+        }
+    }
+
     private void bind() {
+        startupMs = android.os.SystemClock.uptimeMillis();
         final int epoch = generation;
         connection =
                 new ServiceConnection() {
@@ -173,6 +191,7 @@ final class RemoteCalculator {
                     public void onServiceConnected(ComponentName name, IBinder binder) {
                         synchronized (RemoteCalculator.this) {
                             if (epoch != generation) return;
+                            traceStartup("onServiceConnected", epoch);
                             remote = new Messenger(binder);
                             Message hello = Message.obtain(null, CalculationService.HELLO);
                             hello.replyTo = replies;
@@ -211,18 +230,21 @@ final class RemoteCalculator {
         Runnable watchdog =
                 () -> {
                     synchronized (RemoteCalculator.this) {
-                        if (epoch == generation && pending != null && pid == 0)
+                        if (epoch == generation && pending != null && pid == 0) {
+                            traceStartup("watchdog", epoch);
                             fail(
                                     new IllegalStateException(
                                             context.getString(R.string.process_start_failed)));
+                        }
                     }
                 };
         helloWatchdog = watchdog;
-        main.postDelayed(watchdog, HELLO_TIMEOUT_MS);
+        main.postDelayed(watchdog, helloTimeoutMs);
         main.post(
                 () -> {
                     synchronized (RemoteCalculator.this) {
                         if (epoch != generation) return;
+                        traceStartup("bindService", epoch);
                         if (!context.bindService(
                                 new Intent(
                                         context,

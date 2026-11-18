@@ -61,7 +61,10 @@ public final class CancellationTest {
     @Test
     public void cancelStopsWorkerAndPreservesCheckpoint() throws Exception {
         Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        RemoteCalculator remote = new RemoteCalculator(context, false);
+        String startupBudget = InstrumentationRegistry.getArguments().getString("startupBudgetMs");
+        RemoteCalculator remote = startupBudget == null
+                ? new RemoteCalculator(context, false)
+                : new RemoteCalculator(context, false, Long.parseLong(startupBudget), true);
         ExecutorService worker = Executors.newSingleThreadExecutor();
         CalculatorStore store = new CalculatorStore(context.getNoBackupFilesDir(), () -> true);
         File seed = File.createTempFile("cancel-test-", ".state", context.getNoBackupFilesDir());
