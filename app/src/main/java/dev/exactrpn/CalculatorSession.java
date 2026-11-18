@@ -39,11 +39,21 @@ final class CalculatorSession {
         final Command command;
         final long generation;
         final java.util.function.Consumer<String> copy;
+        // When this key's result is published, the selection becomes the rows from this
+        // display index to the top of the new stack: the copies a Pick appended, or the
+        // factors a Factor produced. -1 leaves the selection untouched, and a failed key
+        // never reaches publication, so its selection survives unchanged.
+        final int selectFrom;
 
-        PendingKey(Command command, long generation, java.util.function.Consumer<String> copy) {
+        PendingKey(
+                Command command,
+                long generation,
+                java.util.function.Consumer<String> copy,
+                int selectFrom) {
             this.command = command;
             this.generation = generation;
             this.copy = copy;
+            this.selectFrom = selectFrom;
         }
     }
 
@@ -122,7 +132,25 @@ final class CalculatorSession {
         enqueue(Command.rows(Command.Kind.READ_VALUES, rows), copy);
     }
 
+    /** Pick rows onto the stack; when the pick lands, its copies become the selection. */
+    void pickRows(int[] rows) {
+        enqueue(Command.rows(Command.Kind.PICK_ROWS, rows), null, display.rows.size());
+    }
+
+    /** Factorise the top value; when it lands, the factors produced become the selection. */
+    void factorTop(Command command) {
+        Display current = display;
+        // An unfinished entry commits first, so it counts as the top stack row.
+        int top = current.rows.size() + (current.editing ? 1 : 0) - 1;
+        enqueue(command, null, top);
+    }
+
     private void enqueue(Command command, java.util.function.Consumer<String> copy) {
+        enqueue(command, copy, -1);
+    }
+
+    private void enqueue(
+            Command command, java.util.function.Consumer<String> copy, int selectFrom) {
         if (closing) return;
         if (!temporary && DeviceAccess.locked(context)) {
             if (command.is(Command.RESTORE)) restorePending = true;
@@ -134,7 +162,7 @@ final class CalculatorSession {
                         || changeFormat(command, inputGeneration))) return;
         boolean start;
         synchronized (this) {
-            pending.addLast(new PendingKey(command, inputGeneration, copy));
+            pending.addLast(new PendingKey(command, inputGeneration, copy, selectFrom));
             if (Operation.find(command.wire) != null
                     || command.is("Factor")
                     || command.kind == Command.Kind.UNARY_ROWS
@@ -319,7 +347,12 @@ final class CalculatorSession {
                 throw new IllegalStateException("Invalid entry response", ex);
             }
             publishResult(
-                    result, new Display(result, incoming, settings), incoming, key, generation);
+                    result,
+                    new Display(result, incoming, settings),
+                    incoming,
+                    key,
+                    generation,
+                    input.selectFrom);
             if (key.is(Command.RESTORE) && !temporary) acknowledgeRestore();
             if (background) saveForLifecycle();
         } catch (RuntimeException ex) {
@@ -500,7 +533,8 @@ final class CalculatorSession {
             Display nextDisplay,
             EntryEditor incoming,
             Command key,
-            long generation) {
+            long generation,
+            int selectFrom) {
         Runnable accept =
                 () -> {
                     synchronized (this) {
@@ -514,6 +548,14 @@ final class CalculatorSession {
                                     remaining.add(index - removed.headSet(index).size());
                             selectedRows.clear();
                             selectedRows.addAll(remaining);
+                        }
+                        if (selectFrom >= 0 && selectFrom < nextDisplay.rows.size()) {
+                            // The key produced the rows at the top of the new stack (Pick
+                            // copies or Factor factors); they become the whole selection.
+                            selectedRows.clear();
+                            for (int index = selectFrom;
+                                    index < nextDisplay.rows.size();
+                                    index++) selectedRows.add(index);
                         }
                         checkpoint = new CalculationSnapshot(result.checkpoint, result.state);
                         if (editor == null
