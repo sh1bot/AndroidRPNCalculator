@@ -184,6 +184,7 @@ public class CalculationService extends Service {
             List<UnifiedReal> before = cached.values();
             candidate = cached;
             candidate.setAngleUnit(request.angle);
+            candidate.setRadixMode(request.radix);
             byte[] draft = request.entryDraft;
             if (request.entryBranch) candidate.discardRedo();
             if (draft != null) {

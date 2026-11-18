@@ -22,12 +22,8 @@
         <item>@string/reciprocal_description</item> <!-- RECIPROCAL -->
         <item>@string/floor_description</item> <!-- FLOOR -->
         <item>@string/ceil_description</item> <!-- CEIL -->
-        <item>@string/log10_description</item> <!-- LOG10 -->
-        <item>@string/ten_power_description</item> <!-- TEN_POWER -->
-        <item>""</item> <!-- LOG12 -->
-        <item>""</item> <!-- TWELVE_POWER -->
-        <item>""</item> <!-- LOG16 -->
-        <item>""</item> <!-- SIXTEEN_POWER -->
+        <item>@string/log10_description</item> <!-- LOG -->
+        <item>@string/ten_power_description</item> <!-- BASE_POWER -->
         <item>""</item> <!-- LN -->
         <item>@string/exp_description</item> <!-- EXP -->
         <item>""</item> <!-- SIN -->

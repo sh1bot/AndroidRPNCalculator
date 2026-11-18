@@ -128,7 +128,7 @@ public final class StackSelectionTest {
                 awaitHere("Timed out waiting for stack UI", () -> !state.busy);
             }
             for (int mode = 0; mode < 2; mode++) {
-                String expectedMode = mode == 0 ? "FRAC" : "IMPR";
+                String expectedMode = mode == 0 ? "1+½" : "3/2";
                 instrumentation.runOnMainSync(() -> state.enqueue(Command.key("FRACTION")));
                 awaitHere("Timed out waiting for stack UI", () -> !state.busy);
                 awaitHere("Timed out waiting for stack UI",

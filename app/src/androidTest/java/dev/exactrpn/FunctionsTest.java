@@ -454,14 +454,13 @@ public final class FunctionsTest {
                                     new CalculatorKeypad(
                                             context, command::set, true, (expanded, inverse) -> {});
                             for (RadixMode radix : RadixMode.values()) {
-                                int base = radix.radix;
                                 keypad.setNumberFormat(
                                         new LocaleNumbers(Locale.US, NumberMode.DOT, radix));
                                 keypad.setInverse(false);
-                                Button logarithm = findButton(keypad, "log" + base);
+                                Button logarithm = findButton(keypad, "log10");
                                 assertNotNull(logarithm);
                                 logarithm.performClick();
-                                assertEquals("log" + base, command.get().wire);
+                                assertEquals("log10", command.get().wire);
                                 android.text.Spanned label =
                                         (android.text.Spanned) logarithm.getText();
                                 android.text.style.SubscriptSpan[] subscripts =
@@ -471,16 +470,16 @@ public final class FunctionsTest {
                                                 android.text.style.SubscriptSpan.class);
                                 assertEquals(1, subscripts.length);
                                 assertEquals(
-                                        Integer.toString(base),
+                                        "10",
                                         label.subSequence(
                                                         label.getSpanStart(subscripts[0]),
                                                         label.getSpanEnd(subscripts[0]))
                                                 .toString());
                                 keypad.setInverse(true);
-                                Button power = findButton(keypad, base + "ˣ");
+                                Button power = findButton(keypad, "10ˣ");
                                 assertNotNull(power);
                                 power.performClick();
-                                assertEquals(base + "ˣ", command.get().wire);
+                                assertEquals("10ˣ", command.get().wire);
                             }
                         });
     }

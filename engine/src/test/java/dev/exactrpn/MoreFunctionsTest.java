@@ -11,7 +11,12 @@ import java.math.BigInteger;
 
 final class MoreFunctionsTest {
     private UnifiedReal apply(String value, String operation) {
+        return apply(value, operation, RadixMode.DECIMAL);
+    }
+
+    private UnifiedReal apply(String value, String operation, RadixMode radix) {
         TestCalculator calculator = new TestCalculator();
+        calculator.setRadixMode(radix);
         CalculatorTestSupport.paste(calculator, value);
         calculator.key(operation);
         return calculator.values().get(0);
@@ -32,10 +37,12 @@ final class MoreFunctionsTest {
 
     @Test
     void configuredRadixLogarithmsUseTheirRadixAsTheBase() {
-        assertTrue(apply("144", "log12").approxEquals(new UnifiedReal(2), -100));
-        assertTrue(apply("3", "12ˣ").definitelyEquals(new UnifiedReal(1728)));
-        assertTrue(apply("256", "log16").approxEquals(new UnifiedReal(2), -100));
-        assertTrue(apply("3", "16ˣ").definitelyEquals(new UnifiedReal(4096)));
+        assertTrue(
+                apply("144", "log10", RadixMode.DOZENAL).approxEquals(new UnifiedReal(2), -100));
+        assertTrue(
+                apply("3", "10ˣ", RadixMode.DOZENAL).definitelyEquals(new UnifiedReal(1728)));
+        assertTrue(apply("256", "log10", RadixMode.HEX).approxEquals(new UnifiedReal(2), -100));
+        assertTrue(apply("3", "10ˣ", RadixMode.HEX).definitelyEquals(new UnifiedReal(4096)));
     }
 
     @Test
