@@ -6,9 +6,11 @@ package dev.exactrpn;
  *
  * <p>This is the only place layout policy lives: {@link #choose} returns the workspace
  * geometry — the stack and keypad rectangles and their positions, the regime, and where the
- * function panel sits — and the workspace merely applies it. The plan also carries the keypad's
- * internal subdivision (the control-row height, digit width and function-panel extent), so the
- * Android view does not independently reproduce the geometry policy. Five regimes, from extremely wide
+ * function panel sits — and the workspace merely applies it. The keypad derives its internal
+ * subdivision (the control row's height, the digit block's width and position, the function
+ * panel's extent and position) from its measured rectangle, the placement and the panel
+ * state, evaluating the same forms over the same intermediates: its height gives the key
+ * unit everywhere except R5, whose unit its width gives. Five regimes, from extremely wide
  * to extremely tall:
  *
  * <ul>
@@ -28,8 +30,6 @@ package dev.exactrpn;
  * follows the actual expanded flag.
  */
 public final class KeypadLayout {
-    private final boolean expanded;
-    private final int columns, primaryRows;
     /** The five layout regimes, wide to tall. */
     public enum Regime {
         R1,
@@ -78,8 +78,6 @@ public final class KeypadLayout {
     public final int expandedStackWidth;
     /** The keypad view's total extent, including the R5 function band when open. */
     public final int keypadWidth, keypadHeight;
-    /** The keypad's internal subdivision at this plan's measured extent. */
-    public final int digitsWidth, controlHeight, functionWidth, functionHeight;
 
     /** Left edge of the stack within the workspace. */
     public final int stackX;
@@ -99,10 +97,7 @@ public final class KeypadLayout {
             int keypadHeight,
             int gap,
             int stackX,
-            int keypadX,
-            boolean expanded,
-            int columns,
-            int primaryRows) {
+            int keypadX) {
         this.regime = regime;
         this.besideStack = besideStack;
         this.functionPlacement = functionPlacement;
@@ -114,37 +109,6 @@ public final class KeypadLayout {
         this.gap = gap;
         this.stackX = stackX;
         this.keypadX = keypadX;
-        this.expanded = expanded;
-        this.columns = columns;
-        this.primaryRows = primaryRows;
-        if (functionPlacement == FunctionPlacement.ABOVE) {
-            double unit = (double) keypadWidth / columns;
-            controlHeight = (int) Math.round(unit / 2);
-            functionWidth = expanded ? keypadWidth : 0;
-            functionHeight = expanded ? (int) Math.round(FN_UNITS * unit) : 0;
-            digitsWidth = keypadWidth;
-        } else {
-            double unit = keypadHeight / (primaryRows + .5);
-            controlHeight = (int) Math.round(unit / 2);
-            if (functionPlacement == FunctionPlacement.LEFT
-                    || functionPlacement == FunctionPlacement.RIGHT) {
-                int columnWidth = (int) Math.round(FN_UNITS * unit);
-                functionWidth = expanded ? columnWidth : 0;
-                functionHeight = expanded ? keypadHeight - controlHeight : 0;
-                digitsWidth =
-                        besideStack
-                                ? (int) Math.round(columns * unit)
-                                : expanded ? keypadWidth - columnWidth - gap : keypadWidth;
-            } else {
-                functionWidth = expanded ? keypadWidth : 0;
-                functionHeight =
-                        expanded
-                                ? (keypadHeight - controlHeight) * FN_UNITS
-                                        / (FN_UNITS + primaryRows)
-                                : 0;
-                digitsWidth = keypadWidth;
-            }
-        }
     }
 
     /**
@@ -162,10 +126,7 @@ public final class KeypadLayout {
             int expandedStackWidth,
             int keypadWidth,
             int keypadHeight,
-            int gap,
-            boolean expanded,
-            int columns,
-            int primaryRows) {
+            int gap) {
         return new KeypadLayout(
                 regime,
                 besideStack,
@@ -177,10 +138,7 @@ public final class KeypadLayout {
                 keypadHeight,
                 gap,
                 0,
-                besideStack ? width - keypadWidth : 0,
-                expanded,
-                columns,
-                primaryRows);
+                besideStack ? width - keypadWidth : 0);
     }
 
     /** The exact horizontal mirror of this plan: same sizes and vertical geometry, mirrored x. */
@@ -198,10 +156,7 @@ public final class KeypadLayout {
                 keypadHeight,
                 gap,
                 width - stackX - stackWidth,
-                width - keypadX - keypadWidth,
-                expanded,
-                columns,
-                primaryRows);
+                width - keypadX - keypadWidth);
     }
 
     /**
@@ -242,8 +197,8 @@ public final class KeypadLayout {
      * the design constants (the key unit, the natural digit width at {@code columns} units,
      * the function column at FN_UNITS units); each regime is then a single row of forms over
      * those intermediates, and the one {@code plan(...)} call at the end is the only
-     * construction site. Construction also derives the keypad's internal extents from the
-     * resulting measured rectangle.
+     * construction site. The rows assign only the workspace geometry — the keypad's internal
+     * extents are the same forms, evaluated by the keypad over its measured rectangle.
      * Whether the panel is open is data within a row — the boundary extents select their
      * open or closed form — never a separate construction.
      *
@@ -339,9 +294,6 @@ public final class KeypadLayout {
                 expandedStackWidth,
                 keypadWidth,
                 keypadHeight,
-                gap,
-                expanded,
-                columns,
-                primaryRows);
+                gap);
     }
 }
