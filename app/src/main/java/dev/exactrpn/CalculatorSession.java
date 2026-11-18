@@ -549,7 +549,9 @@ final class CalculatorSession {
                             selectedRows.clear();
                             selectedRows.addAll(remaining);
                         }
-                        if (selectFrom >= 0 && selectFrom < nextDisplay.rows.size()) {
+                        if (result.operationError == null
+                                && selectFrom >= 0
+                                && selectFrom < nextDisplay.rows.size()) {
                             // The key produced the rows at the top of the new stack (Pick
                             // copies or Factor factors); they become the whole selection.
                             selectedRows.clear();
