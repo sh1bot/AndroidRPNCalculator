@@ -359,40 +359,18 @@ public class MainActivity extends Activity {
 
     private boolean executeSelectionAction(String key) {
         if (session.selectedRows.isEmpty()) return false;
-        Command.Kind action;
-        Operation operation = Operation.find(key);
-        switch (key) {
-            case Command.UNDO:
+        InteractionMode.SelectionAction action = InteractionMode.selectionAction(key);
+        switch (action) {
+            case CLEAR_SELECTION:
                 if (stackActionAllowed(session.display)) clearStackSelection(true);
                 return true;
-            case "SMART_CLEAR":
-            case "CLEAR":
+            case SELECT_ALL:
                 if (!stackActionAllowed(session.display)) return true;
                 for (int i = 0; i < session.display.rows.size(); i++) session.selectedRows.add(i);
                 selectionDirty = true;
                 refresh();
                 return true;
-            case Command.ENTER:
-                action = Command.Kind.PICK_ROWS;
-                break;
-            case "BACK":
-            case "DROP":
-            case "DELETE":
-                action = Command.Kind.DROP_ROWS;
-                break;
-            case "+":
-                action = Command.Kind.SUM_ROWS;
-                break;
-            case "×":
-                action = Command.Kind.PRODUCT_ROWS;
-                break;
-            case "÷":
-                action = Command.Kind.MEAN_ROWS;
-                break;
-            case "−":
-                action = Command.Kind.SD_ROWS;
-                break;
-            case "SWAP":
+            case COPY:
                 if (!stackActionAllowed(session.display)) return true;
                 session.copyRows(
                         session.selectedRows.stream().mapToInt(Integer::intValue).toArray(),
@@ -402,28 +380,28 @@ public class MainActivity extends Activity {
                                         session.display.numberMode,
                                         session.display.radixMode));
                 return true;
-            case "HOLD_DROP":
-            case "ROLL_UP":
+            case IGNORE:
                 return true;
-            default:
-                if (operation != null && operation.arity == 1) {
-                    action = Command.Kind.UNARY_ROWS;
-                    break;
-                }
-                if (key.equals("Factor") || operation != null && operation.arity == 2) {
-                    showNotice(getString(R.string.selection_operation_unavailable), true);
-                    return true;
-                }
+            case UNAVAILABLE:
+                showNotice(getString(R.string.selection_operation_unavailable), true);
+                return true;
+            case NONE:
                 return false;
+            default:
+                break;
         }
         if (!stackActionAllowed(session.display)) return true;
         int[] rows = session.selectedRows.stream().mapToInt(Integer::intValue).toArray();
-        if (action == Command.Kind.PICK_ROWS) session.pickRows(rows);
-        else
-            session.enqueue(
-                    action == Command.Kind.UNARY_ROWS
-                            ? Command.unaryRows(operation, rows)
-                            : Command.rows(action, rows));
+        switch (action) {
+            case PICK -> session.pickRows(rows);
+            case DROP -> session.enqueue(Command.rows(Command.Kind.DROP_ROWS, rows));
+            case SUM -> session.enqueue(Command.rows(Command.Kind.SUM_ROWS, rows));
+            case PRODUCT -> session.enqueue(Command.rows(Command.Kind.PRODUCT_ROWS, rows));
+            case MEAN -> session.enqueue(Command.rows(Command.Kind.MEAN_ROWS, rows));
+            case SD -> session.enqueue(Command.rows(Command.Kind.SD_ROWS, rows));
+            case UNARY -> session.enqueue(Command.unaryRows(Operation.find(key), rows));
+            default -> throw new AssertionError(action);
+        }
         refresh();
         return true;
     }
