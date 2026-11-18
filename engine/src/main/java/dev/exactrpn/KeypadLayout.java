@@ -4,8 +4,14 @@ package dev.exactrpn;
 /**
  * Geometry policy in pixels, independent of orientation flags and Android views.
  *
- * <p>This is the only place layout policy lives: {@link #choose} returns the complete plan and
- * the views merely execute it. Five regimes, from extremely wide to extremely tall:
+ * <p>This is the only place layout policy lives: {@link #choose} returns the workspace
+ * geometry — the stack and keypad rectangles and their positions, the regime, and where the
+ * function panel sits — and the workspace merely applies it. The keypad derives its internal
+ * subdivision (the control row's height, the digit block's width and position, the function
+ * panel's extent and position) from its measured rectangle, the placement and the panel
+ * state, evaluating the same forms over the same intermediates: its height gives the key
+ * unit everywhere except R5, whose unit its width gives. Five regimes, from extremely wide
+ * to extremely tall:
  *
  * <ul>
  *   <li>R1 — stack on the left, boundary moves to accommodate the function column, keypad keeps
@@ -47,8 +53,10 @@ public final class KeypadLayout {
 
     /**
      * The function panel's short edge, in key units: 3f with f = ⅔, the function keys being about
-     * two thirds of a normal key on their short edge. A squeezed band takes FN_UNITS / (FN_UNITS +
-     * primaryRows) of the keypad body — 2/7 at five primary rows.
+     * two thirds of a normal key on their short edge. The R1/R3 column and the R5 band are
+     * FN_UNITS units at the family's key unit; a squeezed band takes FN_UNITS / (FN_UNITS +
+     * primaryRows) of the keypad body — 2/7 at five primary rows — which the keypad applies
+     * when it derives the band from its measured height.
      */
     private static final int FN_UNITS = 2;
 
@@ -75,16 +83,6 @@ public final class KeypadLayout {
     public final int stackX;
     /** Left edge of the keypad view within the workspace. */
     public final int keypadX;
-    /** Left edge of the primary (digits) block within the keypad view. */
-    public final int primaryX;
-    /** Left edge of the function panel within the keypad view. */
-    public final int functionX;
-    /** Width of the primary (digits) block inside the keypad view. */
-    public final int primaryWidth;
-    /** Height of the control row: half a key unit of the natural keypad block. */
-    public final int controlHeight;
-    /** The function panel's extent in this plan; zero when the panel is closed. */
-    public final int functionWidth, functionHeight;
     /** The gap the plan was computed with; the keypad view uses it inside the R5 band. */
     public final int gap;
 
@@ -97,15 +95,9 @@ public final class KeypadLayout {
             int expandedStackWidth,
             int keypadWidth,
             int keypadHeight,
-            int primaryWidth,
-            int controlHeight,
-            int functionWidth,
-            int functionHeight,
             int gap,
             int stackX,
-            int keypadX,
-            int primaryX,
-            int functionX) {
+            int keypadX) {
         this.regime = regime;
         this.besideStack = besideStack;
         this.functionPlacement = functionPlacement;
@@ -114,22 +106,15 @@ public final class KeypadLayout {
         this.expandedStackWidth = expandedStackWidth;
         this.keypadWidth = keypadWidth;
         this.keypadHeight = keypadHeight;
-        this.primaryWidth = primaryWidth;
-        this.controlHeight = controlHeight;
-        this.functionWidth = functionWidth;
-        this.functionHeight = functionHeight;
         this.gap = gap;
         this.stackX = stackX;
         this.keypadX = keypadX;
-        this.primaryX = primaryX;
-        this.functionX = functionX;
     }
 
     /**
      * Builds a plan with its unmirrored horizontal positions: the stack hugs the left of the
-     * workspace, the keypad hugs the right when beside the stack (and starts at 0 when stacked,
-     * spanning the width), the digits hug the right of the keypad view, and a function column
-     * hugs its left; a function band shares the digits' left edge.
+     * workspace, and the keypad hugs the right when beside the stack (and starts at 0 when
+     * stacked, spanning the width).
      */
     private static KeypadLayout plan(
             Regime regime,
@@ -141,13 +126,7 @@ public final class KeypadLayout {
             int expandedStackWidth,
             int keypadWidth,
             int keypadHeight,
-            int primaryWidth,
-            int controlHeight,
-            int functionWidth,
-            int functionHeight,
             int gap) {
-        int primaryX = keypadWidth - primaryWidth;
-        int functionX = functionPlacement == FunctionPlacement.LEFT ? 0 : primaryX;
         return new KeypadLayout(
                 regime,
                 besideStack,
@@ -157,15 +136,9 @@ public final class KeypadLayout {
                 expandedStackWidth,
                 keypadWidth,
                 keypadHeight,
-                primaryWidth,
-                controlHeight,
-                functionWidth,
-                functionHeight,
                 gap,
                 0,
-                besideStack ? width - keypadWidth : 0,
-                primaryX,
-                functionX);
+                besideStack ? width - keypadWidth : 0);
     }
 
     /** The exact horizontal mirror of this plan: same sizes and vertical geometry, mirrored x. */
@@ -181,15 +154,9 @@ public final class KeypadLayout {
                 expandedStackWidth,
                 keypadWidth,
                 keypadHeight,
-                primaryWidth,
-                controlHeight,
-                functionWidth,
-                functionHeight,
                 gap,
                 width - stackX - stackWidth,
-                width - keypadX - keypadWidth,
-                keypadWidth - primaryX - primaryWidth,
-                keypadWidth - functionX - functionWidth);
+                width - keypadX - keypadWidth);
     }
 
     /**
@@ -227,12 +194,13 @@ public final class KeypadLayout {
 
     /**
      * The whole policy as one table. Each family first derives its shared intermediates from
-     * the design constants (the key unit, the control height at half a unit, the natural digit
-     * width at {@code columns} units, the function column at FN_UNITS units); each regime is
-     * then a single row of forms over those intermediates, and the one {@code plan(...)} call
-     * at the end is the only construction site. Whether the panel is open is data within a
-     * row — the function extent is zeroed and the boundary extents select their open or
-     * closed form — never a separate construction.
+     * the design constants (the key unit, the natural digit width at {@code columns} units,
+     * the function column at FN_UNITS units); each regime is then a single row of forms over
+     * those intermediates, and the one {@code plan(...)} call at the end is the only
+     * construction site. The rows assign only the workspace geometry — the keypad's internal
+     * extents are the same forms, evaluated by the keypad over its measured rectangle.
+     * Whether the panel is open is data within a row — the boundary extents select their
+     * open or closed form — never a separate construction.
      *
      * <p>The payer cascade picks the row: beside the stack, the stack pays for the column if
      * ceding it leaves the stack its minimum width (R1), else the keypad pays with its height
@@ -254,12 +222,10 @@ public final class KeypadLayout {
         boolean besideStack;
         FunctionPlacement placement;
         int stackWidth, stackHeight, expandedStackWidth, keypadWidth, keypadHeight;
-        int primaryWidth, controlHeight, functionWidth, functionHeight;
         if (width > height) {
             besideStack = true;
             // Beside family: the keypad is natural at the full height.
             double unit = height / (primaryRows + .5);
-            controlHeight = (int) Math.round(unit / 2);
             int naturalWidth = (int) Math.round(columns * unit);
             int columnWidth = (int) Math.round(FN_UNITS * unit);
             // R1's fit test: the ceded column crosses two gaps (workspace, then
@@ -273,9 +239,6 @@ public final class KeypadLayout {
                 expandedStackWidth = openStackWidth;
                 keypadWidth = expanded ? columnWidth + gap + naturalWidth : naturalWidth;
                 keypadHeight = height;
-                primaryWidth = naturalWidth;
-                functionWidth = expanded ? columnWidth : 0;
-                functionHeight = expanded ? height - controlHeight : 0;
             } else {
                 regime = Regime.R2;
                 placement = FunctionPlacement.SQUEEZE;
@@ -284,9 +247,6 @@ public final class KeypadLayout {
                 expandedStackWidth = stackWidth;
                 keypadWidth = width - stackWidth - gap;
                 keypadHeight = height;
-                primaryWidth = keypadWidth;
-                functionWidth = expanded ? keypadWidth : 0;
-                functionHeight = expanded ? squeezedBody(height - controlHeight, primaryRows) : 0;
             }
         } else {
             besideStack = false;
@@ -298,18 +258,14 @@ public final class KeypadLayout {
             int fixedStackHeight = height * STACKED_STACK_PERCENT / 100;
             int blockHeight = Math.max(1, height - fixedStackHeight - gap);
             double unit = blockHeight / (primaryRows + .5);
-            controlHeight = (int) Math.round(unit / 2);
             if ((columns + FN_UNITS) * unit + gap <= width) {
                 // R3: the band fits the column beside natural digits; leftover width widens
-                // them.
-                int columnWidth = (int) Math.round(FN_UNITS * unit);
+                // them. The keypad's height is the block height, so it recovers the unit
+                // from its own height when it derives the column.
                 regime = Regime.R3;
                 placement = FunctionPlacement.LEFT;
                 stackHeight = fixedStackHeight;
                 keypadHeight = blockHeight;
-                primaryWidth = expanded ? width - columnWidth - gap : width;
-                functionWidth = expanded ? columnWidth : 0;
-                functionHeight = expanded ? blockHeight - controlHeight : 0;
             } else {
                 // R5's intermediates are width-derived: the keypad natural at the full width.
                 double widthUnit = (double) width / columns;
@@ -318,21 +274,13 @@ public final class KeypadLayout {
                 if (height - 2 * gap - bandHeight - naturalHeight >= minStackHeight) {
                     regime = Regime.R5;
                     placement = FunctionPlacement.ABOVE;
-                    controlHeight = (int) Math.round(widthUnit / 2);
                     keypadHeight = expanded ? bandHeight + gap + naturalHeight : naturalHeight;
                     stackHeight = height - gap - keypadHeight;
-                    primaryWidth = width;
-                    functionWidth = expanded ? width : 0;
-                    functionHeight = expanded ? bandHeight : 0;
                 } else {
                     regime = Regime.R4;
                     placement = FunctionPlacement.SQUEEZE;
                     stackHeight = fixedStackHeight;
                     keypadHeight = blockHeight;
-                    primaryWidth = width;
-                    functionWidth = expanded ? width : 0;
-                    functionHeight =
-                            expanded ? squeezedBody(blockHeight - controlHeight, primaryRows) : 0;
                 }
             }
         }
@@ -346,18 +294,6 @@ public final class KeypadLayout {
                 expandedStackWidth,
                 keypadWidth,
                 keypadHeight,
-                primaryWidth,
-                controlHeight,
-                functionWidth,
-                functionHeight,
                 gap);
-    }
-
-    /**
-     * The squeezed function band's height within a keypad body of the given height: FN_UNITS
-     * of every FN_UNITS + primaryRows units — 2/7 at five primary rows.
-     */
-    private static int squeezedBody(int bodyHeight, int primaryRows) {
-        return bodyHeight * FN_UNITS / (FN_UNITS + primaryRows);
     }
 }

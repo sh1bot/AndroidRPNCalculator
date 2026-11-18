@@ -35,16 +35,24 @@ final class KeypadLayoutTest {
     // ---------- The table's coefficients, derived from the design constants ----------
 
     @Test
-    void controlHeightIsHalfTheKeyUnit() {
-        // Beside: the unit is the height over 5.5 rows (5 primary + the half control row).
+    void keypadExtentsFollowTheKeyUnit() {
+        // Beside: the unit is the height over 5.5 rows (5 primary + the half control row),
+        // and a closed keypad is exactly the digits' natural width at that unit.
         double besideUnit = 360 / (ROWS + .5);
-        assertEquals((int) Math.round(besideUnit / 2), choose(740, 360, true).controlHeight);
-        // Stacked: the unit comes from the band under the fixed boundary.
+        KeypadLayout besideClosed = choose(740, 360, false);
+        assertEquals(360, besideClosed.keypadHeight);
+        assertEquals((int) Math.round(COLUMNS * besideUnit), besideClosed.keypadWidth);
+        // Stacked: the keypad takes the whole band under the fixed boundary.
         int blockHeight = Math.max(1, 800 - 800 * 36 / 100 - GAP);
-        double stackedUnit = blockHeight / (ROWS + .5);
-        assertEquals((int) Math.round(stackedUnit / 2), choose(600, 800, true).controlHeight);
-        // R5: the unit is width-derived, so the control height is half the width unit.
-        assertEquals((int) Math.round(360.0 / COLUMNS / 2), choose(360, 920, true).controlHeight);
+        assertEquals(blockHeight, choose(600, 800, true).keypadHeight);
+        // R5: the unit is width-derived; the closed keypad is the natural height at that
+        // unit, and opening it adds the FN_UNITS band plus the gap.
+        double widthUnit = 360.0 / COLUMNS;
+        assertEquals(
+                (int) Math.round((ROWS + .5) * widthUnit), choose(360, 920, false).keypadHeight);
+        assertEquals(
+                (int) Math.round(FN_UNITS * widthUnit) + GAP,
+                choose(360, 920, true).keypadHeight - choose(360, 920, false).keypadHeight);
     }
 
     @Test
@@ -64,24 +72,35 @@ final class KeypadLayoutTest {
 
     @Test
     void columnAndDigitsSpanTheirUnits() {
+        // In R1 the keypad's width decomposes into the digits and, when open, the column
+        // plus its gap — each spanning its units of the beside unit.
         double unit = 360 / (ROWS + .5);
-        KeypadLayout r1 = choose(740, 360, true);
-        assertEquals((int) Math.round(COLUMNS * unit), r1.primaryWidth);
-        assertEquals((int) Math.round(FN_UNITS * unit), r1.functionWidth);
+        KeypadLayout closed = choose(740, 360, false);
+        KeypadLayout open = choose(740, 360, true);
+        assertEquals((int) Math.round(COLUMNS * unit), closed.keypadWidth);
+        assertEquals(
+                (int) Math.round(FN_UNITS * unit), open.keypadWidth - closed.keypadWidth - GAP);
     }
 
     @Test
-    void squeezedBandTakesItsShareOfTheBody() {
-        // FN_UNITS of every FN_UNITS + ROWS units of the body below the control row: 2/7.
-        KeypadLayout r2 = choose(716, 360, true);
-        int besideControl = (int) Math.round(360 / (ROWS + .5) / 2);
-        assertEquals((360 - besideControl) * FN_UNITS / (FN_UNITS + ROWS), r2.functionHeight);
-        KeypadLayout r4 = choose(360, 840, true);
-        int blockHeight = Math.max(1, 840 - 840 * 36 / 100 - GAP);
-        int stackedControl = (int) Math.round(blockHeight / (ROWS + .5) / 2);
-        assertEquals(
-                (blockHeight - stackedControl) * FN_UNITS / (FN_UNITS + ROWS),
-                r4.functionHeight);
+    void squeezeRegimesIgnoreThePanelState() {
+        // In R2 and R4 the band squeezes inside the keypad, so the plan the workspace
+        // applies is exactly the same open and closed; only the keypad's internal
+        // subdivision follows the panel state.
+        for (int[] size : new int[][] {{716, 360}, {360, 840}}) {
+            KeypadLayout open = choose(size[0], size[1], true);
+            KeypadLayout closed = choose(size[0], size[1], false);
+            assertTrue(
+                    open.regime == Regime.R2 || open.regime == Regime.R4,
+                    size[0] + "x" + size[1]);
+            assertEquals(open.regime, closed.regime);
+            assertEquals(open.stackWidth, closed.stackWidth);
+            assertEquals(open.stackHeight, closed.stackHeight);
+            assertEquals(open.keypadWidth, closed.keypadWidth);
+            assertEquals(open.keypadHeight, closed.keypadHeight);
+            assertEquals(open.stackX, closed.stackX);
+            assertEquals(open.keypadX, closed.keypadX);
+        }
     }
 
     @Test
@@ -151,7 +170,6 @@ final class KeypadLayoutTest {
                     KeypadLayout plan = choose(width, height, expanded);
                     assertTrue(plan.stackWidth > 0 && plan.stackHeight > 0);
                     assertTrue(plan.keypadWidth > 0 && plan.keypadHeight > 0);
-                    assertTrue(plan.primaryWidth > 0 && plan.controlHeight > 0);
                     if (plan.besideStack)
                         assertEquals(width, plan.stackWidth + GAP + plan.keypadWidth);
                     else assertEquals(height, plan.stackHeight + GAP + plan.keypadHeight);
@@ -167,27 +185,28 @@ final class KeypadLayoutTest {
                     switch (plan.regime) {
                         case R1 -> {
                             // The stack's minimum survives the cession, and the digits are
-                            // exactly their natural width — width is never squeezed.
+                            // exactly their natural width — width is never squeezed: the
+                            // closed keypad is the digits alone at the beside unit.
                             assertTrue(plan.expandedStackWidth >= MIN_WIDTH);
                             if (expanded) assertTrue(plan.stackWidth >= MIN_WIDTH);
                             double unit = height / (ROWS + .5);
-                            assertEquals((int) Math.round(COLUMNS * unit), plan.primaryWidth);
+                            assertEquals(
+                                    (int) Math.round(COLUMNS * unit),
+                                    choose(width, height, false).keypadWidth);
                         }
                         case R3 -> {
-                            // The digits keep at least their natural width at the band's
-                            // unit; opening the column spends width, never squeezes them
-                            // below it.
+                            // The boundary is the fixed share, and the keypad takes the
+                            // whole band under it.
                             int blockHeight =
                                     Math.max(1, height - height * 36 / 100 - GAP);
-                            double unit = blockHeight / (ROWS + .5);
-                            assertTrue(
-                                    plan.primaryWidth >= (int) Math.round(COLUMNS * unit),
-                                    width + "x" + height);
+                            assertEquals(height * 36 / 100, plan.stackHeight);
+                            assertEquals(blockHeight, plan.keypadHeight);
                         }
                         case R5 -> {
-                            // The stack keeps its minimum height even with the band open.
+                            // The stack keeps its minimum height even with the band open,
+                            // and the keypad spans the full width.
                             assertTrue(plan.stackHeight >= MIN_HEIGHT);
-                            assertEquals(width, plan.primaryWidth);
+                            assertEquals(width, plan.keypadWidth);
                         }
                         default -> {}
                     }
@@ -200,49 +219,41 @@ final class KeypadLayoutTest {
             for (int height = 200; height <= 1000; height += 19) {
                 KeypadLayout open = choose(width, height, true);
                 KeypadLayout closed = choose(width, height, false);
-                // The regime is chosen as if expanded, so it never flips; a closed panel
-                // has no function extent, and the header's basis width is toggle-stable.
+                // The regime is chosen as if expanded, so it never flips, and the
+                // header's basis width is toggle-stable.
                 assertEquals(open.regime, closed.regime, width + "x" + height);
-                assertEquals(0, closed.functionWidth);
-                assertEquals(0, closed.functionHeight);
                 assertEquals(open.expandedStackWidth, closed.expandedStackWidth);
                 switch (open.regime) {
                     case R1 -> {
                         // The boundary moves: the column and its gap come out of the stack
-                        // and into the keypad; everything else is invariant.
-                        assertEquals(open.primaryWidth, closed.primaryWidth);
-                        assertEquals(open.controlHeight, closed.controlHeight);
+                        // and into the keypad; the cession is conserved and everything
+                        // else is invariant.
                         assertEquals(open.keypadHeight, closed.keypadHeight);
                         assertEquals(
-                                closed.stackWidth,
-                                open.stackWidth + open.functionWidth + GAP);
-                        assertEquals(
-                                open.keypadWidth,
-                                closed.keypadWidth + open.functionWidth + GAP);
+                                closed.stackWidth - open.stackWidth,
+                                open.keypadWidth - closed.keypadWidth);
+                        assertTrue(open.keypadWidth > closed.keypadWidth);
                     }
                     case R2, R4 -> {
-                        // The squeeze is internal: only the function extent changes.
+                        // The squeeze is internal to the keypad: the plan is unchanged.
                         assertEquals(open.stackWidth, closed.stackWidth);
                         assertEquals(open.stackHeight, closed.stackHeight);
                         assertEquals(open.keypadWidth, closed.keypadWidth);
                         assertEquals(open.keypadHeight, closed.keypadHeight);
-                        assertEquals(open.primaryWidth, closed.primaryWidth);
-                        assertEquals(open.controlHeight, closed.controlHeight);
                     }
                     case R3 -> {
-                        // The boundary is fixed; the column spends keypad width only.
+                        // The boundary is fixed; the column spends keypad width only, so
+                        // every extent the plan carries is invariant.
+                        assertEquals(open.stackWidth, closed.stackWidth);
                         assertEquals(open.stackHeight, closed.stackHeight);
+                        assertEquals(open.keypadWidth, closed.keypadWidth);
                         assertEquals(open.keypadHeight, closed.keypadHeight);
-                        assertEquals(open.controlHeight, closed.controlHeight);
-                        assertEquals(width, open.primaryWidth + open.functionWidth + GAP);
-                        assertEquals(width, closed.primaryWidth);
                     }
                     case R5 -> {
                         // The boundary moves vertically: stack and keypad trade height
-                        // across the one gap; widths and the control row are invariant.
+                        // across the one gap; the widths are invariant.
                         assertEquals(open.keypadWidth, closed.keypadWidth);
-                        assertEquals(open.primaryWidth, closed.primaryWidth);
-                        assertEquals(open.controlHeight, closed.controlHeight);
+                        assertEquals(open.stackWidth, closed.stackWidth);
                         assertEquals(
                                 open.stackHeight + open.keypadHeight,
                                 closed.stackHeight + closed.keypadHeight);
@@ -269,17 +280,9 @@ final class KeypadLayoutTest {
                 assertEquals(plan.expandedStackWidth, mirror.expandedStackWidth);
                 assertEquals(plan.keypadWidth, mirror.keypadWidth);
                 assertEquals(plan.keypadHeight, mirror.keypadHeight);
-                assertEquals(plan.primaryWidth, mirror.primaryWidth);
-                assertEquals(plan.controlHeight, mirror.controlHeight);
-                assertEquals(plan.functionWidth, mirror.functionWidth);
-                assertEquals(plan.functionHeight, mirror.functionHeight);
                 assertEquals(plan.gap, mirror.gap);
                 assertEquals(width - plan.stackX - plan.stackWidth, mirror.stackX);
                 assertEquals(width - plan.keypadX - plan.keypadWidth, mirror.keypadX);
-                assertEquals(
-                        plan.keypadWidth - plan.primaryX - plan.primaryWidth, mirror.primaryX);
-                assertEquals(
-                        plan.keypadWidth - plan.functionX - plan.functionWidth, mirror.functionX);
                 if (plan.functionPlacement == FunctionPlacement.LEFT)
                     assertEquals(FunctionPlacement.RIGHT, mirror.functionPlacement);
                 else assertEquals(plan.functionPlacement, mirror.functionPlacement);
@@ -317,13 +320,9 @@ final class KeypadLayoutTest {
         KeypadLayout r1 = choose(740, 360, true);
         assertEquals(0, r1.stackX);
         assertEquals(335, r1.keypadX); // 740 - 405 of keypad
-        assertEquals(0, r1.functionX);
-        assertEquals(143, r1.primaryX); // 131 column + 12 gap
         KeypadLayout mirrored = chooseMirrored(740, 360, true);
         assertEquals(FunctionPlacement.RIGHT, mirrored.functionPlacement);
         assertEquals(0, mirrored.keypadX);
         assertEquals(417, mirrored.stackX); // 740 - 323 of stack
-        assertEquals(0, mirrored.primaryX);
-        assertEquals(274, mirrored.functionX); // 405 of keypad - 131 of column
     }
 }
