@@ -9,17 +9,21 @@ final class ResultTestSupport {
         List<String> rows = new ArrayList<>();
         for (int i = 0; i < result.values.size(); i++)
             rows.add(
-                    ValueFormatter.format(
-                            result.values.get(i),
-                            i == result.values.size() - 1,
-                            ValueFormatter.Notation.SCIENTIFIC));
+                    ValueFormatter.presentation(
+                                    result.values.get(i),
+                                    i == result.values.size() - 1,
+                                    ValueFormatter.Notation.SCIENTIFIC,
+                                    FractionMode.DECIMAL)
+                            .canonical);
         return rows;
     }
 
     static String copy(DisplayResult result) {
         java.util.StringJoiner text = new java.util.StringJoiner("\n");
         for (NumericValue value : result.values)
-            text.add(ValueFormatter.clipboard(value, ValueFormatter.Notation.SCIENTIFIC));
+            text.add(
+                    ValueFormatter.clipboard(
+                            value, ValueFormatter.Notation.SCIENTIFIC, FractionMode.DECIMAL));
         return text.toString();
     }
 }

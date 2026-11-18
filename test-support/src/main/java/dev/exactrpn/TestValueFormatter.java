@@ -6,8 +6,7 @@ import com.android.calculator2.UnifiedReal;
 /** Evaluates fixtures before exercising the caller-side formatter. */
 final class TestValueFormatter {
     static String format(UnifiedReal value, boolean newest, ValueFormatter.Notation notation) {
-        return ValueFormatter.format(
-                NumericEvaluator.read(value, NumericRequest.DEFAULT), newest, notation);
+        return format(value, newest, notation, FractionMode.DECIMAL);
     }
 
     static String format(
@@ -15,8 +14,12 @@ final class TestValueFormatter {
             boolean newest,
             ValueFormatter.Notation notation,
             FractionMode mode) {
-        return ValueFormatter.format(
-                NumericEvaluator.read(value, NumericRequest.DEFAULT), newest, notation, mode);
+        return ValueFormatter.presentation(
+                        NumericEvaluator.read(value, NumericRequest.DEFAULT),
+                        newest,
+                        notation,
+                        mode)
+                .canonical;
     }
 
     static boolean approximate(
