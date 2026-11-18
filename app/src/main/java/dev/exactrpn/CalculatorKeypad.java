@@ -42,17 +42,9 @@ public final class CalculatorKeypad extends ViewGroup {
     private InteractionMode mode = InteractionMode.STACK;
     private boolean expanded, inverse;
     private final BiConsumer<Boolean, Boolean> savePanel;
-    /**
-     * The function panel's short edge in key units: the function keys are two thirds of a
-     * normal key on their short edge, so the panel spans 2 units — a column is 2 units wide,
-     * and a squeezed band takes 2 of every 2 + primaryRows units of the keypad body.
-     */
-    private static final int FUNCTION_UNITS = 2;
-
     private KeypadLayout plan;
     private KeypadLayout.FunctionPlacement placement = KeypadLayout.FunctionPlacement.SQUEEZE;
-    // The keypad's internal geometry, derived in onMeasure from its measured extent, the
-    // plan's placement and the panel state; onLayout positions from these values.
+    // Horizontal positions derived during measurement; the plan supplies all extents.
     private int functionHeight, digitsX, functionX;
     private final Consumer<Command> command;
     private Runnable beforeInput = () -> {};
@@ -691,8 +683,7 @@ public final class CalculatorKeypad extends ViewGroup {
     }
 
     /**
-     * Takes the layout plan from the workspace. The plan carries the workspace geometry and
-     * the placement; the keypad derives its internal geometry from them in {@link #onMeasure}.
+     * Takes the workspace and internal keypad geometry from the layout policy.
      */
     void setGeometry(KeypadLayout plan) {
         this.plan = plan;
@@ -789,47 +780,11 @@ public final class CalculatorKeypad extends ViewGroup {
     @Override
     protected void onMeasure(int widthSpec, int heightSpec) {
         int width = MeasureSpec.getSize(widthSpec), height = MeasureSpec.getSize(heightSpec);
-        // The plan, which the workspace always supplies before measuring, carries the
-        // workspace geometry and the placement; the internal subdivision is derived here
-        // from the measured extent, the placement and the panel state, using the policy's
-        // own intermediates: the key unit is the height over primaryRows + ½ everywhere
-        // except ABOVE, whose unit is width-derived.
         int planGap = plan.gap;
-        int rows = primaryRowCount(), columns = primaryColumns();
-        int digitsWidth, controlHeight, functionWidth;
-        if (placement == KeypadLayout.FunctionPlacement.LEFT
-                || placement == KeypadLayout.FunctionPlacement.RIGHT) {
-            // A column beside the digits: beside the stack the keypad spans the full
-            // height and the digits keep their natural width; above the keypad the band
-            // is the keypad's whole height and opening the column spends keypad width.
-            double unit = height / (rows + .5);
-            controlHeight = (int) Math.round(unit / 2);
-            int columnWidth = (int) Math.round(FUNCTION_UNITS * unit);
-            functionWidth = expanded ? columnWidth : 0;
-            functionHeight = expanded ? height - controlHeight : 0;
-            digitsWidth =
-                    plan.besideStack
-                            ? (int) Math.round(columns * unit)
-                            : expanded ? width - columnWidth - planGap : width;
-        } else if (placement == KeypadLayout.FunctionPlacement.SQUEEZE) {
-            // A band inside the body: it takes FUNCTION_UNITS of every FUNCTION_UNITS +
-            // primaryRows units of the body below the control row.
-            double unit = height / (rows + .5);
-            controlHeight = (int) Math.round(unit / 2);
-            functionWidth = expanded ? width : 0;
-            functionHeight =
-                    expanded
-                            ? (height - controlHeight) * FUNCTION_UNITS / (FUNCTION_UNITS + rows)
-                            : 0;
-            digitsWidth = width;
-        } else {
-            // ABOVE: the band is ceded by the stack at the width-derived unit.
-            double widthUnit = (double) width / columns;
-            controlHeight = (int) Math.round(widthUnit / 2);
-            functionWidth = expanded ? width : 0;
-            functionHeight = expanded ? (int) Math.round(FUNCTION_UNITS * widthUnit) : 0;
-            digitsWidth = width;
-        }
+        int digitsWidth = plan.digitsWidth;
+        int controlHeight = plan.controlHeight;
+        int functionWidth = plan.functionWidth;
+        functionHeight = plan.functionHeight;
         // Positions for onLayout: the digits hug the right of the view and a function
         // column hugs the left, with mirroring swapping the two sides; a band shares the
         // digits' left edge. Mirroring applies only beside the stack.
