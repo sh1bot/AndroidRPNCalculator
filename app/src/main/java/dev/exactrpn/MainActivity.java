@@ -592,7 +592,7 @@ public class MainActivity extends Activity {
     protected void onDestroy() {
         if (Build.VERSION.SDK_INT >= 33 && backCallback != null)
             getOnBackInvokedDispatcher().unregisterOnBackInvokedCallback(backCallback);
-        if (isFinishing()) {
+        if (!isChangingConfigurations()) {
             session.close();
         }
         super.onDestroy();
@@ -647,10 +647,9 @@ public class MainActivity extends Activity {
                                 getPreferences(0).getBoolean("engineering", false)
                                         ? ValueFormatter.Notation.ENGINEERING
                                         : ValueFormatter.Notation.SCIENTIFIC,
-                                RpnCalculator.AngleUnit.valueOf(
-                                        getPreferences(0).getString("angleUnit", "RAD")),
-                                NumberMode.values()[getPreferences(0).getInt("numberMode", 0)],
-                                FractionMode.values()[getPreferences(0).getInt("fractionMode", 0)],
+                                savedAngleUnit(),
+                                savedNumberMode(),
+                                savedFractionMode(),
                                 savedRadix(),
                                 false);
                 session.tauConstant = getPreferences(0).getBoolean("tauConstant", false);
@@ -660,6 +659,27 @@ public class MainActivity extends Activity {
         session.attach(this);
         numbers = numberFormat(session.display.numberMode, session.display.radixMode);
         return restoreSession;
+    }
+
+    private RpnCalculator.AngleUnit savedAngleUnit() {
+        String name = getPreferences(0).getString("angleUnit", "RAD");
+        for (RpnCalculator.AngleUnit unit : RpnCalculator.AngleUnit.values())
+            if (unit.name().equals(name)) return unit;
+        return RpnCalculator.AngleUnit.RAD;
+    }
+
+    private NumberMode savedNumberMode() {
+        int ordinal = getPreferences(0).getInt("numberMode", 0);
+        return ordinal >= 0 && ordinal < NumberMode.values().length
+                ? NumberMode.values()[ordinal]
+                : NumberMode.LOCALE;
+    }
+
+    private FractionMode savedFractionMode() {
+        int ordinal = getPreferences(0).getInt("fractionMode", 0);
+        return ordinal >= 0 && ordinal < FractionMode.values().length
+                ? FractionMode.values()[ordinal]
+                : FractionMode.DECIMAL;
     }
 
     private RadixMode savedRadix() {

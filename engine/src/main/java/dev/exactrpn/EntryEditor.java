@@ -234,19 +234,46 @@ public final class EntryEditor {
         if (!raw) return;
         NumberText.Analysis a = NumberText.analyze(entry, rawProfile);
         if (a.valid() && !a.ambiguous()) {
-            entry = a.canonical();
+            String resolved = a.canonical();
+            int start = translateOffset(entry, selectionStart, rawProfile),
+                    end = translateOffset(entry, selectionEnd, rawProfile);
+            entry = resolved;
             raw = false;
-            select(selectionStart, selectionEnd);
+            select(start, end);
         }
     }
 
     private void resolveExplicitDecimal() {
         try {
-            entry = NumberText.selected(entry, inputProfile);
+            String resolved = NumberText.selected(entry, inputProfile);
+            int start = translateOffset(entry, selectionStart, inputProfile),
+                    end = translateOffset(entry, selectionEnd, inputProfile);
+            entry = resolved;
             raw = false;
-            select(selectionStart, selectionEnd);
+            select(start, end);
         } catch (IllegalArgumentException ignored) {
         }
+    }
+
+    /**
+     * Map a selection offset across canonicalisation. Canonical form only strips characters
+     * (grouping separators, whitespace, bidi controls) or rewrites them one-for-one, so the
+     * translated offset sits after the same number of surviving characters as the old offset.
+     */
+    private static int translateOffset(String text, int offset, NumberText.Profile profile) {
+        int survivors = 0;
+        for (int i = 0; i < offset && i < text.length(); i++)
+            if (!strippedByCanonical(text.charAt(i), profile)) survivors++;
+        return survivors;
+    }
+
+    private static boolean strippedByCanonical(char c, NumberText.Profile profile) {
+        if (c == '\u200e' || c == '\u200f' || c == '\u061c' || c >= '\u2066' && c <= '\u2069')
+            return true;
+        if (Character.isWhitespace(c) || Character.isSpaceChar(c)) return true;
+        if (profile.grouping != 0 && profile.grouping != profile.decimal && c == profile.grouping)
+            return true;
+        return profile.grouping == '\u2019' && c == '\'';
     }
 
     private void replaceSelection(String text) {

@@ -6,6 +6,7 @@ public interface CalculationError {
     enum Code {
         NEED_VALUES,
         ENTRY_TOO_LONG,
+        TOO_MANY_VALUES,
         ROW_MISSING,
         NUMBER_TOO_LARGE,
         FACTORIAL_INTEGER,

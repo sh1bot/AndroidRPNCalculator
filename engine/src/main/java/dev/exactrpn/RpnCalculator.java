@@ -23,6 +23,7 @@ import java.util.TreeSet;
 /** Exact stack arithmetic accepting completed entry drafts. */
 public final class RpnCalculator {
     public static final int MAX_PASTE_LENGTH = 65536;
+    public static final int MAX_PASTE_VALUES = 1000;
     private List<UnifiedReal> stack = new ArrayList<>();
     private EntryEditor editor = new EntryEditor();
 

@@ -49,6 +49,9 @@ public final class ClipboardNumbers {
             } catch (IllegalArgumentException | ArithmeticException ex) {
                 throw CalculationError.invalid(CalculationError.Code.INVALID_PASTE_LINE, i + 1);
             }
+            if (values.size() > RpnCalculator.MAX_PASTE_VALUES)
+                throw CalculationError.invalid(
+                        CalculationError.Code.TOO_MANY_VALUES, RpnCalculator.MAX_PASTE_VALUES);
         }
         if (values.size() < 2) throw new IllegalArgumentException("Expected multiple values");
         return values.toArray(new RationalValue[0]);

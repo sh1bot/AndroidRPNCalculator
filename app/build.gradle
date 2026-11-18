@@ -204,7 +204,19 @@ tasks.named('preBuild').configure { dependsOn generateLicenseAssets }
 // AGP already runs aapt2 optimize before packaging release resources. Its
 // public DSL does not expose resource-name collapsing, so add that final
 // optimization to the same pre-signing stage instead of rewriting a signed APK.
-tasks.matching { it.name == 'optimizeReleaseResources' }.configureEach {
+// The task is created by AGP after this script runs, so resolve it lazily — but
+// fail the build once configuration finishes if it never appeared, rather than
+// silently shipping an APK whose resource names were not collapsed.
+def optimizeReleaseResources = tasks.matching { it.name == 'optimizeReleaseResources' }
+gradle.projectsEvaluated {
+    if (optimizeReleaseResources.isEmpty()) {
+        throw new GradleException(
+                "AGP task 'optimizeReleaseResources' not found, so release resource names"
+                        + " would not be collapsed. Update the resource optimization in"
+                        + " app/build.gradle for this AGP version.")
+    }
+}
+optimizeReleaseResources.configureEach {
     outputs.upToDateWhen { false }
     doLast {
         def aapt2 = androidComponents.sdkComponents.sdkDirectory.get().file(
