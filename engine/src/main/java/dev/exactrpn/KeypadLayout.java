@@ -30,6 +30,15 @@ package dev.exactrpn;
  * follows the actual expanded flag.
  */
 public final class KeypadLayout {
+    /** The five layout regimes, wide to tall. */
+    public enum Regime {
+        R1,
+        R2,
+        R3,
+        R4,
+        R5
+    }
+
     /** Where the function panel sits relative to the primary keys. */
     public enum FunctionPlacement {
         /** A column on the left of the digits, below control-row level (R1, R3). */
@@ -57,6 +66,7 @@ public final class KeypadLayout {
     /** The stacked family's fixed boundary: the stack's share of the height in R3 and R4. */
     private static final int STACKED_STACK_PERCENT = 36;
 
+    public final Regime regime;
     public final boolean besideStack;
     public final FunctionPlacement functionPlacement;
     public final int stackWidth, stackHeight;
@@ -77,6 +87,7 @@ public final class KeypadLayout {
     public final int gap;
 
     private KeypadLayout(
+            Regime regime,
             boolean besideStack,
             FunctionPlacement functionPlacement,
             int stackWidth,
@@ -87,6 +98,7 @@ public final class KeypadLayout {
             int gap,
             int stackX,
             int keypadX) {
+        this.regime = regime;
         this.besideStack = besideStack;
         this.functionPlacement = functionPlacement;
         this.stackWidth = stackWidth;
@@ -105,6 +117,7 @@ public final class KeypadLayout {
      * stacked, spanning the width).
      */
     private static KeypadLayout plan(
+            Regime regime,
             boolean besideStack,
             FunctionPlacement functionPlacement,
             int width,
@@ -115,6 +128,7 @@ public final class KeypadLayout {
             int keypadHeight,
             int gap) {
         return new KeypadLayout(
+                regime,
                 besideStack,
                 functionPlacement,
                 stackWidth,
@@ -130,6 +144,7 @@ public final class KeypadLayout {
     /** The exact horizontal mirror of this plan: same sizes and vertical geometry, mirrored x. */
     private KeypadLayout mirror(int width) {
         return new KeypadLayout(
+                regime,
                 besideStack,
                 functionPlacement == FunctionPlacement.LEFT
                         ? FunctionPlacement.RIGHT
@@ -203,6 +218,7 @@ public final class KeypadLayout {
             int minStackHeight,
             int columns,
             int primaryRows) {
+        Regime regime;
         boolean besideStack;
         FunctionPlacement placement;
         int stackWidth, stackHeight, expandedStackWidth, keypadWidth, keypadHeight;
@@ -216,6 +232,7 @@ public final class KeypadLayout {
             // column-to-digits), and what remains must keep the stack's minimum width.
             int openStackWidth = width - gap - (columnWidth + gap + naturalWidth);
             if (openStackWidth >= minStackWidth) {
+                regime = Regime.R1;
                 placement = FunctionPlacement.LEFT;
                 stackWidth = expanded ? openStackWidth : width - gap - naturalWidth;
                 stackHeight = height;
@@ -223,6 +240,7 @@ public final class KeypadLayout {
                 keypadWidth = expanded ? columnWidth + gap + naturalWidth : naturalWidth;
                 keypadHeight = height;
             } else {
+                regime = Regime.R2;
                 placement = FunctionPlacement.SQUEEZE;
                 stackWidth = width * BESIDE_STACK_PERCENT / 100;
                 stackHeight = height;
@@ -244,6 +262,7 @@ public final class KeypadLayout {
                 // R3: the band fits the column beside natural digits; leftover width widens
                 // them. The keypad's height is the block height, so it recovers the unit
                 // from its own height when it derives the column.
+                regime = Regime.R3;
                 placement = FunctionPlacement.LEFT;
                 stackHeight = fixedStackHeight;
                 keypadHeight = blockHeight;
@@ -253,10 +272,12 @@ public final class KeypadLayout {
                 int bandHeight = (int) Math.round(FN_UNITS * widthUnit);
                 int naturalHeight = (int) Math.round((primaryRows + .5) * widthUnit);
                 if (height - 2 * gap - bandHeight - naturalHeight >= minStackHeight) {
+                    regime = Regime.R5;
                     placement = FunctionPlacement.ABOVE;
                     keypadHeight = expanded ? bandHeight + gap + naturalHeight : naturalHeight;
                     stackHeight = height - gap - keypadHeight;
                 } else {
+                    regime = Regime.R4;
                     placement = FunctionPlacement.SQUEEZE;
                     stackHeight = fixedStackHeight;
                     keypadHeight = blockHeight;
@@ -264,6 +285,7 @@ public final class KeypadLayout {
             }
         }
         return plan(
+                regime,
                 besideStack,
                 placement,
                 width,
