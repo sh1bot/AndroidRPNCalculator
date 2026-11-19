@@ -18,7 +18,7 @@ How to use the calculator is documented in [HELP.md](HELP.md).
 
 ## Build
 
-Requires JDK 17, Android SDK 36, and Gradle 8.11.1. Set `ANDROID_HOME` to your SDK,
+Requires JDK 17, Android SDK 36, and Gradle 9.3.1. Set `ANDROID_HOME` to your SDK,
 then run:
 
 ```sh
