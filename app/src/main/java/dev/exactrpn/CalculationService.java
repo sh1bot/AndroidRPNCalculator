@@ -86,12 +86,18 @@ public class CalculationService extends Service {
                                     value, v -> NumericEvaluator.read(v, request.numbers)));
                 display = DisplayResult.encode(result, null);
             } else {
-                ExactFunctions.setProbablePrimeListener(
-                        value -> sendNote(client, requestId, generation));
+                java.util.Set<CalculationError.Code> sent =
+                        java.util.EnumSet.noneOf(CalculationError.Code.class);
+                ExactFunctions.setFactorisationNoticeListener(
+                        code -> {
+                            // Each verdict is worth announcing once per evaluation,
+                            // however many cofactors reach the prover.
+                            if (sent.add(code)) sendNote(client, requestId, generation, code);
+                        });
                 try {
                     display = arithmeticResult(request);
                 } finally {
-                    ExactFunctions.setProbablePrimeListener(null);
+                    ExactFunctions.setFactorisationNoticeListener(null);
                 }
             }
             checkAccess();
@@ -125,9 +131,10 @@ public class CalculationService extends Service {
 
     // Interim notice for the request still being evaluated; the client matches it
     // against its pending request, so a late notice can never surface.
-    private void sendNote(Messenger client, int requestId, int generation) {
+    private void sendNote(
+            Messenger client, int requestId, int generation, CalculationError.Code code) {
         Bundle data = new Bundle();
-        data.putString("errorCode", CalculationError.Code.PROBABLY_PRIME.name());
+        data.putString("errorCode", code.name());
         Message note = Message.obtain(null, NOTE);
         note.arg1 = requestId;
         note.arg2 = generation;
