@@ -275,10 +275,12 @@ final class RemoteCalculator {
     }
 
     synchronized void cancel() {
-        if (pending != null) pending.cancel(false);
+        // An idle reset only needs to discard the binding and cached checkpoint.
+        boolean evaluating = pending != null;
+        if (evaluating) pending.cancel(false);
         pending = null;
         pendingRequest = null;
-        disconnect(true);
+        disconnect(evaluating);
     }
 
     synchronized void close() {
