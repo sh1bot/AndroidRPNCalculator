@@ -60,11 +60,19 @@ dependencies {
 // the app ships just the minified HTML and renders it with Android's built-in
 // Html.fromHtml, so nothing is added to the APK but the document itself.
 def licenseAssets = layout.buildDirectory.dir('generated/licenseAssets')
+def stableRelease = providers.environmentVariable('RELEASE_VERSION').map { !it.isEmpty() }.orElse(false)
+def privacySourceRef = providers.environmentVariable('GITHUB_SHA').orElse(providers.exec {
+    workingDir rootProject.projectDir
+    commandLine 'sh', '-c', 'git rev-parse HEAD 2>/dev/null'
+    ignoreExitValue = true
+}.standardOutput.asText.map { it.trim() }.orElse('')).map { it ==~ /[a-f0-9]{40}/ ? it : 'main' }
 def generateLicenseAssets = tasks.register('generateLicenseAssets') {
     inputs.files(rootProject.file('README.md'), rootProject.file('HELP.md'), rootProject.file('PRIVACY.md'), rootProject.file('NOTICE'), rootProject.file('licenses/APACHE-2.0.txt'), rootProject.file('licenses/CR-COPYRIGHT.txt'))
     inputs.property('privacyContactEmailHash', providers.environmentVariable('PRIVACY_CONTACT_EMAIL').map {
         java.security.MessageDigest.getInstance('SHA-256').digest(it.getBytes('UTF-8')).encodeHex().toString()
     }.orElse(''))
+    inputs.property('stableRelease', stableRelease)
+    inputs.property('privacySourceRef', privacySourceRef)
     outputs.dir(licenseAssets)
     doLast {
         def parser = org.commonmark.parser.Parser.builder().build()
@@ -91,7 +99,7 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
         assert sections.containsKey('Sources and license'): 'README.md has no Sources and license section'
         // The APK download link is meaningless inside the app; the source
         // link takes its place.
-        def aboutMarkdown = sections[''].findAll { !it.contains('releases/latest/download') }.join('\n')
+        def aboutMarkdown = sections[''].findAll { !it.contains('github.com/sh1bot/AndroidRPNCalculator/releases') }.join('\n')
         def about = convert(aboutMarkdown)
                 .replace('<h1>Exact RPN for Android</h1>', '<h1 id="about">Exact RPN for Android</h1>')
         about += '<p>Source code: <a href="https://github.com/sh1bot/AndroidRPNCalculator">github.com/sh1bot/AndroidRPNCalculator</a></p>'
@@ -182,8 +190,14 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
             keep
         }.join('\n')
         def contactEmail = System.getenv('PRIVACY_CONTACT_EMAIL')
-        privacyMarkdown = privacyMarkdown.replace('CONTACT_EMAIL', contactEmail ? contactEmail
-                : '[sh1bot.github.io/AndroidRPNCalculator/PRIVACY](https://sh1bot.github.io/AndroidRPNCalculator/PRIVACY.html)')
+        if (contactEmail) {
+            privacyMarkdown = privacyMarkdown.replace('CONTACT_EMAIL', contactEmail)
+        } else if (stableRelease.get()) {
+            privacyMarkdown = privacyMarkdown.readLines().findAll { !it.contains('CONTACT_EMAIL') }.join('\n')
+        } else {
+            def url = "https://github.com/sh1bot/AndroidRPNCalculator/blob/${privacySourceRef.get()}/PRIVACY.md"
+            privacyMarkdown = privacyMarkdown.replace('CONTACT_EMAIL', "[View the privacy policy on GitHub](${url})")
+        }
         def privacy = convert(privacyMarkdown)
                 .replace('<h1>Privacy Policy \u2014 Exact RPN</h1>', '<h1 id="privacy">Privacy Policy</h1>')
                 .replaceAll(/(?<=>)\s+(?=<)/, '')
