@@ -24,9 +24,9 @@ Long-press a digit in stack mode to copy that level to X: `1` picks X, `2` picks
 
 `ƒ()` opens functions; `ƒ⁻¹()` opens inverse and complementary functions. Tap the active panel button again to close it. Inverse trigonometric results use the selected angle unit. Long-press `±` to apply `|x|`, the absolute value.
 
-`rem` gives Y remainder X with the sign of Y; `mod` uses the sign of X. `⌊x⌋` rounds toward negative infinity; `⌈x⌉` rounds toward positive infinity. `x!` requires a nonnegative integer. `Factorise` replaces an integer greater than 1 with its prime factors, smallest first: `84 Factorise` gives 2, 2, 3, 7, with 7 at X. The factors are left selected, so they can be copied or combined with the selection operations. Large factorisations can take time; Cancel stops them.
+`rem` gives Y remainder X with the sign of Y; `mod` uses the sign of X. `gcd` gives the greatest common divisor of Y and X, and `lcm` the least common multiple; both require integers. `⌊x⌋` rounds toward negative infinity; `⌈x⌉` rounds toward positive infinity. `x!` requires a nonnegative integer. `Factorise` replaces an integer greater than 1 with its prime factors, smallest first: `84 Factorise` gives 2, 2, 3, 7, with 7 at X. The factors are left selected, so they can be copied or combined with the selection operations. Large factorisations can take time; Cancel stops them.
 
-The constants are π, e and φ (the exact golden ratio). Long-press the `π`/`τ` key to switch it between pi and tau; the choice is remembered. Long-press `ƒ⁻¹()` in landscape to mirror the layout for left-handed use; long-press it again to switch back. A short press inserts the displayed constant. Tau is represented as exactly 2π.
+The constants are π, e and φ (the exact golden ratio); φ is on the inverse side of the e key. Long-press the `π`/`τ` key to switch it between pi and tau; the choice is remembered. Long-press `ƒ⁻¹()` in landscape to mirror the layout for left-handed use; long-press it again to switch back. A short press inserts the displayed constant. Tau is represented as exactly 2π.
 
 ## Display modes
 

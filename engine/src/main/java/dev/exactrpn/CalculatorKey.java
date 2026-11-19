@@ -18,6 +18,8 @@ public enum CalculatorKey {
     ROOT,
     REMAINDER,
     MODULO,
+    GCD,
+    LCM,
     NEGATE,
     ABS,
     SQRT,
@@ -114,7 +116,7 @@ public enum CalculatorKey {
                 """
                 PI|π||24||p
                 TAU|τ||24
-                E|e||24||e
+                E|e||24|PHI|e
                 PHI|φ||24
                 ADD|+||||+||157
                 SUBTRACT|−||||-−||156
@@ -124,6 +126,8 @@ public enum CalculatorKey {
                 ROOT|root|ˣ√y|22
                 REMAINDER|rem||20|MODULO|%
                 MODULO|mod||20
+                GCD|gcd||20|LCM
+                LCM|lcm||20
                 NEGATE|±||||||139
                 ABS|\\|x\\|
                 SQRT|√||24|SQUARE|r

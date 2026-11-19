@@ -20,6 +20,8 @@ public enum Operation {
     ROOT(CalculatorKey.ROOT, 2),
     REMAINDER(CalculatorKey.REMAINDER, 2),
     MODULO(CalculatorKey.MODULO, 2),
+    GCD(CalculatorKey.GCD, 2),
+    LCM(CalculatorKey.LCM, 2),
     NEGATE(CalculatorKey.NEGATE, 1),
     ABS(CalculatorKey.ABS, 1),
     SQRT(CalculatorKey.SQRT, 1),
@@ -112,6 +114,10 @@ public enum Operation {
             case REMAINDER:
             case MODULO:
                 return ExactFunctions.remainder(a, b, this == MODULO);
+            case GCD:
+                return new UnifiedReal(ExactFunctions.gcd(a, b));
+            case LCM:
+                return new UnifiedReal(ExactFunctions.lcm(a, b));
             case NEGATE:
                 return a.negate();
             case ABS:

@@ -660,8 +660,8 @@ public final class CalculatorKeypad extends ViewGroup {
         {
             CalculatorKey.PI,
             CalculatorKey.E,
-            CalculatorKey.PHI,
             CalculatorKey.POWER,
+            CalculatorKey.GCD,
             CalculatorKey.REMAINDER
         }
     };
