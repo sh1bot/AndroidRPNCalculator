@@ -92,6 +92,7 @@
     <string name="error_factorial_nonnegative">Factorial requires a nonnegative integer</string>
     <string name="error_factor_integer">Factorisation requires an integer</string>
     <string name="error_factor_greater_than_one">Factorisation requires an integer greater than 1</string>
+    <string name="error_probably_prime">Probably prime</string>
     <string name="error_rational_required">This operation requires rational operands</string>
     <string name="error_divide_by_zero">Cannot divide by zero</string>
     <string name="error_zero_root_degree">Root degree cannot be zero</string>

@@ -55,6 +55,7 @@ final class RemoteCalculator {
     private CompletableFuture<Bundle> pending;
     private Bundle pendingRequest;
     private Runnable helloWatchdog;
+    private volatile java.util.function.Consumer<CalculationError.Code> noticeListener;
     private final Messenger replies =
             new Messenger(
                     new Handler(
@@ -77,6 +78,14 @@ final class RemoteCalculator {
                                         pending.complete(message.getData());
                                         pending = null;
                                         pendingRequest = null;
+                                    } else if (message.what == CalculationService.NOTE
+                                            && pending != null
+                                            && message.arg1 == nextRequest) {
+                                        java.util.function.Consumer<CalculationError.Code>
+                                                listener = noticeListener;
+                                        String code = message.getData().getString("errorCode");
+                                        if (listener != null && code != null)
+                                            listener.accept(CalculationError.Code.valueOf(code));
                                     }
                                 }
                                 return true;
@@ -85,6 +94,10 @@ final class RemoteCalculator {
     RemoteCalculator(Context context, boolean temporary) {
         this.context = context.getApplicationContext();
         this.temporary = temporary;
+    }
+
+    void setNoticeListener(java.util.function.Consumer<CalculationError.Code> listener) {
+        noticeListener = listener;
     }
 
     DisplayResult evaluate(CalculationRequest request) {

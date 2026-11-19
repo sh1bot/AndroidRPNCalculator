@@ -22,7 +22,7 @@ import java.util.concurrent.Executors;
 
 /** Arithmetic runs in :calculation, so Cancel can terminate even non-interruptible work. */
 public class CalculationService extends Service {
-    static final int HELLO = 1, EVALUATE = 2;
+    static final int HELLO = 1, EVALUATE = 2, NOTE = 3;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
     private RpnCalculator cached;
     private String cachedId, cachedSession, cachedStackId;
@@ -86,7 +86,13 @@ public class CalculationService extends Service {
                                     value, v -> NumericEvaluator.read(v, request.numbers)));
                 display = DisplayResult.encode(result, null);
             } else {
-                display = arithmeticResult(request);
+                ExactFunctions.setProbablePrimeListener(
+                        value -> sendNote(client, requestId, generation));
+                try {
+                    display = arithmeticResult(request);
+                } finally {
+                    ExactFunctions.setProbablePrimeListener(null);
+                }
             }
             checkAccess();
             response.putByteArray("payload", display);
@@ -113,6 +119,21 @@ public class CalculationService extends Service {
         result.setData(response);
         try {
             client.send(result);
+        } catch (RemoteException ignored) {
+        }
+    }
+
+    // Interim notice for the request still being evaluated; the client matches it
+    // against its pending request, so a late notice can never surface.
+    private void sendNote(Messenger client, int requestId, int generation) {
+        Bundle data = new Bundle();
+        data.putString("errorCode", CalculationError.Code.PROBABLY_PRIME.name());
+        Message note = Message.obtain(null, NOTE);
+        note.arg1 = requestId;
+        note.arg2 = generation;
+        note.setData(data);
+        try {
+            client.send(note);
         } catch (RemoteException ignored) {
         }
     }
