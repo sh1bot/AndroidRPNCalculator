@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
     private LocaleNumbers numbers, localNumbers, computerNumbers, ungroupedNumbers;
     private boolean changingEntry, entryShowsRaw;
     private long shownErrorRevision = -1;
+    private long shownNoticeRevision = -1;
     private android.window.OnBackInvokedCallback backCallback;
     private LinearLayout stackRows;
     private ScrollView scroll;
@@ -1107,6 +1108,12 @@ public class MainActivity extends Activity {
                 session.temporary
                         ? getString(R.string.temporary_description, calculationStatus)
                         : status.getText());
+        long noticeRevision = session.noticeRevision;
+        if (noticeRevision != shownNoticeRevision) {
+            if (!session.notice.isEmpty()) showNotice(session.notice, false);
+            else dismissErrorNotice();
+        }
+        shownNoticeRevision = noticeRevision;
         long errorRevision = session.errorRevision;
         if (!session.error.isEmpty() && errorRevision != shownErrorRevision)
             showNotice(session.error, true);
