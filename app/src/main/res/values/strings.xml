@@ -9,6 +9,8 @@
     <string name="product_selected">Product of selected values</string>
     <string name="mean_selected">Mean of selected values</string>
     <string name="standard_deviation_selected">Standard deviation of selected values</string>
+    <string name="gcd_selected">Greatest common divisor of selected values</string>
+    <string name="lcm_selected">Least common multiple of selected values</string>
     <string name="select_status">SELECT</string>
     <string name="select_all_description">Select all stack rows</string>
     <string name="select_none_description">Clear selection</string>

@@ -255,6 +255,14 @@ final class TestCalculator {
         rowAction(() -> engine.sdRows(rows));
     }
 
+    void gcdRows(int... rows) {
+        rowAction(() -> engine.gcdRows(rows));
+    }
+
+    void lcmRows(int... rows) {
+        rowAction(() -> engine.lcmRows(rows));
+    }
+
     void transformRows(Operation operation, int... rows) {
         rowAction(() -> engine.transformRows(operation, rows));
     }

@@ -292,7 +292,12 @@ public final class CalculatorKeypad extends ViewGroup {
         Runnable hold = null;
         Operation operation = Operation.find(key);
         boolean enabled =
-                !selecting || !key.equals("Factor") && (operation == null || operation.arity != 2);
+                !selecting
+                        || !key.equals("Factor")
+                                && (operation == null
+                                        || operation.arity != 2
+                                        || key.equals("gcd")
+                                        || key.equals("lcm"));
         if (EntryEditor.isEntryKey(key)) {
             android.text.SpannableString digit =
                     new android.text.SpannableString(numbers.entry(label.toString()));
@@ -429,6 +434,16 @@ public final class CalculatorKeypad extends ViewGroup {
                         default -> {}
                     }
                 }
+            }
+            case GCD, LCM -> {
+                // In selection mode gcd and lcm fold the selected values instead of
+                // taking Y and X; the label stays, the description follows the fold.
+                if (selecting)
+                    description =
+                            string(
+                                    definition == CalculatorKey.GCD
+                                            ? R.string.gcd_selected
+                                            : R.string.lcm_selected);
             }
             case NEGATE -> hold = send(CalculatorKey.ABS.wire);
             case ENTER -> {
