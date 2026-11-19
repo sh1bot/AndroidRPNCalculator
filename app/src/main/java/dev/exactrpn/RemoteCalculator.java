@@ -21,6 +21,8 @@ import java.util.concurrent.ExecutionException;
 final class RemoteCalculator {
     // Startup (bind + HELLO) must complete promptly; arithmetic itself stays unbounded.
     private static final long HELLO_TIMEOUT_MS = 5000;
+    // Android can defer a killed service's restart by about ten seconds under memory pressure.
+    private static final long RESTART_HELLO_TIMEOUT_MS = 12000;
     static final class StartupTimeout extends IllegalStateException {
         StartupTimeout(String message) {
             super(message);
@@ -47,6 +49,7 @@ final class RemoteCalculator {
     private final boolean temporary;
     private final Handler main = new Handler(Looper.getMainLooper());
     private Messenger remote;
+    private CompletableFuture<Void> workerExit;
     private ServiceConnection connection;
     private int pid, generation, nextRequest;
     private boolean closed;
@@ -67,6 +70,7 @@ final class RemoteCalculator {
                                     }
                                     if (message.what == CalculationService.HELLO) {
                                         pid = message.arg1;
+                                        workerExit = null;
                                         if (helloWatchdog != null) {
                                             main.removeCallbacks(helloWatchdog);
                                             helloWatchdog = null;
@@ -237,8 +241,10 @@ final class RemoteCalculator {
                     }
                 };
         helloWatchdog = watchdog;
-        main.postDelayed(watchdog, HELLO_TIMEOUT_MS);
-        main.post(
+        CompletableFuture<Void> previousWorker = workerExit;
+        main.postDelayed(
+                watchdog, previousWorker == null ? HELLO_TIMEOUT_MS : RESTART_HELLO_TIMEOUT_MS);
+        Runnable startBinding =
                 () -> {
                     synchronized (RemoteCalculator.this) {
                         if (epoch != generation) return;
@@ -254,10 +260,14 @@ final class RemoteCalculator {
                                     new IllegalStateException(
                                             context.getString(R.string.process_start_failed)));
                     }
-                });
+                };
+        if (previousWorker == null) main.post(startBinding);
+        else previousWorker.thenRun(() -> main.post(startBinding));
     }
 
     private void fail(Exception error) {
+        if (pending != null && pid == 0)
+            android.util.Log.w("CalculatorWorker", "Worker startup failed", error);
         if (pending != null) pending.completeExceptionally(error);
         pending = null;
         pendingRequest = null;
@@ -265,10 +275,12 @@ final class RemoteCalculator {
     }
 
     synchronized void cancel() {
-        if (pending != null) pending.cancel(false);
+        // An idle reset only needs to discard the binding and cached checkpoint.
+        boolean evaluating = pending != null;
+        if (evaluating) pending.cancel(false);
         pending = null;
         pendingRequest = null;
-        disconnect(true);
+        disconnect(evaluating);
     }
 
     synchronized void close() {
@@ -287,12 +299,15 @@ final class RemoteCalculator {
         remoteSnapshotId = null;
         int process = pid;
         ServiceConnection binding = connection;
+        IBinder binder = remote == null ? null : remote.getBinder();
+        CompletableFuture<Void> exit = new CompletableFuture<>();
+        if (terminate && process != 0) workerExit = exit;
         pid = 0;
         remote = null;
         connection = null;
         if (binding == null && process == 0) return;
-        // Remove the binding before killing the process. Otherwise Android may schedule a
-        // crashed bound-service restart with backoff, delaying the next calculation.
+        // Unbind before killing and wait for binder death before binding again.
+        // Otherwise a new connection can attach to the dying worker and trigger restart backoff.
         Runnable release =
                 () -> {
                     if (binding != null) {
@@ -301,7 +316,14 @@ final class RemoteCalculator {
                         } catch (IllegalArgumentException ignored) {
                         }
                     }
-                    if (terminate && process != 0) android.os.Process.killProcess(process);
+                    if (terminate && process != 0) {
+                        try {
+                            binder.linkToDeath(() -> exit.complete(null), 0);
+                            android.os.Process.killProcess(process);
+                        } catch (RemoteException alreadyDead) {
+                            exit.complete(null);
+                        }
+                    }
                 };
         if (Looper.myLooper() == main.getLooper()) release.run();
         else main.post(release);

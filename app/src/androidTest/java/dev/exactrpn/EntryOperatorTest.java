@@ -233,7 +233,7 @@ public final class EntryOperatorTest {
             key(session, "REDO");
             assertEquals("12.3", session.display.entry);
             key(session, "ENTER");
-            assertFalse(session.display.editing);
+            assertFalse("ENTER failed: " + session.error, session.display.editing);
             assertEquals(Arrays.asList("12.3"), session.display.rows);
             key(session, "UNDO");
             assertEquals("12.3", session.display.entry);
@@ -406,8 +406,9 @@ public final class EntryOperatorTest {
             await("Timed out waiting for error notice", 10_000, () -> !session.busy);
             session.background = false;
             key(session, "CLEAR");
+            assertTrue("CLEAR failed: " + session.error, session.display.rows.isEmpty());
             key(session, "UNDO");
-            assertEquals(1, session.display.rows.size());
+            assertEquals("UNDO failed: " + session.error, 1, session.display.rows.size());
         } finally {
             session.close();
             assertTrue(session.awaitClosed(15, TimeUnit.SECONDS));
