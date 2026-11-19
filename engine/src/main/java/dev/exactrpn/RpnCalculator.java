@@ -349,6 +349,27 @@ public final class RpnCalculator {
         aggregateRows(Operation.MULTIPLY, indices);
     }
 
+    /** Append the greatest common divisor of the selected rows; every row must be an integer. */
+    public void gcdRows(int... indices) {
+        checkedAggregateRows(Operation.GCD, "GCD", indices);
+    }
+
+    /** Append the least common multiple of the selected rows; every row must be an integer. */
+    public void lcmRows(int... indices) {
+        checkedAggregateRows(Operation.LCM, "LCM", indices);
+    }
+
+    // The fold itself validates each element only as an operand of the running
+    // result, which a one-row selection never reaches; check every row first so
+    // the integer requirement holds for any selection size, before anything is
+    // appended.
+    private void checkedAggregateRows(Operation operation, String name, int... indices) {
+        TreeSet<Integer> rows = rowSet(indices);
+        if (rows.isEmpty()) return;
+        for (int index : rows) ExactFunctions.integer(stack.get(index), name);
+        aggregateRows(operation, indices);
+    }
+
     private void aggregateRows(Operation operation, int... indices) {
         TreeSet<Integer> rows = rowSet(indices);
         if (rows.isEmpty()) return;
