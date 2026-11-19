@@ -43,6 +43,8 @@ public final class RpnCalculator {
     private final Deque<State> undo = new History(), redo = new History();
 
     private void saveValue(UnifiedReal value, SavedValue expression) {
+        // An operation returning the same object already has an exact expression.
+        if (savedValues.containsKey(value)) return;
         savedValues.put(value, expression);
         if (!references.containsKey(value)) pendingValues.add(value);
     }
@@ -259,9 +261,13 @@ public final class RpnCalculator {
                     stack.add(top());
                 }
             } else {
+                Operation operation = Operation.find(key);
+                if (operation == null && !key.equals("Factor") && !key.equals("SWAP")
+                        && !key.equals("ROLL_UP") && !key.equals("ROLL_DOWN"))
+                    throw new IllegalArgumentException("Unknown operation");
                 commit();
                 committed = new State(this);
-                applyStackOrOperation(key);
+                applyStackOrOperation(key, operation);
                 if (!stack.isEmpty()) NumericEvaluator.read(top(), NumericRequest.DEFAULT);
             }
             remember(before);
@@ -276,7 +282,7 @@ public final class RpnCalculator {
         }
     }
 
-    private void applyStackOrOperation(String key) {
+    private void applyStackOrOperation(String key, Operation operation) {
         switch (key) {
             case "Factor":
                 need(1);
@@ -300,7 +306,7 @@ public final class RpnCalculator {
                 if (stack.size() > 1) Collections.rotate(stack, 1);
                 break;
             default:
-                applyOperation(key);
+                applyOperation(operation);
         }
     }
 
@@ -784,9 +790,7 @@ public final class RpnCalculator {
         editor.clearUndo();
     }
 
-    private void applyOperation(String key) {
-        Operation operation = Operation.find(key);
-        if (operation == null) throw new IllegalArgumentException("Unknown operation");
+    private void applyOperation(Operation operation) {
         need(operation.arity);
         UnifiedReal a = operation.arity == 0 ? null : stack.get(stack.size() - operation.arity);
         UnifiedReal b = operation.arity == 2 ? top() : null;
@@ -827,6 +831,10 @@ public final class RpnCalculator {
             if (powerNegative || power.startsWith("+")) power = power.substring(1);
             if (power.indexOf('+') >= 0 || power.indexOf('-') >= 0)
                 throw CalculationError.invalid(CalculationError.Code.INVALID_NUMBER);
+            int firstNonzero = 0;
+            while (firstNonzero < power.length() - 1 && power.charAt(firstNonzero) == '0')
+                firstNonzero++;
+            power = power.substring(firstNonzero);
             if (power.isEmpty() || power.length() > 8)
                 throw CalculationError.invalid(CalculationError.Code.NUMBER_TOO_LARGE);
             try {

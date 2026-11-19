@@ -103,6 +103,8 @@ final class ExactFunctions {
 
     static UnifiedReal root(UnifiedReal base, UnifiedReal index) {
         BigInteger degree = index.bigIntegerValue();
+        if (base.definitelyZero() && (degree != null ? degree.signum() : index.signum()) < 0)
+            throw CalculationError.arithmetic(CalculationError.Code.DIVIDE_BY_ZERO);
         if (degree == null) return base.pow(index.inverse());
         if (degree.signum() == 0)
             throw CalculationError.arithmetic(CalculationError.Code.ZERO_ROOT_DEGREE);

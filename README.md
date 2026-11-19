@@ -4,9 +4,8 @@ An RPN calculator using exact rational and constructive-real arithmetic.
 [Download the stable APK](https://github.com/sh1bot/AndroidRPNCalculator/releases/latest/download/ExactRPN.apk) · [Development builds](https://github.com/sh1bot/AndroidRPNCalculator/releases?q=0.10-dev).
 
 The arithmetic pairs exact rational arithmetic with constructive reals —
-numbers that evaluate themselves to whatever precision a result needs — so the
-digits shown are always correct, never rounded from a fixed-precision
-approximation. The approach is described by Hans-J. Boehm in
+numbers that can be evaluated at increasing precision. Approximate displays
+refine near a rounding boundary, up to a precision limit. The approach is described by Hans-J. Boehm in
 [Small-data computing: Correct calculator arithmetic](https://research.google/pubs/small-data-computing-correct-calculator-arithmetic/)
 (Communications of the ACM, August 2017); the AOSP calculator's own
 [arithmetic overview](https://android.googlesource.com/platform/packages/apps/ExactCalculator/+/7265aa3a922a7e7c0389dae4b26cca562aa777a6/docs/arithmetic-overview.html)
