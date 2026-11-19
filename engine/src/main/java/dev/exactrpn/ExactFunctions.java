@@ -19,6 +19,15 @@ import java.util.Set;
 final class ExactFunctions {
     private static final BigInteger TWO = BigInteger.valueOf(2), THREE = BigInteger.valueOf(3);
 
+    // Notified when the value being factorised passes the probable-prime filter and the
+    // expensive part — certifying it by Pocklington — is still to come. Only ever called
+    // for the original input of a factorisation, never for a factor or a cofactor.
+    private static volatile java.util.function.Consumer<BigInteger> probablePrimeListener;
+
+    static void setProbablePrimeListener(java.util.function.Consumer<BigInteger> listener) {
+        probablePrimeListener = listener;
+    }
+
     static BigInteger integer(UnifiedReal value, String name) {
         BigInteger n = value.bigIntegerValue();
         if (n == null)
@@ -119,10 +128,14 @@ final class ExactFunctions {
     }
 
     static List<BigInteger> factors(BigInteger n) {
-        return factors(n, new HashMap<>());
+        return factors(n, new HashMap<>(), n);
     }
 
-    private static List<BigInteger> factors(BigInteger n, Map<BigInteger, Boolean> proofs) {
+    // target is the original input of the top-level factorisation, or null in the
+    // recursive factorisation of n-1 inside the prover: only the input itself may
+    // raise the probable-prime notice.
+    private static List<BigInteger> factors(
+            BigInteger n, Map<BigInteger, Boolean> proofs, BigInteger target) {
         if (n.compareTo(TWO) < 0)
             throw CalculationError.invalid(CalculationError.Code.FACTOR_GREATER_THAN_ONE);
         List<BigInteger> factors = new ArrayList<>();
@@ -139,7 +152,7 @@ final class ExactFunctions {
         while (!pending.isEmpty()) {
             check();
             n = pending.pop();
-            if (provenPrime(n, proofs)) {
+            if (provenPrime(n, proofs, target)) {
                 factors.add(n);
                 continue;
             }
@@ -151,7 +164,8 @@ final class ExactFunctions {
         return factors;
     }
 
-    private static boolean provenPrime(BigInteger n, Map<BigInteger, Boolean> proofs) {
+    private static boolean provenPrime(
+            BigInteger n, Map<BigInteger, Boolean> proofs, BigInteger target) {
         if (n.bitLength() <= 64) return prime64(n);
         Boolean cached = proofs.get(n);
         if (cached != null) return cached;
@@ -161,8 +175,12 @@ final class ExactFunctions {
             proofs.put(n, false);
             return false;
         }
+        if (n.equals(target)) {
+            java.util.function.Consumer<BigInteger> listener = probablePrimeListener;
+            if (listener != null) listener.accept(n);
+        }
         BigInteger minusOne = n.subtract(BigInteger.ONE);
-        Set<BigInteger> primeDivisors = new HashSet<>(factors(minusOne, proofs));
+        Set<BigInteger> primeDivisors = new HashSet<>(factors(minusOne, proofs, null));
         for (BigInteger q : primeDivisors) {
             for (BigInteger a = TWO; ; a = a.add(BigInteger.ONE)) {
                 check();

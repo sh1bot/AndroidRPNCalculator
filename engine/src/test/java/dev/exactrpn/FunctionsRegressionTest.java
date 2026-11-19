@@ -228,4 +228,41 @@ final class FunctionsRegressionTest extends RegressionSupport {
                 CalculatorKey.command(40, 0, true, false, false),
                 "Ctrl L uses safe contextual clear");
     }
+
+    @Test
+    void probablePrimeNoticeFiresOnlyForTheInput() {
+        BigInteger mersenne89 = BigInteger.ONE.shiftLeft(89).subtract(BigInteger.ONE);
+        java.util.List<BigInteger> notices = new java.util.ArrayList<>();
+        ExactFunctions.setProbablePrimeListener(notices::add);
+        try {
+            assertEquals(
+                    java.util.Arrays.asList(mersenne89),
+                    ExactFunctions.factors(mersenne89),
+                    "large prime factorises");
+            assertEquals(
+                    java.util.Arrays.asList(mersenne89),
+                    notices,
+                    "the input itself raises the probable-prime notice, once");
+            notices.clear();
+            BigInteger smallPrime = new BigInteger("1000000007");
+            assertEquals(
+                    java.util.Arrays.asList(smallPrime, mersenne89),
+                    ExactFunctions.factors(mersenne89.multiply(smallPrime)),
+                    "rho splits a semiprime with a large prime factor");
+            assertTrue(notices.isEmpty(), "a large prime factor raises no notice");
+            assertEquals(
+                    java.util.Arrays.asList(BigInteger.valueOf(3), mersenne89),
+                    ExactFunctions.factors(mersenne89.multiply(BigInteger.valueOf(3))),
+                    "trial division strips a small factor");
+            assertTrue(notices.isEmpty(), "a stripped factor raises no notice either");
+            BigInteger mersenne61 = BigInteger.ONE.shiftLeft(61).subtract(BigInteger.ONE);
+            assertEquals(
+                    java.util.Arrays.asList(mersenne61),
+                    ExactFunctions.factors(mersenne61),
+                    "prime within 64 bits is proven directly");
+            assertTrue(notices.isEmpty(), "no notice when primality is proven at once");
+        } finally {
+            ExactFunctions.setProbablePrimeListener(null);
+        }
+    }
 }
