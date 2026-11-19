@@ -14,6 +14,8 @@
         <item>@string/root_description</item> <!-- ROOT -->
         <item>@string/remainder_description</item> <!-- REMAINDER -->
         <item>@string/modulo_description</item> <!-- MODULO -->
+        <item>@string/gcd_description</item> <!-- GCD -->
+        <item>@string/lcm_description</item> <!-- LCM -->
         <item>""</item> <!-- NEGATE -->
         <item>@string/abs_description</item> <!-- ABS -->
         <item>""</item> <!-- SQRT -->

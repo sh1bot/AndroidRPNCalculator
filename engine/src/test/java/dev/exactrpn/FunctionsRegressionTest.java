@@ -273,4 +273,47 @@ final class FunctionsRegressionTest extends RegressionSupport {
             ExactFunctions.setFactorisationNoticeListener(null);
         }
     }
+
+    @Test
+    void gcdAndLcm() {
+        assertEquals(CalculatorKey.PHI, CalculatorKey.E.inverse(), "phi is the inverse of e");
+        assertEquals(CalculatorKey.LCM, CalculatorKey.GCD.inverse(), "lcm is the inverse of gcd");
+        assertEquals("6", binary("12", "18", "gcd"), "gcd of 12 and 18");
+        assertEquals("6", binary("-12", "18", "gcd"), "gcd ignores signs");
+        assertEquals("5", binary("0", "5", "gcd"), "gcd with zero");
+        assertEquals("0", binary("0", "0", "gcd"), "gcd of zero and zero");
+        assertEquals("12", binary("4", "6", "lcm"), "lcm of 4 and 6");
+        assertEquals("12", binary("-4", "6", "lcm"), "lcm ignores signs");
+        assertEquals("0", binary("0", "7", "lcm"), "lcm with zero");
+        assertEquals(
+                "1000000007", binary("6000000042", "35000000245", "gcd"), "gcd of large multiples");
+        assertEquals(
+                "210000001470", binary("6000000042", "35000000245", "lcm"), "lcm of large multiples");
+        assertRejected("1.5", "3", "gcd", CalculationError.Code.GCD_INTEGER);
+        assertRejected("3", "2.5", "lcm", CalculationError.Code.LCM_INTEGER);
+    }
+
+    private static String binary(String a, String b, String wire) {
+        TestCalculator calculator = new TestCalculator();
+        CalculatorTestSupport.paste(calculator, a);
+        calculator.key("ENTER");
+        CalculatorTestSupport.paste(calculator, b);
+        calculator.key(wire);
+        return top(calculator).bigIntegerValue().toString();
+    }
+
+    private static void assertRejected(
+            String a, String b, String wire, CalculationError.Code code) {
+        TestCalculator calculator = new TestCalculator();
+        CalculatorTestSupport.paste(calculator, a);
+        calculator.key("ENTER");
+        CalculatorTestSupport.paste(calculator, b);
+        try {
+            calculator.key(wire);
+            throw new AssertionError(wire + " accepted a non-integer");
+        } catch (IllegalArgumentException expected) {
+            assertEquals(
+                    code, ((CalculationError) expected).code(), wire + " has its own integer error");
+        }
+    }
 }
