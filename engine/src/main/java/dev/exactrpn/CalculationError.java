@@ -13,6 +13,7 @@ public interface CalculationError {
         FACTORIAL_NONNEGATIVE,
         FACTOR_INTEGER,
         FACTOR_GREATER_THAN_ONE,
+        PROBABLY_PRIME,
         RATIONAL_REQUIRED,
         DIVIDE_BY_ZERO,
         ZERO_ROOT_DEGREE,

@@ -33,6 +33,7 @@ final class ErrorMessages {
                     case FACTORIAL_NONNEGATIVE -> R.string.error_factorial_nonnegative;
                     case FACTOR_INTEGER -> R.string.error_factor_integer;
                     case FACTOR_GREATER_THAN_ONE -> R.string.error_factor_greater_than_one;
+                    case PROBABLY_PRIME -> R.string.error_probably_prime;
                     case RATIONAL_REQUIRED -> R.string.error_rational_required;
                     case DIVIDE_BY_ZERO -> R.string.error_divide_by_zero;
                     case ZERO_ROOT_DEGREE -> R.string.error_zero_root_degree;

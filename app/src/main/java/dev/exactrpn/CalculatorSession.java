@@ -38,6 +38,9 @@ final class CalculatorSession {
     volatile long errorRevision;
     // A keypress dismisses notices from every earlier input, including unfinished requests.
     private long inputGeneration;
+    // The input generation whose in-flight evaluation may still post a notice (the
+    // probable-prime message during factorisation); zero when none is in flight.
+    private long noticeGeneration;
 
     private static final class PendingKey {
         final Command command;
@@ -92,6 +95,7 @@ final class CalculatorSession {
                 store = new CalculatorStore(context.getNoBackupFilesDir(), this::canUseSavedState);
             }
             remote = new RemoteCalculator(context, temporary);
+            remote.setNoticeListener(this::showNotice);
         }
     }
 
@@ -310,8 +314,14 @@ final class CalculatorSession {
             if (changeRadix(key, generation)) return;
             if (changeFormat(key, generation)) return;
             Display settings = display;
+            synchronized (this) {
+                noticeGeneration = generation;
+            }
             DisplayResult result = remote.evaluate(request(key));
             if (key.kind == Command.Kind.READ_VALUES) {
+                synchronized (this) {
+                    if (noticeGeneration == generation) noticeGeneration = 0;
+                }
                 java.util.StringJoiner text = new java.util.StringJoiner("\n");
                 for (NumericValue value : result.values)
                     text.add(
@@ -474,6 +484,9 @@ final class CalculatorSession {
     }
 
     private void handleFailure(Command key, long generation, RuntimeException ex) {
+        synchronized (this) {
+            if (noticeGeneration == generation) noticeGeneration = 0;
+        }
         boolean oversized =
                 ex instanceof CalculationError
                         && ((CalculationError) ex).code()
@@ -521,6 +534,7 @@ final class CalculatorSession {
                 () -> {
                     synchronized (this) {
                         checkCancelled();
+                        if (noticeGeneration == generation) noticeGeneration = 0;
                         Display before = display;
                         int selectFrom =
                                 key.kind == Command.Kind.PICK_ROWS
@@ -620,6 +634,19 @@ final class CalculatorSession {
         error = message;
         errorRevision++;
         changed();
+    }
+
+    // A notice from the evaluation still in flight (the probable-prime message during
+    // factorisation) takes the error slot until the result for that input replaces it.
+    private void showNotice(CalculationError.Code code) {
+        synchronized (this) {
+            if (noticeGeneration == 0 || noticeGeneration != inputGeneration) return;
+            error =
+                    context.getString(
+                            R.string.error_prefix, ErrorMessages.fromCode(context, code, 0));
+            errorRevision++;
+            changed();
+        }
     }
 
     private void checkCancelled() {
