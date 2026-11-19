@@ -21,6 +21,8 @@ import java.util.concurrent.ExecutionException;
 final class RemoteCalculator {
     // Startup (bind + HELLO) must complete promptly; arithmetic itself stays unbounded.
     private static final long HELLO_TIMEOUT_MS = 5000;
+    // Android can defer a killed service's restart by about ten seconds under memory pressure.
+    private static final long RESTART_HELLO_TIMEOUT_MS = 12000;
     static final class StartupTimeout extends IllegalStateException {
         StartupTimeout(String message) {
             super(message);
@@ -47,7 +49,7 @@ final class RemoteCalculator {
     private final boolean temporary;
     private final Handler main = new Handler(Looper.getMainLooper());
     private Messenger remote;
-    private CompletableFuture<Void> workerExit = CompletableFuture.completedFuture(null);
+    private CompletableFuture<Void> workerExit;
     private ServiceConnection connection;
     private int pid, generation, nextRequest;
     private boolean closed;
@@ -68,6 +70,7 @@ final class RemoteCalculator {
                                     }
                                     if (message.what == CalculationService.HELLO) {
                                         pid = message.arg1;
+                                        workerExit = null;
                                         if (helloWatchdog != null) {
                                             main.removeCallbacks(helloWatchdog);
                                             helloWatchdog = null;
@@ -238,7 +241,9 @@ final class RemoteCalculator {
                     }
                 };
         helloWatchdog = watchdog;
-        main.postDelayed(watchdog, HELLO_TIMEOUT_MS);
+        CompletableFuture<Void> previousWorker = workerExit;
+        main.postDelayed(
+                watchdog, previousWorker == null ? HELLO_TIMEOUT_MS : RESTART_HELLO_TIMEOUT_MS);
         Runnable startBinding =
                 () -> {
                     synchronized (RemoteCalculator.this) {
@@ -256,10 +261,13 @@ final class RemoteCalculator {
                                             context.getString(R.string.process_start_failed)));
                     }
                 };
-        workerExit.thenRun(() -> main.post(startBinding));
+        if (previousWorker == null) main.post(startBinding);
+        else previousWorker.thenRun(() -> main.post(startBinding));
     }
 
     private void fail(Exception error) {
+        if (pending != null && pid == 0)
+            android.util.Log.w("CalculatorWorker", "Worker startup failed", error);
         if (pending != null) pending.completeExceptionally(error);
         pending = null;
         pendingRequest = null;
