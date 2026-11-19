@@ -9,6 +9,8 @@
     <string name="product_selected">Product of selected values</string>
     <string name="mean_selected">Mean of selected values</string>
     <string name="standard_deviation_selected">Standard deviation of selected values</string>
+    <string name="gcd_selected">Greatest common divisor of selected values</string>
+    <string name="lcm_selected">Least common multiple of selected values</string>
     <string name="select_status">SELECT</string>
     <string name="select_all_description">Select all stack rows</string>
     <string name="select_none_description">Clear selection</string>
@@ -94,6 +96,8 @@
     <string name="error_factor_greater_than_one">Factorisation requires an integer greater than 1</string>
     <string name="error_probably_prime">Probably prime</string>
     <string name="error_definitely_composite">Definitely composite</string>
+    <string name="error_gcd_integer">GCD requires integers</string>
+    <string name="error_lcm_integer">LCM requires integers</string>
     <string name="error_rational_required">This operation requires rational operands</string>
     <string name="error_divide_by_zero">Cannot divide by zero</string>
     <string name="error_zero_root_degree">Root degree cannot be zero</string>
@@ -109,6 +113,8 @@
     <string name="base_power_description">%1$d to the power of X</string>
     <string name="phi_description">Golden ratio</string>
     <string name="modulo_description">Y modulo X, with the sign of X</string>
+    <string name="gcd_description">Greatest common divisor of Y and X</string>
+    <string name="lcm_description">Least common multiple of Y and X</string>
     <string name="open_functions">Open functions</string>
     <string name="close_functions">Close functions</string>
     <string name="open_complements">Open inverse and complementary functions</string>

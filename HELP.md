@@ -24,9 +24,9 @@ Long-press a digit in stack mode to copy that level to X: `1` picks X, `2` picks
 
 `ƒ()` opens functions; `ƒ⁻¹()` opens inverse and complementary functions. Tap the active panel button again to close it. Inverse trigonometric results use the selected angle unit. Long-press `±` to apply `|x|`, the absolute value.
 
-`rem` gives Y remainder X with the sign of Y; `mod` uses the sign of X. `⌊x⌋` rounds toward negative infinity; `⌈x⌉` rounds toward positive infinity. `x!` requires a nonnegative integer. `Factorise` replaces an integer greater than 1 with its prime factors, smallest first: `84 Factorise` gives 2, 2, 3, 7, with 7 at X. The factors are left selected, so they can be copied or combined with the selection operations. Large factorisations can take time; Cancel stops them.
+`rem` gives Y remainder X with the sign of Y; `mod` uses the sign of X. `gcd` gives the greatest common divisor of Y and X, and `lcm` the least common multiple; both require integers. `⌊x⌋` rounds toward negative infinity; `⌈x⌉` rounds toward positive infinity. `x!` requires a nonnegative integer. `Factorise` replaces an integer greater than 1 with its prime factors, smallest first: `84 Factorise` gives 2, 2, 3, 7, with 7 at X. The factors are left selected, so they can be copied or combined with the selection operations. Large factorisations can take time; Cancel stops them.
 
-The constants are π, e and φ (the exact golden ratio). Long-press the `π`/`τ` key to switch it between pi and tau; the choice is remembered. Long-press `ƒ⁻¹()` in landscape to mirror the layout for left-handed use; long-press it again to switch back. A short press inserts the displayed constant. Tau is represented as exactly 2π.
+The constants are π, e and φ (the exact golden ratio); φ is on the inverse side of the e key. Long-press the `π`/`τ` key to switch it between pi and tau; the choice is remembered. Long-press `ƒ⁻¹()` in landscape to mirror the layout for left-handed use; long-press it again to switch back. A short press inserts the displayed constant. Tau is represented as exactly 2π.
 
 ## Display modes
 
@@ -42,7 +42,7 @@ Long-press `Enter` or press Ctrl+V to paste. Multiple non-empty lines are added 
 
 Tap a stack row to select it; checkboxes appear, and tapping a row toggles it. Selection is available only in stack mode. Back/Escape exits selection.
 
-In selection mode `Enter` becomes `Pick`, `AC` selects all rows, and the undo key clears the selection. Trash drops the selected values, the swap key copies the selected values to the clipboard (one value per line), `+` becomes `Σ` (sum), `×` becomes `Π` (product), `÷` becomes `μ` (mean), and `−` becomes `σ` (standard deviation). Pick, sum, product, mean and standard deviation append results without removing the originals; Pick leaves the copies selected, so a following operation applies to them rather than the originals. Unary functions replace each selected value in place as one undoable action; if any result fails, none are changed. Binary operations are unavailable while selecting.
+In selection mode `Enter` becomes `Pick`, `AC` selects all rows, and the undo key clears the selection. Trash drops the selected values, the swap key copies the selected values to the clipboard (one value per line), `+` becomes `Σ` (sum), `×` becomes `Π` (product), `÷` becomes `μ` (mean), and `−` becomes `σ` (standard deviation). `gcd` and `lcm` fold the selected values in the same way, and require every selected value to be an integer. Pick, sum, product, mean, standard deviation, gcd and lcm append results without removing the originals; Pick leaves the copies selected, so a following operation applies to them rather than the originals. Unary functions replace each selected value in place as one undoable action; if any result fails, none are changed. Other binary operations are unavailable while selecting.
 
 Root mean square is composed, not built in: select the values, apply `x²` from the `ƒ⁻¹()` panel to square each selected value in place, press `μ` to append the mean of the squares, clear the selection with the undo key, then press `√`.
 

@@ -17,6 +17,8 @@ public final class Command {
         PRODUCT_ROWS(true),
         MEAN_ROWS(true),
         SD_ROWS(true),
+        GCD_ROWS(true),
+        LCM_ROWS(true),
         READ_VALUES(true),
         UNARY_ROWS(true),
         HOLD_DIGIT,
@@ -214,6 +216,12 @@ public final class Command {
                 break;
             case SD_ROWS:
                 calculator.sdRows(rows);
+                break;
+            case GCD_ROWS:
+                calculator.gcdRows(rows);
+                break;
+            case LCM_ROWS:
+                calculator.lcmRows(rows);
                 break;
             case HOLD_DIGIT:
                 calculator.holdDigit(text);

@@ -154,7 +154,9 @@ final class CalculatorSession {
                     || command.kind == Command.Kind.SUM_ROWS
                     || command.kind == Command.Kind.PRODUCT_ROWS
                     || command.kind == Command.Kind.MEAN_ROWS
-                    || command.kind == Command.Kind.SD_ROWS) operationPending = true;
+                    || command.kind == Command.Kind.SD_ROWS
+                    || command.kind == Command.Kind.GCD_ROWS
+                    || command.kind == Command.Kind.LCM_ROWS) operationPending = true;
             start = !busy;
             if (start) {
                 cancelRequested = false;

@@ -37,10 +37,23 @@ final class ExactFunctions {
         BigInteger n = value.bigIntegerValue();
         if (n == null)
             throw CalculationError.invalid(
-                    name.equals("Factorial")
-                            ? CalculationError.Code.FACTORIAL_INTEGER
-                            : CalculationError.Code.FACTOR_INTEGER);
+                    switch (name) {
+                        case "Factorial" -> CalculationError.Code.FACTORIAL_INTEGER;
+                        case "GCD" -> CalculationError.Code.GCD_INTEGER;
+                        case "LCM" -> CalculationError.Code.LCM_INTEGER;
+                        default -> CalculationError.Code.FACTOR_INTEGER;
+                    });
         return n;
+    }
+
+    static BigInteger gcd(UnifiedReal a, UnifiedReal b) {
+        return integer(a, "GCD").gcd(integer(b, "GCD"));
+    }
+
+    static BigInteger lcm(UnifiedReal a, UnifiedReal b) {
+        BigInteger x = integer(a, "LCM"), y = integer(b, "LCM");
+        if (x.signum() == 0 || y.signum() == 0) return BigInteger.ZERO;
+        return x.divide(x.gcd(y)).multiply(y).abs();
     }
 
     /** Rational floor is exact; real floor refines an enclosure until one integer is certain. */

@@ -448,6 +448,12 @@ public class MainActivity extends Activity {
             case "−":
                 action = Command.Kind.SD_ROWS;
                 break;
+            case "gcd":
+                action = Command.Kind.GCD_ROWS;
+                break;
+            case "lcm":
+                action = Command.Kind.LCM_ROWS;
+                break;
             case "SWAP":
                 if (!stackActionAllowed(session.display)) return true;
                 session.copyRows(

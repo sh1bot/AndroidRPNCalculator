@@ -162,7 +162,7 @@ public final class RpnCalculator {
     public static byte[] saveWithEntry(byte[] calculation, EntryEditor draft, boolean newBranch)
             throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(calculation));
-        if (in.readInt() != 0x52504e39)
+        if (in.readInt() != 0x52504e3a)
             throw new IOException("Unsupported snapshot for entry replacement");
         int length = in.readInt();
         if (length < 0 || length > calculation.length - 13)
@@ -347,6 +347,27 @@ public final class RpnCalculator {
     /** Append the exact product without consuming any selected value or unfinished entry. */
     public void productRows(int... indices) {
         aggregateRows(Operation.MULTIPLY, indices);
+    }
+
+    /** Append the greatest common divisor of the selected rows; every row must be an integer. */
+    public void gcdRows(int... indices) {
+        checkedAggregateRows(Operation.GCD, "GCD", indices);
+    }
+
+    /** Append the least common multiple of the selected rows; every row must be an integer. */
+    public void lcmRows(int... indices) {
+        checkedAggregateRows(Operation.LCM, "LCM", indices);
+    }
+
+    // The fold itself validates each element only as an operand of the running
+    // result, which a one-row selection never reaches; check every row first so
+    // the integer requirement holds for any selection size, before anything is
+    // appended.
+    private void checkedAggregateRows(Operation operation, String name, int... indices) {
+        TreeSet<Integer> rows = rowSet(indices);
+        if (rows.isEmpty()) return;
+        for (int index : rows) ExactFunctions.integer(stack.get(index), name);
+        aggregateRows(operation, indices);
     }
 
     private void aggregateRows(Operation operation, int... indices) {
@@ -566,7 +587,7 @@ public final class RpnCalculator {
                 body.length + currentEntry.length + 13, CalculationLimits.ARITHMETIC_BYTES);
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(0x52504e39);
+        out.writeInt(0x52504e3a);
         out.writeInt(body.length);
         out.write(body);
         out.writeInt(currentEntry.length);
@@ -642,7 +663,7 @@ public final class RpnCalculator {
     public static RpnCalculator load(byte[] bytes) throws IOException {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(bytes));
-            if (in.readInt() != 0x52504e39) throw new IOException("Unknown saved state version");
+            if (in.readInt() != 0x52504e3a) throw new IOException("Unknown saved state version");
             byte[] body = readSection(in), entry = readSection(in);
             boolean branch = in.readBoolean();
             if (in.available() != 0) throw new IOException("Trailing saved state data");
