@@ -9,7 +9,7 @@ status=0
 gradle --no-daemon --console=plain :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest,dev.exactrpn.CancellationRecovery || status=$?
 cp -R app/build/reports/androidTests/connected "$reports/ordinary"
-adb logcat -d -s GlyphProbe:I MenuTest:E "*:S"
+adb logcat -d -s GlyphProbe:I MenuTest:E CalculatorWorker:W "*:S"
 adb logcat -d -b crash
 # Each recovery attempt runs in a fresh instrumentation invocation. Keep every report.
 results=app/build/outputs/androidTest-results/connected
@@ -43,11 +43,15 @@ if len(cases) != 1:
     sys.exit(1)
 case = cases[0]
 failure = case.find("failure")
+watchdog = "Recovery worker startup watchdog expired"
 sys.exit(0 if (
     case.get("classname") == "dev.exactrpn.CancellationTest"
     and case.get("name") == "cancelStopsWorkerAndPreservesCheckpoint"
     and failure is not None
-    and "Recovery worker startup watchdog expired" in failure.get("message", "")
+    and (
+        watchdog in failure.get("message", "")
+        or watchdog in "".join(failure.itertext())
+    )
 ) else 1)
 PYTHON
     then
