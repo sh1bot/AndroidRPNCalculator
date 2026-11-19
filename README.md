@@ -1,7 +1,7 @@
 # Exact RPN for Android
 
 An RPN calculator using exact rational and constructive-real arithmetic.
-[Download the latest development APK](https://github.com/sh1bot/AndroidRPNCalculator/releases/latest/download/ExactRPN.apk).
+[Download the stable APK](https://github.com/sh1bot/AndroidRPNCalculator/releases/latest/download/ExactRPN.apk) · [Development builds](https://github.com/sh1bot/AndroidRPNCalculator/releases?q=0.10-dev).
 
 The arithmetic pairs exact rational arithmetic with constructive reals —
 numbers that evaluate themselves to whatever precision a result needs — so the

@@ -104,6 +104,10 @@ jobs:
             cp app/build/outputs/apk/release/app-release.apk dist/ExactRPN.apk
             cp app/build/outputs/bundle/release/app-release.aab dist/ExactRPN.aab
           else
+            if [[ -n "$RELEASE_VERSION" ]]; then
+              echo "::error::Stable releases require the permanent signing key."
+              exit 1
+            fi
             if [[ -n "$ANDROID_KEYSTORE_PASSWORD$ANDROID_KEY_ALIAS$ANDROID_KEY_PASSWORD" ]]; then
               echo "::error::Signing secrets are incomplete: ANDROID_KEYSTORE_BASE64 is missing."
               exit 1
@@ -198,7 +202,7 @@ jobs:
       - name: Verify bundled offline licence texts
         run: |
           python3 - <<'PYTHON'
-          import pathlib, re, zipfile
+          import os, pathlib, re, zipfile
           import html
           with zipfile.ZipFile("dist/ExactRPN.apk") as apk:
               assert apk.getinfo("assets/docs.html").compress_type == zipfile.ZIP_DEFLATED
@@ -206,6 +210,11 @@ jobs:
               document = apk.read("assets/docs.html").decode()
               assert "Your first calculation" in document and "Keyboard" in document
               assert "⇅" in document
+              privacy_blob = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/blob/{os.environ['GITHUB_SHA']}/PRIVACY.md"
+              if os.environ.get("RELEASE_VERSION"):
+                  assert privacy_blob not in document
+              elif os.environ["GITHUB_EVENT_NAME"] == "pull_request":
+                  assert privacy_blob in document
               # The bundled licence texts are flowed into paragraphs and
               # their bare URLs wrapped in links, so compare word sequences
               # rather than bytes: each text's words, in order, must appear
@@ -269,10 +278,71 @@ jobs:
           retention-days: 90
 
 
-  publish:
-    name: Publish latest development release
+  stable_device_checks:
+    name: Run device suite before stable publishing
     needs: build
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request' && needs.build.outputs.permanent_signing == 'true'
+    if: inputs.release_version != '' && github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && needs.build.outputs.permanent_signing == 'true'
+    uses: ./.github/workflows/device-checks.yml
+
+  release_smoke:
+    name: Install and exercise the release APK
+    needs: build
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' && inputs.release_version != '' && needs.build.outputs.permanent_signing == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ExactRPN
+          path: dist
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: 'platform-tools'
+      - name: Prepare APKs for install and upgrade
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PERMANENT_SIGNING: ${{ needs.build.outputs.permanent_signing }}
+        run: |
+          set -euo pipefail
+          sdkmanager "build-tools;35.0.0"
+          previous=$(gh api --paginate --slurp "repos/$GH_REPO/releases" --jq '[.[][] | select(.draft == false and .prerelease == false and (.tag_name | test("^v[0-9]+[.][0-9]+([.][0-9]+)?$")))][0].tag_name // empty')
+          if [[ -n "$previous" ]]; then
+            gh release download "$previous" --pattern ExactRPN.apk --output dist/previous.apk
+          fi
+          if [[ "$PERMANENT_SIGNING" != true ]]; then
+            # PRs exercise the same minified binaries with a disposable signing key.
+            keytool -genkeypair -keystore "$RUNNER_TEMP/smoke.p12" -storepass smoke-test \
+              -alias smoke -keyalg RSA -keysize 2048 -dname CN=SmokeTest -validity 1
+            for apk in dist/*.apk; do
+              "$ANDROID_HOME/build-tools/35.0.0/apksigner" sign --ks "$RUNNER_TEMP/smoke.p12" \
+                --ks-pass pass:smoke-test --ks-key-alias smoke "$apk"
+            done
+          fi
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Smoke-test clean install and upgrade
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          disable-animations: true
+          script: bash scripts/smoke-release.sh
+
+  publish:
+    name: Publish release
+    needs: [build, stable_device_checks, release_smoke]
+    if: >-
+      !cancelled() && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+      && needs.build.result == 'success' && needs.build.outputs.permanent_signing == 'true'
+      && (inputs.release_version == '' ||
+        (needs.stable_device_checks.result == 'success' && needs.release_smoke.result == 'success'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -310,6 +380,8 @@ jobs:
 
           Download **ExactRPN.apk** to install or update. **ExactRPN.aab** is for uploading to Google Play. Both use the project's permanent signing key.
 
+          Privacy policy: https://github.com/$GH_REPO/blob/$BUILD_SHA/PRIVACY.md
+
           Source commit: $BUILD_SHA
           EOF
             gh release create "v$RELEASE_VERSION" dist/ExactRPN.apk dist/ExactRPN.aab dist/SHA256SUMS.txt --target "$BUILD_SHA" --title "Exact RPN $RELEASE_VERSION" --notes-file "$RUNNER_TEMP/release-notes.md" --latest
@@ -325,7 +397,7 @@ jobs:
           current_tag=$(gh api --paginate --slurp "repos/$GH_REPO/releases" | jq -r '[.[][] | select(.name == "Latest development build")][0].tag_name // empty')
           if [[ -z "$current_tag" ]]; then
             current_tag="$tag"
-            gh release create "$tag" --target "$BUILD_SHA" --title "Latest development build" --draft --notes-file "$RUNNER_TEMP/release-notes.md"
+            gh release create "$tag" --target "$BUILD_SHA" --title "Latest development build" --draft --prerelease --latest=false --notes-file "$RUNNER_TEMP/release-notes.md"
           fi
           gh release upload "$current_tag" dist/ExactRPN.apk dist/ExactRPN.aab dist/SHA256SUMS.txt --clobber
-          gh release edit "$current_tag" --tag "$tag" --target "$BUILD_SHA" --title "Latest development build" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false --latest
+          gh release edit "$current_tag" --tag "$tag" --target "$BUILD_SHA" --title "Latest development build" --notes-file "$RUNNER_TEMP/release-notes.md" --draft=false --prerelease --latest=false
