@@ -43,11 +43,15 @@ if len(cases) != 1:
     sys.exit(1)
 case = cases[0]
 failure = case.find("failure")
+watchdog = "Recovery worker startup watchdog expired"
 sys.exit(0 if (
     case.get("classname") == "dev.exactrpn.CancellationTest"
     and case.get("name") == "cancelStopsWorkerAndPreservesCheckpoint"
     and failure is not None
-    and "Recovery worker startup watchdog expired" in failure.get("message", "")
+    and (
+        watchdog in failure.get("message", "")
+        or watchdog in "".join(failure.itertext())
+    )
 ) else 1)
 PYTHON
     then
