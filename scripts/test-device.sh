@@ -9,7 +9,7 @@ status=0
 gradle --no-daemon --console=plain :app:connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.notAnnotation=androidx.test.filters.LargeTest,dev.exactrpn.CancellationRecovery || status=$?
 cp -R app/build/reports/androidTests/connected "$reports/ordinary"
-adb logcat -d -s GlyphProbe:I MenuTest:E "*:S"
+adb logcat -d -s GlyphProbe:I MenuTest:E CalculatorWorker:W "*:S"
 adb logcat -d -b crash
 # Each recovery attempt runs in a fresh instrumentation invocation. Keep every report.
 results=app/build/outputs/androidTest-results/connected
