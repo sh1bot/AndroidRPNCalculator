@@ -19,13 +19,18 @@ import java.util.Set;
 final class ExactFunctions {
     private static final BigInteger TWO = BigInteger.valueOf(2), THREE = BigInteger.valueOf(3);
 
-    // Notified when the value being factorised passes the probable-prime filter and the
-    // expensive part — certifying it by Pocklington — is still to come. Only ever called
-    // for the original input of a factorisation, never for a factor or a cofactor.
-    private static volatile java.util.function.Consumer<BigInteger> probablePrimeListener;
+    // Notified when a value being factorised passes the probable-prime filter and the
+    // expensive part — certifying it by Pocklington — is still to come. The code says
+    // what is known at that point: PROBABLY_PRIME when the candidate is the original
+    // input itself, DEFINITELY_COMPOSITE when it is a proper cofactor of the input
+    // (which proves the input composite). Never called from the recursive
+    // factorisation of n-1 inside the prover, where nothing follows about the input.
+    private static volatile java.util.function.Consumer<CalculationError.Code>
+            factorisationNoticeListener;
 
-    static void setProbablePrimeListener(java.util.function.Consumer<BigInteger> listener) {
-        probablePrimeListener = listener;
+    static void setFactorisationNoticeListener(
+            java.util.function.Consumer<CalculationError.Code> listener) {
+        factorisationNoticeListener = listener;
     }
 
     static BigInteger integer(UnifiedReal value, String name) {
@@ -145,8 +150,8 @@ final class ExactFunctions {
     }
 
     // target is the original input of the top-level factorisation, or null in the
-    // recursive factorisation of n-1 inside the prover: only the input itself may
-    // raise the probable-prime notice.
+    // recursive factorisation of n-1 inside the prover: only a non-null target may
+    // raise a factorisation notice.
     private static List<BigInteger> factors(
             BigInteger n, Map<BigInteger, Boolean> proofs, BigInteger target) {
         if (n.compareTo(TWO) < 0)
@@ -188,9 +193,14 @@ final class ExactFunctions {
             proofs.put(n, false);
             return false;
         }
-        if (n.equals(target)) {
-            java.util.function.Consumer<BigInteger> listener = probablePrimeListener;
-            if (listener != null) listener.accept(n);
+        if (target != null) {
+            java.util.function.Consumer<CalculationError.Code> listener =
+                    factorisationNoticeListener;
+            if (listener != null)
+                listener.accept(
+                        n.equals(target)
+                                ? CalculationError.Code.PROBABLY_PRIME
+                                : CalculationError.Code.DEFINITELY_COMPOSITE);
         }
         BigInteger minusOne = n.subtract(BigInteger.ONE);
         Set<BigInteger> primeDivisors = new HashSet<>(factors(minusOne, proofs, null));

@@ -93,6 +93,7 @@
     <string name="error_factor_integer">Factorisation requires an integer</string>
     <string name="error_factor_greater_than_one">Factorisation requires an integer greater than 1</string>
     <string name="error_probably_prime">Probably prime</string>
+    <string name="error_definitely_composite">Definitely composite</string>
     <string name="error_gcd_integer">GCD requires integers</string>
     <string name="error_lcm_integer">LCM requires integers</string>
     <string name="error_rational_required">This operation requires rational operands</string>

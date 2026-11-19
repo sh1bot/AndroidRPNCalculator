@@ -14,6 +14,7 @@ public interface CalculationError {
         FACTOR_INTEGER,
         FACTOR_GREATER_THAN_ONE,
         PROBABLY_PRIME,
+        DEFINITELY_COMPOSITE,
         GCD_INTEGER,
         LCM_INTEGER,
         RATIONAL_REQUIRED,

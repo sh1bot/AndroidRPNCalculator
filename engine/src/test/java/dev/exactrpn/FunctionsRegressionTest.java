@@ -230,17 +230,17 @@ final class FunctionsRegressionTest extends RegressionSupport {
     }
 
     @Test
-    void probablePrimeNoticeFiresOnlyForTheInput() {
+    void factorisationNotices() {
         BigInteger mersenne89 = BigInteger.ONE.shiftLeft(89).subtract(BigInteger.ONE);
-        java.util.List<BigInteger> notices = new java.util.ArrayList<>();
-        ExactFunctions.setProbablePrimeListener(notices::add);
+        java.util.List<CalculationError.Code> notices = new java.util.ArrayList<>();
+        ExactFunctions.setFactorisationNoticeListener(notices::add);
         try {
             assertEquals(
                     java.util.Arrays.asList(mersenne89),
                     ExactFunctions.factors(mersenne89),
                     "large prime factorises");
             assertEquals(
-                    java.util.Arrays.asList(mersenne89),
+                    java.util.Arrays.asList(CalculationError.Code.PROBABLY_PRIME),
                     notices,
                     "the input itself raises the probable-prime notice, once");
             notices.clear();
@@ -249,12 +249,20 @@ final class FunctionsRegressionTest extends RegressionSupport {
                     java.util.Arrays.asList(smallPrime, mersenne89),
                     ExactFunctions.factors(mersenne89.multiply(smallPrime)),
                     "rho splits a semiprime with a large prime factor");
-            assertTrue(notices.isEmpty(), "a large prime factor raises no notice");
+            assertEquals(
+                    java.util.Arrays.asList(CalculationError.Code.DEFINITELY_COMPOSITE),
+                    notices,
+                    "certifying a proper cofactor proves the input composite");
+            notices.clear();
             assertEquals(
                     java.util.Arrays.asList(BigInteger.valueOf(3), mersenne89),
                     ExactFunctions.factors(mersenne89.multiply(BigInteger.valueOf(3))),
                     "trial division strips a small factor");
-            assertTrue(notices.isEmpty(), "a stripped factor raises no notice either");
+            assertEquals(
+                    java.util.Arrays.asList(CalculationError.Code.DEFINITELY_COMPOSITE),
+                    notices,
+                    "a stripped factor leaves the same conclusion");
+            notices.clear();
             BigInteger mersenne61 = BigInteger.ONE.shiftLeft(61).subtract(BigInteger.ONE);
             assertEquals(
                     java.util.Arrays.asList(mersenne61),
@@ -262,7 +270,7 @@ final class FunctionsRegressionTest extends RegressionSupport {
                     "prime within 64 bits is proven directly");
             assertTrue(notices.isEmpty(), "no notice when primality is proven at once");
         } finally {
-            ExactFunctions.setProbablePrimeListener(null);
+            ExactFunctions.setFactorisationNoticeListener(null);
         }
     }
 

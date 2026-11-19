@@ -34,6 +34,7 @@ final class ErrorMessages {
                     case FACTOR_INTEGER -> R.string.error_factor_integer;
                     case FACTOR_GREATER_THAN_ONE -> R.string.error_factor_greater_than_one;
                     case PROBABLY_PRIME -> R.string.error_probably_prime;
+                    case DEFINITELY_COMPOSITE -> R.string.error_definitely_composite;
                     case GCD_INTEGER -> R.string.error_gcd_integer;
                     case LCM_INTEGER -> R.string.error_lcm_integer;
                     case RATIONAL_REQUIRED -> R.string.error_rational_required;
