@@ -1,0 +1,11 @@
+Exact RPN is a scientific calculator for Android that uses reverse Polish notation. Enter your operands first, then choose an operation. The stack keeps intermediate results visible so you can reuse them in the next calculation.
+
+• Exact rational and constructive-real arithmetic
+• Decimal, hexadecimal and dozenal input and display
+• Decimal, mixed-fraction and improper-fraction display modes
+• Scientific and engineering notation, with degrees, radians and gradians
+• Scientific functions, prime factorisation, greatest common divisor and least common multiple
+• Stack selection, copy and paste, undo and redo
+• Hardware keyboard support, light and dark themes, and offline help
+
+The app works offline and requests no Android permissions.

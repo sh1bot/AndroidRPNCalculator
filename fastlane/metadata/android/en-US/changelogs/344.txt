@@ -1,0 +1,1 @@
+Negative powers and roots of zero now report division by zero. Improved rounding near display midpoints, prevented repeated no-op calculations from growing saved state, and fixed edge cases in number entry.

@@ -1,0 +1,1 @@
+Scientific RPN calculator with exact arithmetic and offline help
