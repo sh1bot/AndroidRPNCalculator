@@ -212,7 +212,7 @@ def generateLicenseAssets = tasks.register('generateLicenseAssets') {
         new File(directory, 'docs.html').setText(document, 'UTF-8')
     }
 }
-android.sourceSets.main.assets.srcDir(licenseAssets)
+android.sourceSets.main.assets.srcDir(licenseAssets.get().asFile)
 tasks.named('preBuild').configure { dependsOn generateLicenseAssets }
 
 // AGP already runs aapt2 optimize before packaging release resources. Its
