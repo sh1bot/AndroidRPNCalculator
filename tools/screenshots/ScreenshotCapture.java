@@ -26,7 +26,7 @@ import java.lang.reflect.Field;
 import dev.exactrpn.MainActivity;
 
 /**
- * Shoots the screenshot set for screenshots/ at the set's native geometry:
+ * Shoots the F-Droid screenshot set at the set's native geometry:
  * portrait 420x840dp and landscape 840x420dp at xxhdpi (1260x2520 /
  * 2520x1260 px), under Robolectric's native graphics. Not part of the test
  * suite: it is run by tools/screenshots/capture-screenshots.sh, which also
@@ -234,7 +234,7 @@ public final class ScreenshotCapture {
     public void hero() throws Exception {
         launch(PORTRAIT_DARK);
         heroStack();
-        shoot("Calculator.png");
+        shoot("01-calculator.png");
     }
 
     @Test
@@ -242,7 +242,7 @@ public final class ScreenshotCapture {
         launch(PORTRAIT_DARK);
         tap("FRACTION"); // mixed
         fractionStack();
-        shoot("Calculator-mixed-fraction.png");
+        shoot("04-calculator-mixed-fraction.png");
     }
 
     @Test
@@ -253,7 +253,7 @@ public final class ScreenshotCapture {
         tap("FORMAT"); // SCI -> ENG
         fractionStack();
         type("1", "2", "3", "4", "5", "6", "7", "8", "9", "ENTER");
-        shoot("Calculator-improper-fraction.png");
+        shoot("09-calculator-improper-fraction.png");
     }
 
     @Test
@@ -261,7 +261,7 @@ public final class ScreenshotCapture {
         launch(PORTRAIT_DARK);
         type("1", "2", "ENTER", "1", "8", "ENTER");
         tap("FUNCTIONS");
-        shoot("Calculator-f.png");
+        shoot("03-calculator-f.png");
     }
 
     @Test
@@ -271,7 +271,7 @@ public final class ScreenshotCapture {
         tap("FUNCTIONS");
         longTapText("π"); // pi -> tau
         tap("COMPLEMENTS");
-        shoot("Calculator-finv.png");
+        shoot("10-calculator-finv.png");
     }
 
     @Test
@@ -287,7 +287,7 @@ public final class ScreenshotCapture {
         tap("ENTER");
         type("2", "÷");
         tap("FUNCTIONS"); // shows the constant log12 label
-        shoot("Calculator-dozenal.png");
+        shoot("06-calculator-dozenal.png");
     }
 
     @Test
@@ -295,7 +295,7 @@ public final class ScreenshotCapture {
         launch(PORTRAIT);
         tap("RADIX"); // hex
         hexStack();
-        shoot("Calculator-hex-light-mode.png");
+        shoot("05-calculator-hex-light-mode.png");
     }
 
     @Test
@@ -303,7 +303,7 @@ public final class ScreenshotCapture {
         launch(PORTRAIT_DARK);
         tap("RADIX"); // hex
         hexStack();
-        shoot("Calculator-hex.png");
+        shoot("11-calculator-hex.png");
     }
 
     private int checkedCount(int rows) {
@@ -369,7 +369,7 @@ public final class ScreenshotCapture {
                             }
                         });
         settle();
-        shoot("Calculator-selection.png");
+        shoot("07-calculator-selection.png");
     }
 
     @Test
@@ -381,7 +381,7 @@ public final class ScreenshotCapture {
         tapText("↊");
         type("5", ".");
         tapText("↋"); // entry left uncommitted: turned digits in the entry row
-        shoot("Calculator-entry-mode.png");
+        shoot("02-calculator-entry-mode.png");
     }
 
     @Test
@@ -391,7 +391,7 @@ public final class ScreenshotCapture {
         type("5", "ENTER", "2", "÷");
         type("7", "ENTER", "3", "÷");
         type("2", "2", "ENTER", "7", "÷");
-        shoot("Calculator-landscape.png");
+        shoot("08-calculator-landscape.png");
     }
 
     @Test
@@ -402,6 +402,6 @@ public final class ScreenshotCapture {
         type("7", "ENTER", "3", "÷");
         type("2", "2", "ENTER", "7", "÷");
         tap("FUNCTIONS");
-        shoot("Calculator-landscape-f.png");
+        shoot("12-calculator-landscape-f.png");
     }
 }
