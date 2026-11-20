@@ -316,8 +316,8 @@ public final class EntryEditor {
 
     boolean applyEntryKey(String key, boolean clearsEntry) {
         if (isEntryKey(key)) {
-            editing = true;
             if (key.equals(".")) {
+                editing = true;
                 if (raw) {
                     replaceSelection(Character.toString(inputProfile.decimal));
                     resolveExplicitDecimal();
@@ -329,6 +329,7 @@ public final class EntryEditor {
             } else {
                 int digit = Character.digit(key.charAt(0), inputProfile.radix);
                 if (digit < 0) return true;
+                editing = true;
                 replaceSelection(
                         Character.toString(
                                 Character.toUpperCase(

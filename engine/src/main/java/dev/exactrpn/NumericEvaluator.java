@@ -31,19 +31,33 @@ public final class NumericEvaluator {
                     rational);
         }
         int digits = request.limit.toString(request.base).length() + 12;
-        StringFloatRep rep = value.crValue().toStringFloatRep(digits, request.base, -1000);
-        if (rep.sign == 0)
-            return new NumericValue(BigInteger.ZERO, request.base, 0, false, 1000, null);
-        BigInteger mantissa = new BigInteger(rep.mantissa, request.base);
-        if (rep.sign < 0) mantissa = mantissa.negate();
-        int scale = rep.mantissa.length() - rep.exponent;
-        BigInteger power = BigInteger.valueOf(request.base).pow(Math.abs(scale));
-        NumericValue result =
-                round(
-                        new RationalValue(
-                                scale < 0 ? mantissa.multiply(power) : mantissa,
-                                scale > 0 ? power : BigInteger.ONE),
-                        request);
+        NumericValue result;
+        for (int extra = 0; ; extra += 16) {
+            StringFloatRep rep = value.crValue().toStringFloatRep(digits + extra, request.base, -1000);
+            if (rep.sign == 0)
+                return new NumericValue(BigInteger.ZERO, request.base, 0, false, 1000, null);
+            BigInteger mantissa = new BigInteger(rep.mantissa, request.base);
+            if (rep.sign < 0) mantissa = mantissa.negate();
+            int scale = rep.mantissa.length() - rep.exponent;
+            BigInteger power = BigInteger.valueOf(request.base).pow(Math.abs(scale));
+            BigInteger denominator = scale > 0 ? power : BigInteger.ONE;
+            BigInteger unit = scale < 0 ? power : BigInteger.ONE;
+            BigInteger numerator = mantissa.multiply(unit);
+            // Constructive-real approximation and mantissa truncation together
+            // contribute less than two units at the last reported digit.
+            BigInteger error = unit.shiftLeft(1);
+            NumericValue lower = round(new RationalValue(numerator.subtract(error), denominator), request);
+            NumericValue upper = round(new RationalValue(numerator.add(error), denominator), request);
+            if (lower.scale == upper.scale && lower.num.equals(upper.num)) {
+                result = lower;
+                break;
+            }
+            // A constructive real may be indistinguishable from an exact midpoint.
+            if (extra == 96) {
+                result = round(new RationalValue(numerator, denominator), request);
+                break;
+            }
+        }
         BigInteger factor = BigInteger.valueOf(request.base).pow(Math.abs(result.scale));
         UnifiedReal rounded =
                 new UnifiedReal(

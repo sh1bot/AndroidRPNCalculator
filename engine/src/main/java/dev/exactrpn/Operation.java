@@ -108,6 +108,8 @@ public enum Operation {
                     throw CalculationError.arithmetic(CalculationError.Code.DIVIDE_BY_ZERO);
                 return a.divide(b);
             case POWER:
+                if (a.definitelyZero() && b.signum() < 0)
+                    throw CalculationError.arithmetic(CalculationError.Code.DIVIDE_BY_ZERO);
                 return a.pow(b);
             case ROOT:
                 return ExactFunctions.root(a, b);
