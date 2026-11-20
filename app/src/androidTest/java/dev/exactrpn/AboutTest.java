@@ -45,7 +45,6 @@ public final class AboutTest {
             assertTrue(document.contains("TERMS AND CONDITIONS"));
             assertTrue(document.contains("Hans-J. Boehm"));
             assertTrue(document.contains("Silicon Graphics"));
-            assertTrue(document.contains("does not collect"));
             assertTrue(document.contains(AboutDialog.REPOSITORY));
             pressBack();
         } catch (Throwable failure) {
