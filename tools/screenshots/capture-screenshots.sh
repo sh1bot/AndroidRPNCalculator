@@ -1,5 +1,5 @@
 #!/bin/bash
-# Capture the screenshot set for screenshots/ with Robolectric and optimise
+# Capture the screenshot set for the F-Droid listing with Robolectric and optimise
 # it the way the set was made: quantise to 32 colours (pngquant), then
 # zopflipng.
 #
@@ -7,7 +7,7 @@
 # set's scenes at its native geometry — portrait 420x840dp and landscape
 # 840x420dp at xxhdpi — under Robolectric's native graphics and writes raw
 # PNGs. This script compiles it, runs it via the bundled TestRunner, and
-# optimises the results into screenshots/.
+# optimises the results into the Fastlane phone screenshot directory.
 #
 # The script does not build the app. The caller provides, via the
 # environment:
@@ -24,7 +24,7 @@
 #                    (used with robolectric.offline=true)
 # Optional:
 #   SCREENSHOTS_DIR  destination for the optimised PNGs (default:
-#                    <repo>/screenshots)
+#                    <repo>/fastlane/metadata/android/en-US/images/phoneScreenshots)
 #   RAW_DIR          raw capture directory (default: <repo>/build/screenshots-raw)
 #   TOOLS_CLASSES    where the capture classes are compiled (default:
 #                    <repo>/build/screenshot-tools)
@@ -32,7 +32,7 @@
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")/../.." && pwd)
-SCREENSHOTS_DIR=${SCREENSHOTS_DIR:-$REPO/screenshots}
+SCREENSHOTS_DIR=${SCREENSHOTS_DIR:-$REPO/fastlane/metadata/android/en-US/images/phoneScreenshots}
 RAW_DIR=${RAW_DIR:-$REPO/build/screenshots-raw}
 TOOLS_CLASSES=${TOOLS_CLASSES:-$REPO/build/screenshot-tools}
 DEPS=$(ls "$ROBOLECTRIC_DEPS"/*.jar | tr '\n' ':')
