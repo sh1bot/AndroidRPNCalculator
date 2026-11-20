@@ -65,20 +65,17 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          PRIVACY_CONTACT_EMAIL: ${{ secrets.PRIVACY_CONTACT_EMAIL }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist
-          # Record a public-input, unsigned release before introducing either
-          # the signing key or the private contact address. This is directly
-          # comparable with the unsigned release built for pull requests.
+          # Record an unsigned release before introducing the signing key.
+          # This is directly comparable with the release built for pull requests.
           env \
             -u ANDROID_KEYSTORE_PATH \
             -u ANDROID_KEYSTORE_PASSWORD \
             -u ANDROID_KEY_ALIAS \
             -u ANDROID_KEY_PASSWORD \
-            -u PRIVACY_CONTACT_EMAIL \
             gradle --no-daemon --console=plain :engine:regression :app:assembleRelease :app:bundleRelease
           python3 - <<'PYTHON'
           import hashlib, json, os, pathlib
@@ -202,7 +199,7 @@ jobs:
       - name: Verify bundled offline licence texts
         run: |
           python3 - <<'PYTHON'
-          import os, pathlib, re, zipfile
+          import pathlib, re, zipfile
           import html
           with zipfile.ZipFile("dist/ExactRPN.apk") as apk:
               assert apk.getinfo("assets/docs.html").compress_type == zipfile.ZIP_DEFLATED
@@ -210,11 +207,6 @@ jobs:
               document = apk.read("assets/docs.html").decode()
               assert "Your first calculation" in document and "Keyboard" in document
               assert "⇅" in document
-              privacy_blob = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/blob/{os.environ['GITHUB_SHA']}/PRIVACY.md"
-              if os.environ.get("RELEASE_VERSION"):
-                  assert privacy_blob not in document
-              elif os.environ["GITHUB_EVENT_NAME"] == "pull_request":
-                  assert privacy_blob in document
               # The bundled licence texts are flowed into paragraphs and
               # their bare URLs wrapped in links, so compare word sequences
               # rather than bytes: each text's words, in order, must appear
@@ -379,8 +371,6 @@ jobs:
           Exact arithmetic RPN calculator for Android, using Google's arithmetic engine. Includes scientific functions, decimal and fraction display, stack selection, keyboard support, and offline help and licenses.
 
           Download **ExactRPN.apk** to install or update. **ExactRPN.aab** is for uploading to Google Play. Both use the project's permanent signing key.
-
-          Privacy policy: https://github.com/$GH_REPO/blob/$BUILD_SHA/PRIVACY.md
 
           Source commit: $BUILD_SHA
           EOF
